@@ -694,7 +694,12 @@ export type Database = {
         Returns: undefined
       }
       complete_ticket: {
-        Args: { p_fishery_data?: Json; p_log_id: string }
+        Args: {
+          p_fishery_data?: Json
+          p_latitude: number
+          p_log_id: string
+          p_longitude: number
+        }
         Returns: {
           completed_at: string
           log_id: string

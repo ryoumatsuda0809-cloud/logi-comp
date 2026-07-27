@@ -252,12 +252,18 @@ export function useDailyTimeline(): DailyTimelineResult {
     fetchTimeline();
   }, [fetchTimeline]);
 
+  // 待機料の集計対象は「実際の待機イベント」に限定する。
+  // 作業時間（loading_start/departure等）を誤って合算すると待機料が過大計算されるため、
+  // waiting_start（GPS由来の荷待ち）と voice_report（音声申告の荷待ち）のみを対象とする。
+  const isWaitEligible = (i: UnifiedTimelineItem) =>
+    i.eventType === "waiting_start" || i.eventType === "voice_report";
+
   const totalWaitMinutes = timeline
-    .filter((i) => i.waitMinutes && i.waitMinutes > 0)
+    .filter((i) => isWaitEligible(i) && i.waitMinutes && i.waitMinutes > 0)
     .reduce((sum, i) => sum + (i.waitMinutes ?? 0), 0);
 
   const totalWaitCost = timeline
-    .filter((i) => i.estimatedCost && i.estimatedCost > 0)
+    .filter((i) => isWaitEligible(i) && i.estimatedCost && i.estimatedCost > 0)
     .reduce((sum, i) => sum + (i.estimatedCost ?? 0), 0);
 
   const hasDiscrepancy = detectDiscrepancies(timeline);

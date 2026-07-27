@@ -103,6 +103,9 @@ export function convertWaitLogsToTimeline(
     }
 
     // 4. 作業終了（出発）→ 作業時間を計算
+    //    作業時間（荷役時間）は待機時間ではないため waitMinutes には入れない。
+    //    ここに work 時間を waitMinutes として渡すと、待機料課金（calcWaitCost）に
+    //    作業時間が混入し、待機料を過大計算してしまう。
     if (log.work_end_time) {
       const workMins = diffMinutes(log.work_start_time, log.work_end_time);
       if (workMins !== null) totalWorkMinutes += workMins;
@@ -112,7 +115,6 @@ export function convertWaitLogsToTimeline(
         timestamp: log.work_end_time,
         eventType: "departure",
         locationName: facilityName,
-        waitMinutes: workMins ?? undefined,
         ticketNumber: log.ticket_number,
       });
     }

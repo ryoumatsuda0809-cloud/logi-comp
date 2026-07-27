@@ -229,15 +229,34 @@ export function useEvidence(): UseEvidenceReturn {
   }, [user, position]);
 
   // ── 作業完了打刻（complete_ticket RPC）──
+  // 出発時のGPS座標は到着時の座標を再利用せず、作業完了操作その場で再取得する。
   const completeTicket = useCallback(
     async (fisheryData: FisheryData) => {
       if (!lastResult) {
         setCompleteError("到着打刻が見つかりません。先に到着打刻を行ってください。");
         return;
       }
+      if (!position) {
+        setCompleteError("GPS座標を取得中です。取得完了後に再試行してください。");
+        return;
+      }
 
       setIsCompleting(true);
       setCompleteError(null);
+
+      // 高精度GPSを新たに取得（失敗時は watchPosition の最終値を使用）
+      let coords: GpsPosition = position;
+      try {
+        coords = await new Promise<GpsPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            (err) => reject(err),
+            { enableHighAccuracy: true, timeout: 10000 }
+          );
+        });
+      } catch {
+        // watchPosition の最終座標で続行
+      }
 
       const payload: Json = {
         species: fisheryData.species,
@@ -247,6 +266,8 @@ export function useEvidence(): UseEvidenceReturn {
 
       const { data, error } = await supabase.rpc("complete_ticket", {
         p_log_id: lastResult.logId,
+        p_latitude: coords.lat,
+        p_longitude: coords.lon,
         p_fishery_data: payload,
       });
 
@@ -256,6 +277,8 @@ export function useEvidence(): UseEvidenceReturn {
           setCompleteError("この打刻はすでに完了済みです。");
         } else if (msg.includes("no_data_found") || msg.includes("見つからない")) {
           setCompleteError("待機ログが見つかりません。再度到着打刻を行ってください。");
+        } else if (msg.includes("GPS座標")) {
+          setCompleteError("GPS座標を取得できませんでした。取得完了後に再試行してください。");
         } else if (msg.includes("check_violation") || msg.includes("ステータス遷移")) {
           setCompleteError("打刻のステータスが無効です。管理者にご連絡ください。");
         } else {
@@ -279,7 +302,7 @@ export function useEvidence(): UseEvidenceReturn {
       });
       setIsCompleting(false);
     },
-    [lastResult]
+    [lastResult, position]
   );
 
   const clearSubmitError = useCallback(() => setSubmitError(null), []);

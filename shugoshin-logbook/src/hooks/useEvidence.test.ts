@@ -246,3 +246,120 @@ describe("useEvidence — バックエンド送信の結合テスト", () => {
     expect(result.current.isSubmitting).toBe(false);
   });
 });
+
+describe("useEvidence.completeTicket — 作業完了打刻の結合テスト", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRpc.mockReset();
+  });
+
+  async function arriveFirst(latOverride?: number, lonOverride?: number) {
+    setupGeolocation({ lat: latOverride ?? 34.1, lon: lonOverride ?? 135.4 });
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "get_nearest_facility") {
+        return Promise.resolve({
+          data: [{ id: "facility-001", name: "下関中央物流センター" }],
+          error: null,
+        });
+      }
+      if (rpcName === "issue_ticket") {
+        return Promise.resolve({
+          data: [
+            {
+              log_id: "log-abc-789",
+              new_ticket_number: 7,
+              new_arrival_time: "2026-04-18T09:00:00.000Z",
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const hook = renderHook(() => useEvidence());
+    await waitFor(() => {
+      expect(hook.result.current.position).not.toBeNull();
+    });
+    await act(async () => {
+      await hook.result.current.submitEvidence();
+    });
+    expect(hook.result.current.lastResult).not.toBeNull();
+    return hook;
+  }
+
+  it("正常系: 作業完了操作その場のGPS座標がp_latitude/p_longitudeとしてRPCに渡ること", async () => {
+    const { result } = await arriveFirst(34.1, 135.4);
+
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "complete_ticket") {
+        return Promise.resolve({
+          data: [
+            {
+              log_id: "log-abc-789",
+              completed_at: "2026-04-18T10:30:00.000Z",
+              waiting_minutes: 90,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    await act(async () => {
+      await result.current.completeTicket({
+        species: "マグロ",
+        weight_kg: 120.5,
+        catch_number: "SH20260720TEST01",
+      });
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("complete_ticket", {
+      p_log_id: "log-abc-789",
+      p_latitude: 34.1,
+      p_longitude: 135.4,
+      p_fishery_data: {
+        species: "マグロ",
+        weight_kg: 120.5,
+        catch_number: "SH20260720TEST01",
+      },
+    });
+
+    expect(result.current.completeResult).toEqual({
+      logId: "log-abc-789",
+      completedAt: "2026-04-18T10:30:00.000Z",
+      waitingMinutes: 90,
+    });
+    expect(result.current.completeError).toBeNull();
+    expect(result.current.isCompleting).toBe(false);
+  });
+
+  it("異常系: DBがGPS座標必須の[法的保護]エラーを返した場合、日本語メッセージに変換されること", async () => {
+    const { result } = await arriveFirst();
+
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "complete_ticket") {
+        return Promise.resolve({
+          data: null,
+          error: { message: "[法的保護] GPS座標(latitude/longitude)は必須です。" },
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    await act(async () => {
+      await result.current.completeTicket({
+        species: "マグロ",
+        weight_kg: 120.5,
+        catch_number: "SH20260720TEST01",
+      });
+    });
+
+    expect(result.current.completeError).toBe(
+      "GPS座標を取得できませんでした。取得完了後に再試行してください。"
+    );
+    expect(result.current.completeResult).toBeNull();
+    expect(result.current.isCompleting).toBe(false);
+  });
+});
