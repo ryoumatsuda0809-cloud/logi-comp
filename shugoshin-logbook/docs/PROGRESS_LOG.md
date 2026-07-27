@@ -10,7 +10,9 @@
 
 1. [進行中の修正 #1: complete_ticket の GPS 座標詰みバグ](#進行中の修正-1-complete_ticket-の-gps-座標詰みバグ)
 2. [進行中の修正 #2: 待機料の過大計算バグ](#進行中の修正-2-待機料の過大計算バグ)
-3. [未着手・要検討事項](#未着手要検討事項)
+3. [進行中の修正 #3: Rule 1 の DB レベル強制 と waiting_evidence 署名確定](#進行中の修正-3-rule-1-の-db-レベル強制-と-waiting_evidence-署名確定)
+4. [コミット・適用状況（2026-07-27時点）](#コミット適用状況2026-07-27時点)
+5. [未着手・要検討事項](#未着手要検討事項)
 
 ---
 
@@ -64,13 +66,58 @@
 
 ### ステータス
 
-未コミット。既存の `waitLogToTimeline` / `useDailyTimeline` を利用する他画面（ダッシュボード集計等）への影響範囲は未確認。
+コミット済み（[#4](#コミット適用状況2026-07-27時点)参照）。既存の `waitLogToTimeline` / `useDailyTimeline` を利用する他画面（ダッシュボード集計等）への影響範囲は未確認。
+
+---
+
+## 進行中の修正 #3: Rule 1 の DB レベル強制 と waiting_evidence 署名確定
+
+修正 #1 の作業と並行して、以下2件のmigrationが追加された。
+
+### `20260720130000_enforce_wait_log_geofence_rls.sql`
+
+CLAUDE.md Rule 1（RPCチェーン必須）はこれまでコード規約のみで守られており、DBレベルでは強制されていなかった。`wait_logs` の RLS ポリシーが `WITH CHECK (user_id = auth.uid())` のみだったため、`facility_id` / `latitude` / `longitude` / `ticket_number` / `status` を authenticated ロールが自由な値で直接 INSERT でき、500m ジオフェンス判定（Rule 2 のフェイルセーフ）を完全にバイパスできる状態だった。
+
+対策として `wait_logs` に BEFORE INSERT トリガー (`enforce_wait_log_geofence`) を追加し、`get_nearest_facility` と同じ Haversine 式で施設からの距離を計算、`radius` 超過時は INSERT 自体を拒否する。さらに `issue_ticket` が `SECURITY DEFINER` であることを自己検証した上で、直接INSERTを許可する既存RLSポリシーを削除する（`issue_ticket` の実装が変わっていた場合は安全側に倒してスキップし、NOTICEで通知）。
+
+### `20260720140000_sign_waiting_evidence_on_complete.sql`
+
+`waiting_evidence` は `is_signed = true` の行の変更・削除を全ロールで禁止する改ざん防止トリガーを備えていたが、**`is_signed` を true にセットするコードがアプリ全体に一つも存在しなかった**。そのため全ての証拠行が永久に `is_signed = false` のままで、ドライバー本人がRLS経由で自分のGPS座標・水産物情報をいつでも書き換えられる状態だった（CLAUDE.md/CONTEXT_LEGAL_SPEC.md が要求する不変性が実質無効化されていた）。
+
+対策として `complete_ticket`（修正#1の版をベースに再定義）が、完了処理の最後に同一 `wait_log_id` に紐づく到着・出発両方の `waiting_evidence` 行を `is_signed = true` に更新し、以後の改ざんを不可能にする。
+
+### ステータス
+
+コミット済み（[#4](#コミット適用状況2026-07-27時点)参照）。DB未検証（後述）。
+
+---
+
+## コミット・適用状況（2026-07-27時点）
+
+| 項目 | 状態 |
+|------|------|
+| `tsc --noEmit` | ✅ エラーなし |
+| `vitest run` | ✅ `useEvidence.test.ts`(5)・`waitLogToTimeline.test.ts`(2)は全通過。`EvidenceCollector.test.tsx`(3)は失敗するが、`git stash`で確認済みの通り**今回の変更と無関係の既存バグ**（修正前のコミットでも同じ理由で失敗） |
+| ローカルコミット | ✅ `34080ee` "Fix complete_ticket GPS deadlock and waiting-fee overbilling"（修正#1〜#3 + 本ドキュメント + 回帰テストをまとめて1コミット） |
+| Supabaseへのmigration適用 | ⛔ **保留中**。理由は下記 |
+| リモートpush | 未実施 |
+
+### ブロッカー: Supabase MCP接続先プロジェクトの不一致
+
+migration適用を試みる前に `mcp__claude_ai_Supabase__list_projects` で確認したところ、MCP経由で見えるプロジェクトは **`Bloomers Project`**（id: `cpvuugafgabiqekvbiiy`, org: `smnpzpiqeqnmltultqtu`）の1件のみだった。一方、このリポジトリの `supabase/config.toml` は `project_id = "qojhncmwmsqzycxrfezv"` を指しており、**一致していない**。
+
+誤ったプロジェクトへDDLを適用する事故を避けるため、適用は中止した。ユーザーに確認したところ「適用を中止する」を選択（正しいプロジェクトへの接続切り替えが必要という認識）。
+
+**再開時に必要な作業**:
+1. Supabase MCPの認証を `qojhncmwmsqzycxrfezv` が属する正しい組織/アカウントで再接続する、または
+2. `supabase` CLI（本マシンには未インストール）を導入し `supabase login` → `supabase link --project-ref qojhncmwmsqzycxrfezv` → `supabase db push` で適用する
+3. 上記いずれかで接続確認後、未適用のmigration3件（`20260720120000` / `20260720130000` / `20260720140000`）を本番に適用する
 
 ---
 
 ## 未着手・要検討事項
 
-- [ ] migration `20260720120000_fix_complete_ticket_gps_coords.sql` の実環境（Supabase）への適用
-- [ ] `npm run build` / `tsc --noEmit` による型チェック確認
-- [ ] 上記2修正のコミット・PR化
+- [ ] Supabase MCP接続先を正しいプロジェクト（`qojhncmwmsqzycxrfezv`）に切り替える
+- [ ] 未適用のmigration3件を実環境（Supabase）へ適用
+- [ ] リモートへのpush（現状ローカルコミットのみ、origin/mainに1コミット先行）
 - [ ] 待機料自動計算ロジックまわりの他の集計箇所（荷主向けダッシュボード等、`IMPLEMENTATION_SUMMARY.md` の「次のステップ」参照）に同様の混入バグがないかの横展開確認
