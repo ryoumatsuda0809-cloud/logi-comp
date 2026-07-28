@@ -144,9 +144,13 @@ describe("useEvidence — バックエンド送信の結合テスト", () => {
       user_lng: 135.456789, // 実装の coords.lon が user_lng パラメータに変換されること
     });
 
-    // ② issue_ticket RPC に施設 ID が正しく渡されること（DB 側で INSERT が行われる）
+    // ② issue_ticket RPC に施設IDとGPS座標が渡されること
+    //    座標を渡さないと wait_logs の enforce_gps_not_null トリガーに拒否され、
+    //    到着打刻が記録できない（本番で実際に発生していた）
     expect(mockRpc).toHaveBeenCalledWith("issue_ticket", {
       p_facility_id: "facility-001",
+      p_latitude: 34.123456,
+      p_longitude: 135.456789,
     });
 
     // ③ lastResult にレスポンスが正しくマッピングされること
@@ -333,6 +337,59 @@ describe("useEvidence.completeTicket — 作業完了打刻の結合テスト", 
     });
     expect(result.current.completeError).toBeNull();
     expect(result.current.isCompleting).toBe(false);
+  });
+
+  it("cancelTicket: DBのcancel_ticket RPCを呼び、成功時にlastResultがクリアされること", async () => {
+    const { result } = await arriveFirst();
+
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "cancel_ticket") {
+        return Promise.resolve({
+          data: [{ log_id: "log-abc-789", cancelled_at: "2026-07-28T01:00:00.000Z" }],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    await act(async () => {
+      await result.current.cancelTicket();
+    });
+
+    // DBへ取消が伝わること（ローカルstateのクリアだけで終わらせない）
+    expect(mockRpc).toHaveBeenCalledWith("cancel_ticket", {
+      p_log_id: "log-abc-789",
+    });
+    expect(result.current.lastResult).toBeNull();
+    expect(result.current.cancelError).toBeNull();
+    expect(result.current.isCancelling).toBe(false);
+  });
+
+  it("cancelTicket: 署名済みで取消拒否された場合、lastResultを消さずエラーを表示すること", async () => {
+    const { result } = await arriveFirst();
+
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "cancel_ticket") {
+        return Promise.resolve({
+          data: null,
+          error: {
+            message: "[法的保護] 署名済みエビデンスが存在するため、この打刻は取り消せません。",
+          },
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    await act(async () => {
+      await result.current.cancelTicket();
+    });
+
+    expect(result.current.cancelError).toBe(
+      "この打刻は確定済みのため取り消せません。管理者にご連絡ください。"
+    );
+    // 取消に失敗した以上、画面上の打刻は残したままにする
+    expect(result.current.lastResult).not.toBeNull();
+    expect(result.current.isCancelling).toBe(false);
   });
 
   it("異常系: DBがGPS座標必須の[法的保護]エラーを返した場合、日本語メッセージに変換されること", async () => {

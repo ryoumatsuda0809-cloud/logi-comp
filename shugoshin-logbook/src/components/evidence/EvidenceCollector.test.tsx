@@ -23,9 +23,15 @@ vi.mock("@/integrations/supabase/client", () => ({
         data: { subscription: { unsubscribe: vi.fn() } },
       })),
     },
+    // 状態復元クエリ（wait_logs）のチェーンを完全にモックする。
+    // in / order / limit が欠けていると復元処理が例外で止まり、
+    // 画面が「打刻状態を確認中...」のまま先に進まなくなる。
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     })),
   },

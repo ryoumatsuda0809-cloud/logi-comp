@@ -693,6 +693,13 @@ export type Database = {
         Args: { p_log_id: string; p_new_status: string }
         Returns: undefined
       }
+      cancel_ticket: {
+        Args: { p_log_id: string }
+        Returns: {
+          cancelled_at: string
+          log_id: string
+        }[]
+      }
       complete_ticket: {
         Args: {
           p_fishery_data?: Json
@@ -768,7 +775,11 @@ export type Database = {
         Returns: boolean
       }
       issue_ticket: {
-        Args: { p_facility_id: string }
+        Args: {
+          p_facility_id: string
+          p_latitude: number
+          p_longitude: number
+        }
         Returns: {
           log_id: string
           new_arrival_time: string

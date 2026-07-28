@@ -56,6 +56,11 @@ export interface UseEvidenceReturn {
   completeTicket: (fisheryData: FisheryData) => Promise<void>;
   clearCompleteError: () => void;
   resetForNext: () => void;
+  // 打刻取消フロー
+  isCancelling: boolean;
+  cancelError: string | null;
+  cancelTicket: () => Promise<void>;
+  clearCancelError: () => void;
   // 状態復元中フラグ
   isRestoringState: boolean;
 }
@@ -70,6 +75,8 @@ export function useEvidence(): UseEvidenceReturn {
   const [completeResult, setCompleteResult] = useState<CompleteResult | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [isRestoringState, setIsRestoringState] = useState(true);
 
   // ── 連続GPS監視 ──
@@ -187,9 +194,14 @@ export function useEvidence(): UseEvidenceReturn {
     const facility = facilities[0];
 
     // Step 3: issue_ticket RPC で wait_logs を INSERT
+    // GPS座標はDB側で必須。500mジオフェンス判定もサーバーサイドで行われる。
     const { data: ticketData, error: ticketError } = await supabase.rpc(
       "issue_ticket",
-      { p_facility_id: facility.id }
+      {
+        p_facility_id: facility.id,
+        p_latitude: coords.lat,
+        p_longitude: coords.lon,
+      }
     );
 
     if (ticketError) {
@@ -305,9 +317,42 @@ export function useEvidence(): UseEvidenceReturn {
     [lastResult, position]
   );
 
+  // ── 打刻取消（cancel_ticket RPC）──
+  // DBの status を 'cancelled' に確定させる。レコードは削除せず監査証跡を保全する。
+  const cancelTicket = useCallback(async () => {
+    if (!lastResult) return;
+
+    setIsCancelling(true);
+    setCancelError(null);
+
+    const { error } = await supabase.rpc("cancel_ticket", {
+      p_log_id: lastResult.logId,
+    });
+
+    if (error) {
+      const msg = error.message ?? "";
+      if (msg.includes("署名済み")) {
+        setCancelError("この打刻は確定済みのため取り消せません。管理者にご連絡ください。");
+      } else if (msg.includes("no_data_found") || msg.includes("見つからない")) {
+        setCancelError("待機ログが見つかりません。画面を再読み込みしてください。");
+      } else if (msg.includes("取り消せません") || msg.includes("check_violation")) {
+        setCancelError("この打刻はすでに完了または取消済みです。");
+      } else {
+        setCancelError(`打刻の取り消しに失敗しました（${msg}）。再試行してください。`);
+      }
+      setIsCancelling(false);
+      return;
+    }
+
+    setLastResult(null);
+    setCompleteResult(null);
+    setIsCancelling(false);
+  }, [lastResult]);
+
   const clearSubmitError = useCallback(() => setSubmitError(null), []);
   const clearResult = useCallback(() => setLastResult(null), []);
   const clearCompleteError = useCallback(() => setCompleteError(null), []);
+  const clearCancelError = useCallback(() => setCancelError(null), []);
   const resetForNext = useCallback(() => {
     setLastResult(null);
     setCompleteResult(null);
@@ -328,6 +373,10 @@ export function useEvidence(): UseEvidenceReturn {
     completeTicket,
     clearCompleteError,
     resetForNext,
+    isCancelling,
+    cancelError,
+    cancelTicket,
+    clearCancelError,
     isRestoringState,
   };
 }

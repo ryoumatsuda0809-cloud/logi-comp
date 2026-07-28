@@ -6,6 +6,12 @@ import { useEvidence } from "@/hooks/useEvidence";
 import { useToast } from "@/hooks/use-toast";
 import { FisheryForm } from "@/components/evidence/FisheryForm";
 import type { FisheryData } from "@/hooks/useEvidence";
+import {
+  isStaleTicket,
+  elapsedMs,
+  formatElapsed,
+  formatArrivalDateTime,
+} from "@/lib/staleTicket";
 
 export function EvidenceCollector() {
   const {
@@ -16,13 +22,16 @@ export function EvidenceCollector() {
     lastResult,
     submitEvidence,
     clearSubmitError,
-    clearResult,
     completeResult,
     isCompleting,
     completeError,
     completeTicket,
     clearCompleteError,
     resetForNext,
+    isCancelling,
+    cancelError,
+    cancelTicket,
+    clearCancelError,
     isRestoringState,
   } = useEvidence();
 
@@ -40,9 +49,27 @@ export function EvidenceCollector() {
     clearCompleteError();
   }, [completeError, toast, clearCompleteError]);
 
+  // cancelError をトースト通知に変換
+  useEffect(() => {
+    if (!cancelError) return;
+    toast({
+      variant: "destructive",
+      title: "打刻取消エラー",
+      description: cancelError,
+    });
+    clearCancelError();
+  }, [cancelError, toast, clearCancelError]);
+
   const isGpsReady = position !== null && !gpsError;
   // GPS未取得・エラー・送信中はボタンを物理ロック
   const isButtonLocked = !isGpsReady || isSubmitting;
+
+  // 完了打刻の押し忘れ疑い（16時間以上経過した到着打刻）を検知する。
+  // 気づかず完了すると待機時間が実経過時間として法的記録に残るため警告する。
+  const isStale = lastResult ? isStaleTicket(lastResult.arrivalTime) : false;
+  const staleElapsed = lastResult
+    ? formatElapsed(elapsedMs(lastResult.arrivalTime))
+    : "";
 
   const isFisheryDataValid =
     Boolean(fisheryData.species?.trim()) &&
@@ -58,6 +85,12 @@ export function EvidenceCollector() {
   // State B → A リセット時に水産物フォームもクリア
   const handleResetForNext = () => {
     resetForNext();
+    setFisheryData({});
+  };
+
+  // 打刻取消: DBの status を cancelled に確定させてからフォームをクリアする
+  const handleCancelTicket = async () => {
+    await cancelTicket();
     setFisheryData({});
   };
 
@@ -211,13 +244,27 @@ export function EvidenceCollector() {
               {lastResult.facilityName}
             </p>
             <p className="text-xs text-muted-foreground">
-              {new Date(lastResult.arrivalTime).toLocaleTimeString("ja-JP", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              到着記録
+              {formatArrivalDateTime(lastResult.arrivalTime)} 到着記録
             </p>
           </div>
+
+          {/* 押し忘れ疑いの警告（16時間以上経過した打刻） */}
+          {isStale && (
+            <Alert variant="destructive">
+              <AlertTitle>⚠️ 前日以前の打刻が残っています</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>
+                  この打刻は{formatArrivalDateTime(lastResult.arrivalTime)}の記録で、
+                  すでに{staleElapsed}が経過しています。完了打刻を押し忘れた可能性があります。
+                </span>
+                <span>
+                  このまま作業完了すると、待機時間が{staleElapsed}として法的記録に保存され、
+                  待機料の請求根拠が不正確になります。記録が誤りの場合は
+                  「打刻を取り消す」を押してください。
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* 水産物情報フォーム */}
           <FisheryForm value={fisheryData} onChange={setFisheryData} />
@@ -294,18 +341,27 @@ export function EvidenceCollector() {
         </>
       )}
 
-      {/* State B: 到着後のリセットボタン（作業前のキャンセル用） */}
+      {/* State B: 到着後の打刻取消（DBの status を cancelled に確定させる） */}
       {lastResult && !completeResult && (
         <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-muted-foreground"
-          onClick={() => {
-            clearResult();
-            setFisheryData({});
-          }}
+          variant={isStale ? "outline" : "ghost"}
+          size={isStale ? "lg" : "sm"}
+          disabled={isCancelling}
+          className={
+            isStale
+              ? "w-full border-destructive text-destructive hover:bg-destructive/10 font-semibold"
+              : "w-full text-muted-foreground"
+          }
+          onClick={handleCancelTicket}
         >
-          打刻を取り消す
+          {isCancelling ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              取り消し中...
+            </span>
+          ) : (
+            "打刻を取り消す"
+          )}
         </Button>
       )}
     </div>
