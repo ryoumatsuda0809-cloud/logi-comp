@@ -159,11 +159,55 @@ describe("useEvidence — バックエンド送信の結合テスト", () => {
       ticketNumber: 7,
       arrivalTime: "2026-04-18T09:00:00.000Z",
       facilityName: "下関中央物流センター",
+      // 届出番号未登録の施設では null（16桁の直接入力にフォールバックする）
+      facilityNotificationNumber: null,
     });
 
     // ④ エラーなし・送信中フラグ解除
     expect(result.current.submitError).toBeNull();
     expect(result.current.isSubmitting).toBe(false);
+  });
+
+  it("施設に届出番号が登録されていればlastResultに引き継がれる（漁獲番号の自動組み立てに使う）", async () => {
+    setupGeolocation();
+
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "get_nearest_facility") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "facility-001",
+              name: "下関南風泊市場",
+              notification_number: "1234567",
+            },
+          ],
+          error: null,
+        });
+      }
+      if (rpcName === "issue_ticket") {
+        return Promise.resolve({
+          data: [
+            {
+              log_id: "log-1",
+              new_ticket_number: 1,
+              new_arrival_time: "2026-07-28T09:00:00.000Z",
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { result } = renderHook(() => useEvidence());
+    await waitFor(() => {
+      expect(result.current.position).not.toBeNull();
+    });
+    await act(async () => {
+      await result.current.submitEvidence();
+    });
+
+    expect(result.current.lastResult?.facilityNotificationNumber).toBe("1234567");
   });
 
   // ── 異常系: ネットワークエラー ──────────────────────────────────────────────

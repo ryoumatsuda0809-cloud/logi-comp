@@ -141,6 +141,7 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          notification_number: string | null
           radius: number
         }
         Insert: {
@@ -151,6 +152,7 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          notification_number?: string | null
           radius?: number
         }
         Update: {
@@ -161,6 +163,7 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
+          notification_number?: string | null
           radius?: number
         }
         Relationships: []
@@ -744,6 +747,7 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          notification_number: string | null
           radius: number
         }[]
       }

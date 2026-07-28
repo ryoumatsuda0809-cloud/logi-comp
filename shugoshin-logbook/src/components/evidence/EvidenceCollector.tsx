@@ -12,6 +12,7 @@ import {
   formatElapsed,
   formatArrivalDateTime,
 } from "@/lib/staleTicket";
+import { isCatchNumberRequired } from "@/lib/fisheryLaw";
 
 export function EvidenceCollector() {
   const {
@@ -71,11 +72,17 @@ export function EvidenceCollector() {
     ? formatElapsed(elapsedMs(lastResult.arrivalTime))
     : "";
 
+  // 漁獲番号は特定第一種水産動植物のときのみ必須。
+  // フグ・タイなど対象外の魚種で入力を求めると作業完了できなくなる。
+  const catchNumberNeeded = isCatchNumberRequired(
+    fisheryData.species_id,
+    fisheryData.weight_kg
+  );
   const isFisheryDataValid =
     Boolean(fisheryData.species?.trim()) &&
     fisheryData.weight_kg != null &&
     fisheryData.weight_kg > 0 &&
-    fisheryData.catch_number?.length === 16;
+    (!catchNumberNeeded || Boolean(fisheryData.catch_number?.trim()));
 
   const handleCompleteTicket = async () => {
     if (!isFisheryDataValid) return;
@@ -267,7 +274,12 @@ export function EvidenceCollector() {
           )}
 
           {/* 水産物情報フォーム */}
-          <FisheryForm value={fisheryData} onChange={setFisheryData} />
+          <FisheryForm
+            value={fisheryData}
+            onChange={setFisheryData}
+            notificationNumber={lastResult.facilityNotificationNumber}
+            transferDate={new Date(lastResult.arrivalTime)}
+          />
 
           {/* 作業完了ボタン */}
           <Button

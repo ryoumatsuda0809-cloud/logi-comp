@@ -13,12 +13,18 @@ export interface EvidenceResult {
   ticketNumber: number;
   arrivalTime: string;
   facilityName: string;
+  /** 漁獲番号の先頭7桁。施設に未登録の場合は null（16桁の直接入力にフォールバックする） */
+  facilityNotificationNumber: string | null;
 }
 
 export interface FisheryData {
+  /** 表示用の魚種名（例: "アワビ" / "フグ"） */
   species: string;
+  /** 特定第一種水産動植物のID（TARGET_SPECIES）。対象外の魚種では undefined */
+  species_id?: string;
   weight_kg: number;
-  catch_number: string;
+  /** 漁獲番号16桁。対象魚種でない場合は undefined（法令上不要なため） */
+  catch_number?: string;
 }
 
 export interface CompleteResult {
@@ -109,7 +115,7 @@ export function useEvidence(): UseEvidenceReturn {
     (async () => {
       const { data, error } = await supabase
         .from("wait_logs")
-        .select("id, ticket_number, arrival_time, facilities(name)")
+        .select("id, ticket_number, arrival_time, facilities(name, notification_number)")
         .eq("user_id", user.id)
         .in("status", ["waiting", "called", "working"])
         .order("created_at", { ascending: false })
@@ -120,15 +126,14 @@ export function useEvidence(): UseEvidenceReturn {
 
       if (!error && data) {
         const facilityRow = data.facilities;
-        const facilityName = Array.isArray(facilityRow)
-          ? (facilityRow[0]?.name ?? "不明")
-          : (facilityRow?.name ?? "不明");
+        const facility = Array.isArray(facilityRow) ? facilityRow[0] : facilityRow;
 
         setLastResult({
           logId: data.id,
           ticketNumber: data.ticket_number,
           arrivalTime: data.arrival_time,
-          facilityName,
+          facilityName: facility?.name ?? "不明",
+          facilityNotificationNumber: facility?.notification_number ?? null,
         });
       }
 
@@ -236,6 +241,7 @@ export function useEvidence(): UseEvidenceReturn {
       ticketNumber: result.new_ticket_number,
       arrivalTime: result.new_arrival_time,
       facilityName: facility.name,
+      facilityNotificationNumber: facility.notification_number ?? null,
     });
     setIsSubmitting(false);
   }, [user, position]);
@@ -270,10 +276,15 @@ export function useEvidence(): UseEvidenceReturn {
         // watchPosition の最終座標で続行
       }
 
+      // 漁獲番号は特定第一種水産動植物のみ法令上必要なため、
+      // 対象外の魚種では catch_number を持たせない。
       const payload: Json = {
         species: fisheryData.species,
         weight_kg: fisheryData.weight_kg,
-        catch_number: fisheryData.catch_number,
+        ...(fisheryData.species_id ? { species_id: fisheryData.species_id } : {}),
+        ...(fisheryData.catch_number
+          ? { catch_number: fisheryData.catch_number }
+          : {}),
       };
 
       const { data, error } = await supabase.rpc("complete_ticket", {
