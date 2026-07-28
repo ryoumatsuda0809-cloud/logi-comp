@@ -21,3 +21,4 @@
 3. **コンテキストの参照**: 
    - データベース設計・RLSについては `@docs/CONTEXT_SUPABASE.md` を参照。
    - 取適法のビジネスロジックについては `@docs/CONTEXT_LEGAL_SPEC.md` を参照。
+   - 水産流通適正化法（漁獲番号・対象魚種）については `@docs/CONTEXT_FISHERY_LAW.md` を参照。水産物情報の入力まわりを変更する前に必ず読むこと。
