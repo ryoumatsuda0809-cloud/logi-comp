@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock } from "lucide-react";
+import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useEvidence } from "@/hooks/useEvidence";
@@ -13,6 +13,7 @@ import {
   formatArrivalDateTime,
 } from "@/lib/staleTicket";
 import { isCatchNumberRequired } from "@/lib/fisheryLaw";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 export function EvidenceCollector() {
   const {
@@ -61,9 +62,13 @@ export function EvidenceCollector() {
     clearCancelError();
   }, [cancelError, toast, clearCancelError]);
 
+  const isOnline = useOnlineStatus();
+
   const isGpsReady = position !== null && !gpsError;
-  // GPS未取得・エラー・送信中はボタンを物理ロック
-  const isButtonLocked = !isGpsReady || isSubmitting;
+  // GPS未取得・エラー・送信中・オフラインはボタンを物理ロック。
+  // 打刻はサーバー時刻とサーバー側ジオフェンス判定に依存するため、
+  // 通信がない状態では法的に有効な記録を作れない（Rule 1 / Rule 2）。
+  const isButtonLocked = !isGpsReady || isSubmitting || !isOnline;
 
   // 完了打刻の押し忘れ疑い（16時間以上経過した到着打刻）を検知する。
   // 気づかず完了すると待機時間が実経過時間として法的記録に残るため警告する。
@@ -181,6 +186,18 @@ export function EvidenceCollector() {
         )}
       </div>
 
+      {/* ── オフライン Alert ── */}
+      {!isOnline && (
+        <Alert variant="destructive">
+          <AlertTitle>オフラインです</AlertTitle>
+          <AlertDescription>
+            打刻には通信が必要です（時刻と拠点の確認をサーバーで行うため）。
+            電波の良い場所へ移動してから打刻してください。
+            これまでの記録はそのまま残っています。
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* ── GPS エラー Alert ── */}
       {gpsError && (
         <Alert variant="destructive">
@@ -220,6 +237,11 @@ export function EvidenceCollector() {
             <span className="flex flex-col items-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin" />
               <span>記録中...</span>
+            </span>
+          ) : !isOnline ? (
+            <span className="flex flex-col items-center gap-3 opacity-60">
+              <WifiOff className="h-10 w-10" />
+              <span>オフライン</span>
             </span>
           ) : !isGpsReady ? (
             <span className="flex flex-col items-center gap-3 opacity-60">
@@ -293,6 +315,11 @@ export function EvidenceCollector() {
               <span className="flex flex-col items-center gap-3">
                 <Loader2 className="h-10 w-10 animate-spin" />
                 <span>記録中...</span>
+              </span>
+            ) : !isOnline ? (
+              <span className="flex flex-col items-center gap-3 opacity-60">
+                <WifiOff className="h-10 w-10" />
+                <span>オフライン</span>
               </span>
             ) : !isGpsReady ? (
               <span className="flex flex-col items-center gap-3 opacity-60">

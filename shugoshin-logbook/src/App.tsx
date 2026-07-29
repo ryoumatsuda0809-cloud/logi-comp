@@ -11,7 +11,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import UnassignedAlert from "@/components/UnassignedAlert";
-import OfflineFallback from "@/components/OfflineFallback";
+import OfflineBanner from "@/components/OfflineBanner";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -101,28 +102,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function useOnlineStatus() {
-  const [online, setOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
-  return online;
-}
-
 const App = () => {
   const online = useOnlineStatus();
   return (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      {!online && <OfflineFallback />}
+      {!online && <OfflineBanner />}
       <Toaster />
       <Sonner />
       <BrowserRouter>

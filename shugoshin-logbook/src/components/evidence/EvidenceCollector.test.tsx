@@ -125,3 +125,59 @@ describe("EvidenceCollector — GPS 状態によるUIフェイルセーフ検証
     expect(button).toBeDisabled();
   });
 });
+
+describe("EvidenceCollector — オフライン時のフェイルセーフ", () => {
+  function setOnline(value: boolean) {
+    Object.defineProperty(window.navigator, "onLine", {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setOnline(true);
+  });
+
+  it("オフライン時はGPS取得済みでも打刻ボタンがロックされる", async () => {
+    setOnline(false);
+    mockGeolocation("success");
+    render(<EvidenceCollector />);
+
+    // 打刻にはサーバー時刻とサーバー側ジオフェンス判定が必要なため、
+    // 通信がない状態では法的に有効な記録を作れない
+    await waitFor(() => {
+      const button = screen.getByRole("button", { name: /オフライン/ });
+      expect(button).toBeDisabled();
+    });
+  });
+
+  it("オフライン時は理由を説明するAlertが表示される", async () => {
+    setOnline(false);
+    mockGeolocation("success");
+    render(<EvidenceCollector />);
+
+    await waitFor(() => {
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts.some((a) => a.textContent?.includes("オフラインです"))).toBe(true);
+    });
+  });
+
+  it("オンラインに復帰すると打刻ボタンが再び押せるようになる", async () => {
+    setOnline(false);
+    mockGeolocation("success");
+    render(<EvidenceCollector />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /オフライン/ })).toBeDisabled();
+    });
+
+    setOnline(true);
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /到着打刻/ })).not.toBeDisabled();
+    });
+  });
+});
