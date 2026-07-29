@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, AlertTriangle, ArrowLeft } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 import { convertWaitLogsToTimeline, generateFormalReportFromWaitLogs } from "@/lib/waitLogToTimeline";
-import { calcWaitCost } from "@/lib/waitCostCalc";
+import { sumWaitCost } from "@/lib/waitCostCalc";
 
 /* ------------------------------------------------------------------ */
 /*  In-App Browser Detection                                          */
@@ -149,8 +149,10 @@ export default function SharedReportView() {
             facilityMap[f.id] = f.name;
           }
 
-          const { entries, totalWaitMinutes } = convertWaitLogsToTimeline(logs, facilityMap);
-          const waitCost = calcWaitCost(totalWaitMinutes, vc);
+          const { entries, totalWaitMinutes, waitMinutesPerEvent } = convertWaitLogsToTimeline(logs, facilityMap);
+          // 30分の控除は待機1回ごとに適用する。日次合計に calcWaitCost を1回だけ
+          // 適用すると控除が1回分しか効かず、荷主へ提示する請求額が過大になる。
+          const waitCost = sumWaitCost(waitMinutesPerEvent, vc);
           const formalReport = generateFormalReportFromWaitLogs(logs, facilityMap);
 
           setReport({

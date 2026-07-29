@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { calcWaitCost } from "@/lib/waitCostCalc";
+import { calcWaitCost, sumWaitCost } from "@/lib/waitCostCalc";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
 import type { WaitLogRow } from "@/lib/waitLogToTimeline";
 
@@ -262,9 +262,14 @@ export function useDailyTimeline(): DailyTimelineResult {
     .filter((i) => isWaitEligible(i) && i.waitMinutes && i.waitMinutes > 0)
     .reduce((sum, i) => sum + (i.waitMinutes ?? 0), 0);
 
-  const totalWaitCost = timeline
-    .filter((i) => isWaitEligible(i) && i.estimatedCost && i.estimatedCost > 0)
-    .reduce((sum, i) => sum + (i.estimatedCost ?? 0), 0);
+  // 30分の控除は待機1回ごとに適用するため、合計分数ではなく待機1回ごとの分数を
+  // sumWaitCost() に渡す。日次合計に calcWaitCost() を1回だけ適用すると過大計算になる。
+  const totalWaitCost = sumWaitCost(
+    timeline
+      .filter((i) => isWaitEligible(i) && i.waitMinutes && i.waitMinutes > 0)
+      .map((i) => i.waitMinutes ?? 0),
+    vehicleClass
+  );
 
   const hasDiscrepancy = detectDiscrepancies(timeline);
 

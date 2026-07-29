@@ -190,13 +190,105 @@ Vercel側の環境変数として設定されていなかったため、`VITE_SU
 `docs/CONTEXT_SUPABASE.md`、git追跡されていた`supabase/.temp/`）を削除済み
 （`shugoshin-logbook/`側が上位互換のため実害なし）。
 
+## 待機料集計の横展開確認（2026-07-29）
+
+修正#2（作業時間が待機料に混入していたバグ）と同種の誤りが他の集計経路に残っていないかを、
+待機料を算出している**4経路すべて**について確認した。
+
+| # | 経路 | 用途 | 結果 |
+|---|------|------|------|
+| 1 | `useDailyTimeline` | ドライバーの日報確認 → `submitted_reports` に保存 | 30分控除の単位は正（要リファクタのみ） |
+| 2 | `SharedReportView`（liveパス） | **荷主向け**の当日レポート | ⛔ 過大計算バグ |
+| 3 | `DailyReportConfirm`（snapshot生成） | 提出済み日報のタイムライン保全 | ⛔ 取消済み打刻が混入 |
+| 4 | `monthly_wait_risk_reports` VIEW | `Report.tsx` の月次帳票 | ⚠️ 単価・控除がフロントと不一致（未修正） |
+
+### 修正した不整合 A: 取消済み(cancelled)の打刻が待機料・法定乗務記録に計上されていた
+
+`cancel_ticket` は証拠隠滅を防ぐためレコードを物理削除せず `status='cancelled'` に
+更新するのみだが、`convertWaitLogsToTimeline` は `WaitLogRow.status` を受け取りながら
+**一度も参照していなかった**。`wait_logs` を素朴にSELECTしている経路（上表 1・2・3）すべてで
+取消済みの行が集計対象になっていた。
+
+`cancel_ticket` は `status` が `'called'` / `'working'` の行も取消可能なため、
+`called_time` が入った行＝待機時間が算出できる行がそのまま課金対象に混入する。
+取り消したはずの打刻が荷主向けの請求根拠および法定乗務記録テキストに載る状態だった。
+
+対策として `isBillableWaitLog()` を追加し、`convertWaitLogsToTimeline` と
+`generateFormalReportFromWaitLogs` の両方で取消済み行を除外する。3経路すべてがこの
+2関数を経由するため、単一箇所の修正で横展開できる。監査証跡はDB側に行が残ることで担保される。
+
+### 修正した不整合 B: 30分控除の適用単位が画面ごとに違い、荷主向けが過大だった
+
+- `useDailyTimeline`: 待機1回ごとに `calcWaitCost()` を適用して合算（正）
+- `SharedReportView`: **日次合計に対して `calcWaitCost()` を1回だけ適用**（誤）
+
+同じ日・同じデータでもドライバーの確認画面と荷主向けレポートで金額が食い違い、
+荷主向けのほうが常に過大になる。
+
+```
+40分待機 × 2回、4t車（50円/分）
+  正: (40-30)*50 * 2 = 1,000円
+  誤: (80-30)*50     = 2,500円
+20分待機 × 3回（各回とも30分以下＝課金対象外）
+  正: 0円
+  誤: (60-30)*50     = 1,500円   ← 課金対象でない待機に課金
+```
+
+**採用した解釈**: 30分の控除は「待機1回ごと」に適用する。標準貨物自動車運送約款の
+待機時間料が集貨地・配達地ごとの待機について算定されるため。したがって
+`SharedReportView` 側が誤りであり、こちらを是正した。
+
+対策として `sumWaitCost(waitMinutesList, vehicleClass)` を `waitCostCalc.ts` に追加し、
+集計側は `calcWaitCost()` を直接呼ばずこの関数を経由する形に統一した。
+`convertWaitLogsToTimeline` は待機1回ごとの分数を `waitMinutesPerEvent` として返す。
+
+### 変更点
+
+| ファイル | 内容 |
+|---------|------|
+| `src/lib/waitCostCalc.ts` | `sumWaitCost()` を追加（30分控除は待機1回ごと、という規則を単一箇所に集約） |
+| `src/lib/waitLogToTimeline.ts` | `isBillableWaitLog()` を追加し取消済み行を除外。`WaitLogSummary.waitMinutesPerEvent` を追加 |
+| `src/pages/SharedReportView.tsx` | 日次合計への `calcWaitCost` を `sumWaitCost(waitMinutesPerEvent)` に置換 |
+| `src/hooks/useDailyTimeline.ts` | 同値だが `sumWaitCost()` 経由に統一（再発防止） |
+| `src/lib/waitLogToTimeline.test.ts` | 取消済み打刻の除外3件・30分控除の適用単位3件の回帰テストを追加 |
+
+### 検証
+
+| 項目 | 結果 |
+|------|------|
+| `tsc --noEmit` | ✅ エラーなし |
+| `npm run build` | ✅ 成功 |
+| `vitest run` | ✅ 6ファイル / 41テスト通過（36→41）。Unhandled Errors 8件は `git stash` で確認済みの通り**変更前から同数**で、`useEvidence.test.ts` のモック未整備に起因する既存の問題 |
+| 本番デプロイの世代一致 | ✅ 配信中バンドルに `p_latitude` / `cancel_ticket` / `notification_number` を確認（DBとフロントの世代が一致） |
+
+### 未修正（要判断）
+
+- **C: 集計対象のデータソースが画面で不一致**。`SharedReportView` のliveパスは `wait_logs` のみを
+  読むが、`useDailyTimeline` は `compliance_logs` + `daily_reports`（音声申告）+ `wait_logs` を
+  マージする。そのため音声申告の待機が荷主向けliveレポートから欠落する。
+  過小側なので緊急度は低いが、そもそも自己申告の待機を荷主向け証拠に載せるべきかという
+  設計判断を含むため保留。
+- **D: `monthly_wait_risk_reports` VIEW の算定がフロントと不一致**。30分控除が一切なく、
+  単価も `10t` が70円（フロントは60円）、`trailer` が90円（フロントには定義がなく50円扱い）。
+  `Report.tsx` はこの帳票を「法的な支払督促の根拠資料として有効」と明記しているため、
+  数字の食い違いは是正すべき。ただしVIEWの元テーブル `compliance_logs` は現行フローから
+  書き込まれていないため実データは空とみられ、緊急度は低い。修正にはmigrationが必要。
+- **E（休眠）: `compliance_logs` と `wait_logs` の二重計上リスク**。`useDailyTimeline` は
+  両者をマージするため、同一の物理的な待機が両方に記録されると二重計上になる。
+  現状 `compliance_logs` への書き込み口は `src/lib/offlineQueue.ts` のみで、これは
+  どこからも呼ばれていない（ヘッダーコメント参照）ため顕在化していない。
+  オフライン打刻を実装する際に必ず再検討すること。
+
+---
+
 ## 未着手・要検討事項
 
 - [ ] 施設ごとの届出番号（7桁）をDBに登録する。未登録の間は漁獲番号が16桁の直接入力にフォールバックする
 - [ ] オフライン打刻の可否判断。現状は打刻ボタンを物理ロックしており、圏外では記録が残らない。
       弱い証拠として残すなら、クライアント主張時刻とサーバー受信時刻を別カラムで保持し、
       証拠の強さを偽らない設計が必要（`src/lib/offlineQueue.ts` のヘッダー参照）
-- [ ] 待機料自動計算ロジックまわりの他の集計箇所（荷主向けダッシュボード等、`IMPLEMENTATION_SUMMARY.md` の「次のステップ」参照）に同様の混入バグがないかの横展開確認
+- [x] 待機料自動計算ロジックまわりの他の集計箇所に同様の混入バグがないかの横展開確認
+      → 完了（上記「待機料集計の横展開確認」参照）。不整合A・Bを修正、C・D・Eは要判断で保留
 - [ ] 水産流通適正化法の未解決照会5件（`CONTEXT_FISHERY_LAW.md` 参照）。特に運送業者が「取扱事業者」に該当するかの確認
 
 ## 運用開始後に直面する4つの実務上の懸念（2026-07-29 ユーザー指摘）

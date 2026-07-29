@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { convertWaitLogsToTimeline, diffMinutes, type WaitLogRow } from "./waitLogToTimeline";
+import {
+  convertWaitLogsToTimeline,
+  diffMinutes,
+  generateFormalReportFromWaitLogs,
+  type WaitLogRow,
+} from "./waitLogToTimeline";
+import { calcWaitCost, sumWaitCost } from "./waitCostCalc";
 
 describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テスト", () => {
   const facilityMap = { "facility-1": "下関中央卸売市場" };
@@ -40,5 +46,84 @@ describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テス�
     expect(
       diffMinutes("2026-07-20T10:00:00.000Z", "2026-07-20T09:00:00.000Z")
     ).toBe(0);
+  });
+
+  it("取消済み(cancelled)の打刻は待機時間・待機料・法定乗務記録のいずれにも計上しない", () => {
+    // cancel_ticket は status='called'/'working' の行も取消可能なため、
+    // called_time が入ったまま cancelled になった行が課金対象に混入しうる。
+    const logs: WaitLogRow[] = [
+      {
+        id: "log-live",
+        facility_id: "facility-1",
+        ticket_number: 1,
+        status: "completed",
+        arrival_time: "2026-07-20T09:00:00.000Z",
+        called_time: "2026-07-20T09:40:00.000Z", // 荷待ち40分（有効）
+        work_start_time: "2026-07-20T09:40:00.000Z",
+        work_end_time: "2026-07-20T10:00:00.000Z",
+      },
+      {
+        id: "log-cancelled",
+        facility_id: "facility-1",
+        ticket_number: 2,
+        status: "cancelled",
+        arrival_time: "2026-07-20T13:00:00.000Z",
+        called_time: "2026-07-20T15:00:00.000Z", // 取消済みなので計上してはいけない120分
+        work_start_time: null,
+        work_end_time: null,
+      },
+    ];
+
+    const { entries, totalWaitMinutes, waitMinutesPerEvent } = convertWaitLogsToTimeline(
+      logs,
+      facilityMap
+    );
+
+    // 取消済みログ由来のエントリが一切生成されていないこと（到着エントリも含む）
+    expect(entries.some((e) => e.ticketNumber === 2)).toBe(false);
+    expect(totalWaitMinutes).toBe(40);
+    expect(waitMinutesPerEvent).toEqual([40]);
+
+    // 荷主へ提示する法定乗務記録にも取消済みの打刻が現れないこと
+    const report = generateFormalReportFromWaitLogs(logs, facilityMap);
+    expect(report).toContain("整理券 #1");
+    expect(report).not.toContain("整理券 #2");
+  });
+
+  it("全ログが取消済みの場合、法定乗務記録は「記録なし」になる", () => {
+    const logs: WaitLogRow[] = [
+      {
+        id: "log-cancelled",
+        facility_id: "facility-1",
+        ticket_number: 1,
+        status: "cancelled",
+        arrival_time: "2026-07-20T09:00:00.000Z",
+        called_time: null,
+        work_start_time: null,
+        work_end_time: null,
+      },
+    ];
+    expect(generateFormalReportFromWaitLogs(logs, facilityMap)).toBe("（記録なし）");
+  });
+});
+
+describe("sumWaitCost — 30分控除の適用単位（過大請求防止）", () => {
+  it("30分の控除は待機1回ごとに適用される（日次合計に1回だけ適用しない）", () => {
+    // 40分待機 × 2回、4t車（50円/分）
+    const perEvent = sumWaitCost([40, 40], "4t");
+    expect(perEvent).toBe(1000); // (40-30)*50 * 2
+
+    // 日次合計へ1回だけ適用した場合の誤った値と一致しないこと
+    expect(perEvent).not.toBe(calcWaitCost(80, "4t")); // (80-30)*50 = 2500
+  });
+
+  it("各回が30分以下の待機は、合計が30分を超えても課金されない", () => {
+    // 20分待機 × 3回 = 合計60分だが、どの回も課金対象ではない
+    expect(sumWaitCost([20, 20, 20], "4t")).toBe(0);
+    expect(calcWaitCost(60, "4t")).toBe(1500); // 合計に適用すると誤課金になる
+  });
+
+  it("待機が0件なら0円", () => {
+    expect(sumWaitCost([], "4t")).toBe(0);
   });
 });

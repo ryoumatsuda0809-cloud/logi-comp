@@ -28,6 +28,27 @@ export interface WaitLogSummary {
   entries: WaitLogTimelineEntry[];
   totalWaitMinutes: number;
   totalWorkMinutes: number;
+  /**
+   * 待機1回ごとの待機時間（分）。
+   * 30分の控除は待機1回ごとに適用するため、待機料は totalWaitMinutes ではなく
+   * この配列を sumWaitCost() に渡して算出すること（詳細は waitCostCalc.ts）。
+   */
+  waitMinutesPerEvent: number[];
+}
+
+/**
+ * 取り消された打刻（cancel_ticket で status='cancelled' にした行）を除外する。
+ *
+ * cancel_ticket は証拠隠滅を防ぐためレコードを物理削除せず status のみを更新する。
+ * そのため wait_logs を素朴に SELECT すると取消済みの行も返ってくる。
+ * これを集計に含めると「取り消したはずの打刻が荷主向けの請求根拠に載る」ことになる。
+ * 特に cancel_ticket は status が 'called' / 'working' の行も取消可能なため、
+ * called_time が入った行＝待機時間が算出できる行がそのまま課金対象に混入する。
+ *
+ * 監査証跡はDB側に行が残ることで担保されており、帳票から除外して問題ない。
+ */
+export function isBillableWaitLog(log: WaitLogRow): boolean {
+  return log.status !== "cancelled";
 }
 
 /**
@@ -61,10 +82,13 @@ export function convertWaitLogsToTimeline(
   facilityMap: Record<string, string>
 ): WaitLogSummary {
   const entries: WaitLogTimelineEntry[] = [];
+  const waitMinutesPerEvent: number[] = [];
   let totalWaitMinutes = 0;
   let totalWorkMinutes = 0;
 
   for (const log of logs) {
+    if (!isBillableWaitLog(log)) continue;
+
     const facilityName = facilityMap[log.facility_id] || "不明な施設";
 
     // 1. 到着
@@ -79,7 +103,10 @@ export function convertWaitLogsToTimeline(
     // 2. 呼出（= 待機終了）→ 待機時間を計算
     if (log.called_time) {
       const waitMins = diffMinutes(log.arrival_time, log.called_time);
-      if (waitMins !== null) totalWaitMinutes += waitMins;
+      if (waitMins !== null) {
+        totalWaitMinutes += waitMins;
+        waitMinutesPerEvent.push(waitMins);
+      }
 
       entries.push({
         source: "gps",
@@ -123,7 +150,7 @@ export function convertWaitLogsToTimeline(
   // 時系列ソート
   entries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-  return { entries, totalWaitMinutes, totalWorkMinutes };
+  return { entries, totalWaitMinutes, totalWorkMinutes, waitMinutesPerEvent };
 }
 
 /**
@@ -133,11 +160,12 @@ export function generateFormalReportFromWaitLogs(
   logs: WaitLogRow[],
   facilityMap: Record<string, string>
 ): string {
-  if (logs.length === 0) return "（記録なし）";
+  const billableLogs = logs.filter(isBillableWaitLog);
+  if (billableLogs.length === 0) return "（記録なし）";
 
   const lines: string[] = ["【法定乗務記録】", ""];
 
-  for (const log of logs) {
+  for (const log of billableLogs) {
     const facilityName = facilityMap[log.facility_id] || "不明な施設";
     const arrivalStr = formatTimeOrNull(log.arrival_time);
     const calledStr = formatTimeOrNull(log.called_time);
