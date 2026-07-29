@@ -172,9 +172,26 @@ complete_ticket(p_log_id, p_fishery_data)   → 404 PGRST202
 
 ---
 
+## Vercel接続先の是正（2026-07-29）
+
+本番URL（shugoshin-logbook.vercel.app）は、実は`logi-comp`ではなく**別の非公開リポジトリ
+`ryoumatsuda0809-cloud/shugoshin-logbook`**（Lovable製、2026-04-19で更新停止）に接続されて
+いたことが判明した。テナントオンボーディング等の未使用機能が本番に残っていたのはこのため。
+
+同一Supabaseプロジェクト（`qojhncmwmsqzycxrfezv`）を参照していたため、DB側の作業に無駄は
+なかった。VercelのGit接続先を`ryoumatsuda0809-cloud/logi-comp`（Root Directory:
+`shugoshin-logbook`）に切り替え済み。旧リポジトリは削除せずそのまま残置（アーカイブ用途）。
+
+切替に伴い、旧リポジトリに直接コミットされていた`.env`（anon keyのみ、深刻度は低い）が
+Vercel側の環境変数として設定されていなかったため、`VITE_SUPABASE_URL` /
+`VITE_SUPABASE_PUBLISHABLE_KEY` をVercelのEnvironment Variablesに追加して解消した。
+
+あわせてモノレポルートに残っていた陳腐化した重複（`CLAUDE.md`、`docs/CONTEXT_LEGAL_SPEC.md`、
+`docs/CONTEXT_SUPABASE.md`、git追跡されていた`supabase/.temp/`）を削除済み
+（`shugoshin-logbook/`側が上位互換のため実害なし）。
+
 ## 未着手・要検討事項
 
-- [ ] **6コミットのpush＝本番デプロイ**（上記GitHub権限の解消が前提）
 - [ ] 施設ごとの届出番号（7桁）をDBに登録する。未登録の間は漁獲番号が16桁の直接入力にフォールバックする
 - [ ] オフライン打刻の可否判断。現状は打刻ボタンを物理ロックしており、圏外では記録が残らない。
       弱い証拠として残すなら、クライアント主張時刻とサーバー受信時刻を別カラムで保持し、
