@@ -29,6 +29,10 @@ yarn-debug.log*
 
 # Claude Code personal config
 .claude/
+.mcp.json
+
+# Supabase CLI local cache (linked project ref, service versions)
+**/supabase/.temp/
 
 # VS Code Server
 .vscode-server/
