@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock, WifiOff } from "lucide-react";
+import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock, WifiOff, FileClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useEvidence } from "@/hooks/useEvidence";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/staleTicket";
 import { isCatchNumberRequired } from "@/lib/fisheryLaw";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useOfflinePunch } from "@/hooks/useOfflinePunch";
 
 export function EvidenceCollector() {
   const {
@@ -23,6 +24,7 @@ export function EvidenceCollector() {
     submitError,
     lastResult,
     submitEvidence,
+    submitFailedOffline,
     clearSubmitError,
     completeResult,
     isCompleting,
@@ -64,6 +66,26 @@ export function EvidenceCollector() {
 
   const isOnline = useOnlineStatus();
 
+  const {
+    pendingCount,
+    rejected,
+    dismissRejected,
+    isFlushing,
+    lastAccepted,
+    clearLastAccepted,
+    recordOfflinePunch,
+  } = useOfflinePunch();
+
+  // 送信成功をトーストで知らせる
+  useEffect(() => {
+    if (lastAccepted === 0) return;
+    toast({
+      title: "仮記録を送信しました",
+      description: `${lastAccepted}件を申請として送信しました。管理者の承認後に正式な打刻になります。`,
+    });
+    clearLastAccepted();
+  }, [lastAccepted, toast, clearLastAccepted]);
+
   const isGpsReady = position !== null && !gpsError;
   // GPS未取得・エラー・送信中・オフラインはボタンを物理ロック。
   // 打刻はサーバー時刻とサーバー側ジオフェンス判定に依存するため、
@@ -104,6 +126,27 @@ export function EvidenceCollector() {
   const handleCancelTicket = async () => {
     await cancelTicket();
     setFisheryData({});
+  };
+
+  // 圏外で通信が通らないが GPS 座標は取れている状態。
+  // 圏外＝GPS不可ではない（衛星測位は通信なしでも動く）ため、座標のある記録は残せる。
+  // navigator.onLine は圏外ギリギリを検出できないので、打刻の通信失敗も条件に含める。
+  const canRecordOffline = isGpsReady && (!isOnline || submitFailedOffline);
+
+  // 圏外の到着を仮記録として端末に保存する。
+  // これは待機料の請求根拠ではなく、管理者の承認を経て初めて正式な打刻になる。
+  const handleRecordOffline = () => {
+    if (!position) return;
+    recordOfflinePunch({
+      punchType: "arrival",
+      latitude: position.lat,
+      longitude: position.lon,
+    });
+    toast({
+      title: "仮記録として保存しました",
+      description:
+        "通信が回復すると自動で送信されます。管理者の承認後に正式な打刻になります。",
+    });
   };
 
   // 状態復元中はローディング表示
@@ -191,9 +234,45 @@ export function EvidenceCollector() {
         <Alert variant="destructive">
           <AlertTitle>オフラインです</AlertTitle>
           <AlertDescription>
-            打刻には通信が必要です（時刻と拠点の確認をサーバーで行うため）。
-            電波の良い場所へ移動してから打刻してください。
+            正式な打刻には通信が必要です（時刻と拠点の確認をサーバーで行うため）。
+            {isGpsReady
+              ? "GPSは取得できているため、下のボタンで仮記録として残せます。"
+              : "電波の良い場所へ移動してから打刻してください。"}
             これまでの記録はそのまま残っています。
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* ── 未送信の仮記録 ── */}
+      {pendingCount > 0 && (
+        <Alert>
+          <AlertTitle>
+            未送信の仮記録が{pendingCount}件あります
+            {isFlushing && "（送信中...）"}
+          </AlertTitle>
+          <AlertDescription>
+            通信が回復すると自動で送信されます。送信後も管理者の承認を受けるまでは
+            正式な打刻にならず、待機料の請求根拠にはなりません。
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* ── 送信したが受け付けられなかった仮記録 ── */}
+      {rejected.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTitle>受け付けられなかった仮記録が{rejected.length}件あります</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            {rejected.slice(0, 3).map((r) => (
+              <span key={r.clientPunchId} className="text-xs">
+                {formatArrivalDateTime(r.claimedAt)} の記録: {r.reason}
+              </span>
+            ))}
+            <button
+              onClick={dismissRejected}
+              className="self-start text-xs underline underline-offset-2"
+            >
+              確認したので閉じる
+            </button>
           </AlertDescription>
         </Alert>
       )}
@@ -255,6 +334,30 @@ export function EvidenceCollector() {
             </span>
           )}
         </Button>
+      )}
+
+      {/* ── 圏外時の仮記録（正式な打刻の代替ではないことを明示する）── */}
+      {!lastResult && canRecordOffline && (
+        <div className="flex flex-col gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+          <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+            通信がなくても記録を残せます
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            GPS座標は取得できているため、到着した事実を仮記録として端末に保存できます。
+            通信が回復すると自動で送信され、<strong>管理者が承認すると正式な打刻になります</strong>。
+            承認されるまでは待機料の請求根拠になりません。
+          </p>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleRecordOffline}
+            className="w-full border-amber-500 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-bold"
+            style={{ minHeight: "64px" }}
+          >
+            <FileClock className="mr-2 h-5 w-5" />
+            到着を仮記録する
+          </Button>
+        </div>
       )}
 
       {/* ════════════════════════════════════════════

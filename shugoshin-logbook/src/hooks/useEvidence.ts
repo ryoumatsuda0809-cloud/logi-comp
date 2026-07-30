@@ -33,6 +33,24 @@ export interface CompleteResult {
   waitingMinutes: number | null;
 }
 
+/**
+ * 通信到達性の失敗かどうかを判定する。
+ *
+ * `navigator.onLine` は「圏外ギリギリで接続はあるが通信が通らない」状態を true のまま
+ * 返すため（`useOnlineStatus` のヘッダー参照）、オフライン判定をそれだけに頼ると
+ * 実質圏外のドライバーに仮記録の導線を出せない。RPC の失敗内容からも判定する。
+ */
+function isNetworkFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("network request failed") ||
+    m.includes("load failed") ||
+    m.includes("timeout")
+  );
+}
+
 function gpsErrorMessage(err: GeolocationPositionError): string {
   switch (err.code) {
     case 1:
@@ -53,6 +71,8 @@ export interface UseEvidenceReturn {
   submitError: string | null;
   lastResult: EvidenceResult | null;
   submitEvidence: () => Promise<void>;
+  /** 直近の打刻失敗が通信到達性に起因するか。true のとき UI は仮記録の導線を出す */
+  submitFailedOffline: boolean;
   clearSubmitError: () => void;
   clearResult: () => void;
   // 作業完了フロー
@@ -77,6 +97,7 @@ export function useEvidence(): UseEvidenceReturn {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitFailedOffline, setSubmitFailedOffline] = useState(false);
   const [lastResult, setLastResult] = useState<EvidenceResult | null>(null);
   const [completeResult, setCompleteResult] = useState<CompleteResult | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -160,6 +181,7 @@ export function useEvidence(): UseEvidenceReturn {
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setSubmitFailedOffline(false);
 
     // Step 1: 高精度GPSを新たに取得（失敗時は watchPosition の最終値を使用）
     let coords: GpsPosition = position;
@@ -184,6 +206,7 @@ export function useEvidence(): UseEvidenceReturn {
 
     if (facilityError) {
       setSubmitError("拠点の検索に失敗しました。通信環境を確認してください。");
+      setSubmitFailedOffline(isNetworkFailure(facilityError.message ?? ""));
       setIsSubmitting(false);
       return;
     }
@@ -225,6 +248,7 @@ export function useEvidence(): UseEvidenceReturn {
       } else {
         setSubmitError(`打刻の記録に失敗しました（${msg}）。再試行してください。`);
       }
+      setSubmitFailedOffline(isNetworkFailure(msg));
       setIsSubmitting(false);
       return;
     }
@@ -360,7 +384,10 @@ export function useEvidence(): UseEvidenceReturn {
     setIsCancelling(false);
   }, [lastResult]);
 
-  const clearSubmitError = useCallback(() => setSubmitError(null), []);
+  const clearSubmitError = useCallback(() => {
+    setSubmitError(null);
+    setSubmitFailedOffline(false);
+  }, []);
   const clearResult = useCallback(() => setLastResult(null), []);
   const clearCompleteError = useCallback(() => setCompleteError(null), []);
   const clearCancelError = useCallback(() => setCancelError(null), []);
@@ -376,6 +403,7 @@ export function useEvidence(): UseEvidenceReturn {
     submitError,
     lastResult,
     submitEvidence,
+    submitFailedOffline,
     clearSubmitError,
     clearResult,
     completeResult,

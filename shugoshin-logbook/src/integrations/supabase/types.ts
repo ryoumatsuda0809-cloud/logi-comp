@@ -551,6 +551,50 @@ export type Database = {
           },
         ]
       }
+      pending_punches: {
+        Row: {
+          claimed_at: string
+          client_punch_id: string
+          created_at: string
+          distance_m: number | null
+          driver_note: string | null
+          facility_id: string | null
+          gps_accuracy_m: number | null
+          id: string
+          latitude: number
+          longitude: number
+          organization_id: string | null
+          promoted_log_id: string | null
+          punch_type: string
+          received_at: string
+          review_note: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          self_approved: boolean
+          user_id: string
+          wait_log_id: string | null
+          within_geofence: boolean | null
+        }
+        Insert: never
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: "pending_punches_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_punches_wait_log_id_fkey"
+            columns: ["wait_log_id"]
+            isOneToOne: false
+            referencedRelation: "wait_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wait_logs: {
         Row: {
           arrival_time: string
@@ -793,6 +837,25 @@ export type Database = {
       join_organization_by_invite_code: {
         Args: { _code: string }
         Returns: string
+      }
+      queue_offline_punch: {
+        Args: {
+          p_accuracy_m?: number | null
+          p_claimed_at: string
+          p_client_punch_id: string
+          p_latitude: number
+          p_longitude: number
+          p_note?: string | null
+          p_punch_type?: string
+          p_wait_log_id?: string | null
+        }
+        Returns: {
+          distance_m: number | null
+          facility_name: string | null
+          is_duplicate: boolean
+          punch_id: string
+          within_geofence: boolean | null
+        }[]
       }
       verify_company_name: {
         Args: { _input: string }
