@@ -843,6 +843,7 @@ export type Database = {
           p_accuracy_m?: number | null
           p_claimed_at: string
           p_client_punch_id: string
+          p_fishery_data?: Json | null
           p_latitude: number
           p_longitude: number
           p_note?: string | null
