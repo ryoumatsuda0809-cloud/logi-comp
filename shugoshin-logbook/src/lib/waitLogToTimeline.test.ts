@@ -107,6 +107,95 @@ describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テス�
   });
 });
 
+describe("荷待ち時間の終端（荷役開始）", () => {
+  const facilityMap = { "facility-1": "下関中央卸売市場" };
+
+  const base = {
+    id: "log-1",
+    facility_id: "facility-1",
+    ticket_number: 1,
+    status: "completed",
+    arrival_time: "2026-07-31T09:00:00.000Z",
+  };
+
+  it("荷役開始(work_start_time)が終端になり、呼出から荷役開始までも荷待ちに含まれる", () => {
+    // 到着9:00 → 呼出9:30 → 荷役開始9:50 → 完了10:30
+    // 呼出〜荷役開始の20分もドライバーは荷役を待っているため荷待ちに含む
+    const logs: WaitLogRow[] = [
+      {
+        ...base,
+        called_time: "2026-07-31T09:30:00.000Z",
+        work_start_time: "2026-07-31T09:50:00.000Z",
+        work_end_time: "2026-07-31T10:30:00.000Z",
+      },
+    ];
+
+    const { totalWaitMinutes, totalWorkMinutes, entries } = convertWaitLogsToTimeline(
+      logs,
+      facilityMap
+    );
+
+    expect(totalWaitMinutes).toBe(50); // 呼出までの30分ではなく荷役開始までの50分
+    expect(totalWorkMinutes).toBe(40); // 荷役開始〜完了
+
+    const wait = entries.find((e) => e.eventType === "waiting_start");
+    expect(wait?.timestamp).toBe("2026-07-31T09:50:00.000Z");
+  });
+
+  it("荷役開始が無い場合は呼出で代替する（従来データの後方互換）", () => {
+    const logs: WaitLogRow[] = [
+      {
+        ...base,
+        called_time: "2026-07-31T09:40:00.000Z",
+        work_start_time: null,
+        work_end_time: "2026-07-31T10:30:00.000Z",
+      },
+    ];
+
+    const { totalWaitMinutes } = convertWaitLogsToTimeline(logs, facilityMap);
+    expect(totalWaitMinutes).toBe(40);
+  });
+
+  it("荷役開始も呼出も無い場合、荷待ちは算定不能とし、作業完了へフォールバックしない", () => {
+    // ここで work_end_time にフォールバックすると荷役作業時間が待機料に混入する
+    const logs: WaitLogRow[] = [
+      {
+        ...base,
+        called_time: null,
+        work_start_time: null,
+        work_end_time: "2026-07-31T12:00:00.000Z", // 到着から3時間
+      },
+    ];
+
+    const { totalWaitMinutes, waitMinutesPerEvent, entries } = convertWaitLogsToTimeline(
+      logs,
+      facilityMap
+    );
+
+    expect(totalWaitMinutes).toBe(0);
+    expect(waitMinutesPerEvent).toEqual([]);
+    expect(entries.some((e) => e.eventType === "waiting_start")).toBe(false);
+    // 到着と出発は記録として残る
+    expect(entries.map((e) => e.eventType)).toEqual(["arrival", "departure"]);
+  });
+
+  it("法定乗務記録の荷待ち時間も荷役開始を終端にする", () => {
+    const report = generateFormalReportFromWaitLogs(
+      [
+        {
+          ...base,
+          called_time: "2026-07-31T09:30:00.000Z",
+          work_start_time: "2026-07-31T09:50:00.000Z",
+          work_end_time: "2026-07-31T10:30:00.000Z",
+        },
+      ],
+      facilityMap
+    );
+    expect(report).toContain("荷待ち時間: 50分");
+    expect(report).toContain("作業時間: 40分");
+  });
+});
+
 describe("等級C（圏外申告の承認記録）の扱い", () => {
   const facilityMap = { "facility-1": "下関中央卸売市場" };
 

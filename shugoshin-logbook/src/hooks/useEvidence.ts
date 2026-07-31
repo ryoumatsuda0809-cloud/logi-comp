@@ -33,6 +33,13 @@ export interface CompleteResult {
   waitingMinutes: number | null;
 }
 
+export interface LoadingResult {
+  logId: string;
+  startedAt: string;
+  /** 確定した荷待ち時間（到着〜荷役開始）。これが待機料の課金対象になる */
+  waitingMinutes: number | null;
+}
+
 /**
  * 通信到達性の失敗かどうかを判定する。
  *
@@ -75,6 +82,12 @@ export interface UseEvidenceReturn {
   submitFailedOffline: boolean;
   clearSubmitError: () => void;
   clearResult: () => void;
+  // 荷役開始フロー（荷待ち時間の終端を確定する）
+  loadingResult: LoadingResult | null;
+  isStartingLoading: boolean;
+  loadingError: string | null;
+  startLoading: () => Promise<void>;
+  clearLoadingError: () => void;
   // 作業完了フロー
   completeResult: CompleteResult | null;
   isCompleting: boolean;
@@ -99,6 +112,9 @@ export function useEvidence(): UseEvidenceReturn {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitFailedOffline, setSubmitFailedOffline] = useState(false);
   const [lastResult, setLastResult] = useState<EvidenceResult | null>(null);
+  const [loadingResult, setLoadingResult] = useState<LoadingResult | null>(null);
+  const [isStartingLoading, setIsStartingLoading] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const [completeResult, setCompleteResult] = useState<CompleteResult | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
@@ -136,7 +152,9 @@ export function useEvidence(): UseEvidenceReturn {
     (async () => {
       const { data, error } = await supabase
         .from("wait_logs")
-        .select("id, ticket_number, arrival_time, facilities(name, notification_number)")
+        .select(
+          "id, ticket_number, arrival_time, claimed_at, status, work_start_time, waiting_minutes, facilities(name, notification_number)"
+        )
         .eq("user_id", user.id)
         .in("status", ["waiting", "called", "working"])
         .order("created_at", { ascending: false })
@@ -152,10 +170,21 @@ export function useEvidence(): UseEvidenceReturn {
         setLastResult({
           logId: data.id,
           ticketNumber: data.ticket_number,
-          arrivalTime: data.arrival_time,
+          // 等級Cでは arrival_time が承認処理を行った時刻になるため主張時刻を優先する
+          arrivalTime: data.claimed_at ?? data.arrival_time,
           facilityName: facility?.name ?? "不明",
           facilityNotificationNumber: facility?.notification_number ?? null,
         });
+
+        // 荷役開始済みの状態も復元する。これを復元しないと、再読み込み後に
+        // 荷役開始ボタンが再表示され、押すとRPCが「すでに荷役開始済み」で失敗する。
+        if (data.work_start_time) {
+          setLoadingResult({
+            logId: data.id,
+            startedAt: data.work_start_time,
+            waitingMinutes: data.waiting_minutes ?? null,
+          });
+        }
       }
 
       setIsRestoringState(false);
@@ -269,6 +298,74 @@ export function useEvidence(): UseEvidenceReturn {
     });
     setIsSubmitting(false);
   }, [user, position]);
+
+  // ── 荷役開始打刻（start_loading RPC）──
+  //
+  // 荷待ち時間は「到着〜荷役開始」で算定される。この打刻がないと終端が
+  // 確定せず、待機料が1円も発生しない。従来この時刻を設定できるのは
+  // 管理ダッシュボード側だけだったが、そちらは別組織の管理者からは
+  // 操作できない作りになっており、実質的に誰も設定できなかった。
+  const startLoading = useCallback(async () => {
+    if (!lastResult) {
+      setLoadingError("到着打刻が見つかりません。先に到着打刻を行ってください。");
+      return;
+    }
+    if (!position) {
+      setLoadingError("GPS座標を取得中です。取得完了後に再試行してください。");
+      return;
+    }
+
+    setIsStartingLoading(true);
+    setLoadingError(null);
+
+    let coords: GpsPosition = position;
+    try {
+      coords = await new Promise<GpsPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+    } catch {
+      // watchPosition の最終座標で続行
+    }
+
+    const { data, error } = await supabase.rpc("start_loading", {
+      p_log_id: lastResult.logId,
+      p_latitude: coords.lat,
+      p_longitude: coords.lon,
+    });
+
+    if (error) {
+      const msg = error.message ?? "";
+      if (msg.includes("荷役開始エラー") || msg.includes("check_violation")) {
+        setLoadingError("この打刻はすでに荷役開始済み、または完了・取消済みです。");
+      } else if (msg.includes("no_data_found") || msg.includes("見つからない")) {
+        setLoadingError("待機ログが見つかりません。画面を再読み込みしてください。");
+      } else if (msg.includes("GPS座標")) {
+        setLoadingError("GPS座標を取得できませんでした。取得完了後に再試行してください。");
+      } else {
+        setLoadingError(`荷役開始の記録に失敗しました（${msg}）。再試行してください。`);
+      }
+      setIsStartingLoading(false);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setLoadingError("荷役開始の記録に失敗しました。再試行してください。");
+      setIsStartingLoading(false);
+      return;
+    }
+
+    const result = data[0];
+    setLoadingResult({
+      logId: result.log_id,
+      startedAt: result.started_at,
+      waitingMinutes: result.waiting_minutes ?? null,
+    });
+    setIsStartingLoading(false);
+  }, [lastResult, position]);
 
   // ── 作業完了打刻（complete_ticket RPC）──
   // 出発時のGPS座標は到着時の座標を再利用せず、作業完了操作その場で再取得する。
@@ -389,11 +486,13 @@ export function useEvidence(): UseEvidenceReturn {
     setSubmitFailedOffline(false);
   }, []);
   const clearResult = useCallback(() => setLastResult(null), []);
+  const clearLoadingError = useCallback(() => setLoadingError(null), []);
   const clearCompleteError = useCallback(() => setCompleteError(null), []);
   const clearCancelError = useCallback(() => setCancelError(null), []);
   const resetForNext = useCallback(() => {
     setLastResult(null);
     setCompleteResult(null);
+    setLoadingResult(null);
   }, []);
 
   return {
@@ -406,6 +505,11 @@ export function useEvidence(): UseEvidenceReturn {
     submitFailedOffline,
     clearSubmitError,
     clearResult,
+    loadingResult,
+    isStartingLoading,
+    loadingError,
+    startLoading,
+    clearLoadingError,
     completeResult,
     isCompleting,
     completeError,

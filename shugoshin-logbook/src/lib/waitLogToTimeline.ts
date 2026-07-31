@@ -44,6 +44,23 @@ export function isApprovedClaim(log: WaitLogRow): boolean {
   return log.evidence_grade === "C";
 }
 
+/**
+ * 荷待ち時間の終端（＝荷役開始）を返す。到着からこの時刻までが課金対象。
+ *
+ * 取適法の荷待ち時間は「到着から荷役開始まで」であり、呼出(called_time)は
+ * その途中に置かれる任意の中間イベントにすぎない。呼出から荷役開始までの間も
+ * ドライバーは荷役を待っている以上、荷待ち時間に含まれる。
+ * したがって終端は work_start_time を優先し、これが無い場合にのみ
+ * called_time で代替する。
+ *
+ * どちらも無い場合は null を返し、荷待ち時間を「算定不能」として扱う。
+ * ここで work_end_time にフォールバックしてはならない。荷役作業時間が
+ * まるごと待機料に混入し、過大請求になる（同じ誤りを一度踏んでいる）。
+ */
+export function loadingStartedAt(log: WaitLogRow): string | null {
+  return log.work_start_time ?? log.called_time;
+}
+
 export interface WaitLogTimelineEntry {
   source: string;
   timestamp: string;
@@ -144,9 +161,13 @@ export function convertWaitLogsToTimeline(
       ...gradeFields,
     });
 
-    // 2. 呼出（= 待機終了）→ 待機時間を計算
-    if (log.called_time) {
-      const waitMins = diffMinutes(arrivalAt, log.called_time);
+    // 2. 荷役開始（= 荷待ち終了）→ 荷待ち時間を計算
+    //    終端は work_start_time を優先し、無ければ called_time で代替する
+    //    （理由は loadingStartedAt のコメント参照）。どちらも無い場合は
+    //    荷待ち時間を算定できないため、イベント自体を生成しない。
+    const loadingAt = loadingStartedAt(log);
+    if (loadingAt) {
+      const waitMins = diffMinutes(arrivalAt, loadingAt);
       if (waitMins !== null) {
         totalWaitMinutes += waitMins;
         waitMinutesPerEvent.push(waitMins);
@@ -154,22 +175,10 @@ export function convertWaitLogsToTimeline(
 
       entries.push({
         source: "gps",
-        timestamp: log.called_time,
+        timestamp: loadingAt,
         eventType: "waiting_start",
         locationName: facilityName,
         waitMinutes: waitMins ?? undefined,
-        ticketNumber: log.ticket_number,
-        ...gradeFields,
-      });
-    }
-
-    // 3. 作業開始
-    if (log.work_start_time) {
-      entries.push({
-        source: "gps",
-        timestamp: log.work_start_time,
-        eventType: "loading_start",
-        locationName: facilityName,
         ticketNumber: log.ticket_number,
         ...gradeFields,
       });
@@ -180,7 +189,7 @@ export function convertWaitLogsToTimeline(
     //    ここに work 時間を waitMinutes として渡すと、待機料課金（calcWaitCost）に
     //    作業時間が混入し、待機料を過大計算してしまう。
     if (workEndAt) {
-      const workMins = diffMinutes(log.work_start_time, workEndAt);
+      const workMins = diffMinutes(loadingAt, workEndAt);
       if (workMins !== null) totalWorkMinutes += workMins;
 
       entries.push({
@@ -216,18 +225,18 @@ export function generateFormalReportFromWaitLogs(
     const facilityName = facilityMap[log.facility_id] || "不明な施設";
     const arrivalAt = effectiveArrival(log);
     const workEndAt = effectiveWorkEnd(log);
+    const loadingAt = loadingStartedAt(log);
     const arrivalStr = formatTimeOrNull(arrivalAt);
-    const calledStr = formatTimeOrNull(log.called_time);
-    const workStartStr = formatTimeOrNull(log.work_start_time);
+    const loadingStr = formatTimeOrNull(loadingAt);
     const workEndStr = formatTimeOrNull(workEndAt);
 
-    const waitMins = diffMinutes(arrivalAt, log.called_time);
-    const workMins = diffMinutes(log.work_start_time, workEndAt);
+    const waitMins = diffMinutes(arrivalAt, loadingAt);
+    const workMins = diffMinutes(loadingAt, workEndAt);
 
     lines.push(`▶ ${facilityName}（整理券 #${log.ticket_number}）`);
     lines.push(`  到着時刻: ${arrivalStr}`);
-    lines.push(`  荷待ち時間: ${waitMins !== null ? `${waitMins}分（${arrivalStr}〜${calledStr}）` : "未記録"}`);
-    lines.push(`  作業時間: ${workMins !== null ? `${workMins}分（${workStartStr}〜${workEndStr}）` : "未記録"}`);
+    lines.push(`  荷待ち時間: ${waitMins !== null ? `${waitMins}分（${arrivalStr}〜${loadingStr}）` : "未記録"}`);
+    lines.push(`  作業時間: ${workMins !== null ? `${workMins}分（${loadingStr}〜${workEndStr}）` : "未記録"}`);
 
     // 等級Cは時刻がサーバー検証されていない。等級Aと同じ体裁で出すと
     // 証拠の強さを偽ることになるため、必ず注記を添える。

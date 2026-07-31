@@ -860,6 +860,18 @@ export type Database = {
           rejected_at: string
         }[]
       }
+      start_loading: {
+        Args: {
+          p_latitude: number
+          p_log_id: string
+          p_longitude: number
+        }
+        Returns: {
+          log_id: string
+          started_at: string
+          waiting_minutes: number | null
+        }[]
+      }
       queue_offline_punch: {
         Args: {
           p_accuracy_m?: number | null

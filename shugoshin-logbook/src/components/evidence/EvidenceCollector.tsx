@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock, WifiOff, FileClock } from "lucide-react";
+import { MapPin, Loader2, CheckCircle2, Radar, RotateCcw, LogOut, Clock, WifiOff, FileClock, PackageOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useEvidence } from "@/hooks/useEvidence";
@@ -26,6 +26,11 @@ export function EvidenceCollector() {
     submitEvidence,
     submitFailedOffline,
     clearSubmitError,
+    loadingResult,
+    isStartingLoading,
+    loadingError,
+    startLoading,
+    clearLoadingError,
     completeResult,
     isCompleting,
     completeError,
@@ -52,6 +57,17 @@ export function EvidenceCollector() {
     });
     clearCompleteError();
   }, [completeError, toast, clearCompleteError]);
+
+  // loadingError をトースト通知に変換
+  useEffect(() => {
+    if (!loadingError) return;
+    toast({
+      variant: "destructive",
+      title: "荷役開始エラー",
+      description: loadingError,
+    });
+    clearLoadingError();
+  }, [loadingError, toast, clearLoadingError]);
 
   // cancelError をトースト通知に変換
   useEffect(() => {
@@ -418,6 +434,57 @@ export function EvidenceCollector() {
             </Alert>
           )}
 
+          {/* ── 荷役開始（荷待ち時間の終端を確定する）──
+              この打刻がないと荷待ち時間の終端が決まらず、待機料が発生しない。
+              到着と作業完了の間に必ず挟まる操作。 */}
+          {!loadingResult ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4">
+              <p className="text-sm font-bold text-sky-900 dark:text-sky-200">
+                荷役が始まったら押してください
+              </p>
+              <p className="text-xs text-sky-800 dark:text-sky-300">
+                ここまでが荷待ち時間として記録され、<strong>待機料の算定根拠になります</strong>。
+                押し忘れると荷待ち時間が確定せず、待機料を請求できません。
+              </p>
+              <Button
+                size="lg"
+                disabled={isButtonLocked || isStartingLoading}
+                onClick={startLoading}
+                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold"
+                style={{ minHeight: "88px", fontSize: "1.25rem" }}
+              >
+                {isStartingLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    記録中...
+                  </span>
+                ) : !isOnline ? (
+                  <span className="flex items-center gap-2 opacity-60">
+                    <WifiOff className="h-6 w-6" />
+                    オフライン
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <PackageOpen className="h-6 w-6" />
+                    荷役開始
+                  </span>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-3 rounded-xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 p-4">
+              <CheckCircle2 className="h-6 w-6 text-sky-500 shrink-0" />
+              <div className="text-center">
+                <p className="text-sm font-bold text-foreground">荷役開始を記録しました</p>
+                {loadingResult.waitingMinutes != null && (
+                  <p className="text-xs text-muted-foreground">
+                    荷待ち時間 {loadingResult.waitingMinutes}分を確定（待機料の算定対象）
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 水産物情報フォーム */}
           <FisheryForm
             value={fisheryData}
@@ -425,6 +492,20 @@ export function EvidenceCollector() {
             notificationNumber={lastResult.facilityNotificationNumber}
             transferDate={new Date(lastResult.arrivalTime)}
           />
+
+          {/* 荷役開始を飛ばすと荷待ち時間の終端が決まらず待機料がゼロになる。
+              完了直前にもう一度警告する。 */}
+          {!loadingResult && (
+            <Alert variant="destructive">
+              <AlertTitle>荷役開始が未記録です</AlertTitle>
+              <AlertDescription>
+                このまま作業完了すると荷待ち時間が確定せず、
+                <strong>この待機の待機料を請求できません</strong>。
+                荷役が始まった時点に戻れない場合は、先に上の「荷役開始」を押してから
+                作業完了してください。
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* 作業完了ボタン */}
           <Button
