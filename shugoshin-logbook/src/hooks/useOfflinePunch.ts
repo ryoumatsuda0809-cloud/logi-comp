@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import type { FisheryData } from "@/hooks/useEvidence";
 import {
   enqueuePunch,
   flushPunchQueue,
@@ -30,6 +31,7 @@ export interface UseOfflinePunchReturn {
     accuracyM?: number | null;
     note?: string | null;
     waitLogId?: string | null;
+    fisheryData?: FisheryData | null;
   }) => OfflinePunch;
   /** 手動送信（通常は復帰時に自動で走る） */
   flushNow: () => Promise<void>;
@@ -91,7 +93,15 @@ export function useOfflinePunch(): UseOfflinePunchReturn {
   }, [isOnline, user, flushNow]);
 
   const recordOfflinePunch = useCallback<UseOfflinePunchReturn["recordOfflinePunch"]>(
-    ({ punchType, latitude, longitude, accuracyM = null, note = null, waitLogId = null }) => {
+    ({
+      punchType,
+      latitude,
+      longitude,
+      accuracyM = null,
+      note = null,
+      waitLogId = null,
+      fisheryData = null,
+    }) => {
       const entry = enqueuePunch({
         punchType,
         // 端末時刻。検証不能な「主張」であり、サーバーは received_at を別に記録する
@@ -101,6 +111,7 @@ export function useOfflinePunch(): UseOfflinePunchReturn {
         accuracyM,
         note,
         waitLogId,
+        fisheryData,
       });
       syncFromStorage();
       return entry;

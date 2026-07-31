@@ -149,6 +149,26 @@ export function EvidenceCollector() {
     });
   };
 
+  // 圏外の作業完了を仮記録する。
+  // 実務では「到着はオンラインで正常、完了打刻だけ圏外」が最も多い。
+  // 水産物情報は法令上の要求項目なので、完了の仮記録でも入力を必須にする。
+  const handleRecordOfflineCompletion = () => {
+    if (!position || !lastResult || !isFisheryDataValid) return;
+    recordOfflinePunch({
+      punchType: "completion",
+      latitude: position.lat,
+      longitude: position.lon,
+      waitLogId: lastResult.logId,
+      fisheryData: fisheryData as FisheryData,
+    });
+    toast({
+      title: "作業完了を仮記録しました",
+      description:
+        "通信が回復すると自動で送信されます。管理者の承認後に正式な記録になります。",
+    });
+    setFisheryData({});
+  };
+
   // 状態復元中はローディング表示
   if (isRestoringState) {
     return (
@@ -441,6 +461,34 @@ export function EvidenceCollector() {
               </span>
             )}
           </Button>
+
+          {/* ── 圏外時の完了仮記録 ──
+              実務では「到着はオンラインで正常、完了打刻だけ圏外」が最も多い。
+              水産物情報は法令上の要求項目なので、仮記録でも入力を必須にする。 */}
+          {canRecordOffline && (
+            <div className="flex flex-col gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                通信がなくても作業完了を記録できます
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                GPS座標は取得できているため、出発した事実を仮記録として残せます。
+                通信が回復すると自動で送信され、
+                <strong>管理者が承認すると正式な記録になります</strong>。
+                {!isFisheryDataValid && "（先に水産物情報の入力が必要です）"}
+              </p>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={!isFisheryDataValid}
+                onClick={handleRecordOfflineCompletion}
+                className="w-full border-amber-500 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-bold"
+                style={{ minHeight: "64px" }}
+              >
+                <FileClock className="mr-2 h-5 w-5" />
+                作業完了を仮記録する
+              </Button>
+            </div>
+          )}
         </>
       )}
 

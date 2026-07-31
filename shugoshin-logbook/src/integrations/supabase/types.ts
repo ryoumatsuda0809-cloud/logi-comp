@@ -597,13 +597,19 @@ export type Database = {
       }
       wait_logs: {
         Row: {
+          approved_by: string | null
           arrival_time: string
           called_time: string | null
+          claimed_at: string | null
+          claimed_end_at: string | null
           created_at: string
+          evidence_grade: string
           facility_id: string
           id: string
           latitude: number | null
           longitude: number | null
+          self_approved: boolean
+          source_punch_id: string | null
           status: string | null
           ticket_number: number
           user_id: string
@@ -837,6 +843,22 @@ export type Database = {
       join_organization_by_invite_code: {
         Args: { _code: string }
         Returns: string
+      }
+      approve_pending_punch: {
+        Args: { p_punch_id: string; p_review_note?: string | null }
+        Returns: {
+          punch_id: string
+          self_approved: boolean
+          ticket_number: number
+          wait_log_id: string
+        }[]
+      }
+      reject_pending_punch: {
+        Args: { p_punch_id: string; p_review_note: string }
+        Returns: {
+          punch_id: string
+          rejected_at: string
+        }[]
       }
       queue_offline_punch: {
         Args: {

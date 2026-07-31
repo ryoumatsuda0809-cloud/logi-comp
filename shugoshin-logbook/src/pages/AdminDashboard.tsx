@@ -288,6 +288,7 @@ export default function AdminDashboard() {
 
   const [logs, setLogs] = useState<WaitLog[]>([]);
   const [completedLogs, setCompletedLogs] = useState<WaitLog[]>([]);
+  const [pendingPunchCount, setPendingPunchCount] = useState(0);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -387,6 +388,15 @@ export default function AdminDashboard() {
       .order("ticket_number", { ascending: true });
 
     if (completed) setCompletedLogs(completed);
+
+    // 圏外申請の承認待ち件数。RLSにより自組織の分だけが返る。
+    // 施設で絞らないのは、申請時点で拠点が特定できなかった分も拾うため。
+    const { count } = await supabase
+      .from("pending_punches")
+      .select("id", { count: "exact", head: true })
+      .eq("review_status", "pending");
+
+    setPendingPunchCount(count ?? 0);
   }, [selectedFacilityId]);
 
   useEffect(() => {
@@ -567,14 +577,31 @@ export default function AdminDashboard() {
               <p className="text-xs text-primary-foreground/60">🏢 {orgName}</p>
             </div>
           </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="text-primary-foreground"
-            onClick={fetchLogs}
-          >
-            <RefreshCw className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {/* 圏外申請は放置するとドライバーが待機料を請求できないままになる。
+                件数を常に見せて承認画面への導線にする。 */}
+            <Button
+              size="sm"
+              variant={pendingPunchCount > 0 ? "secondary" : "ghost"}
+              className={pendingPunchCount > 0 ? "font-bold" : "text-primary-foreground/70"}
+              onClick={() => navigate("/pending-punches")}
+            >
+              圏外申請
+              {pendingPunchCount > 0 && (
+                <span className="ml-1 rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">
+                  {pendingPunchCount}
+                </span>
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-primary-foreground"
+              onClick={fetchLogs}
+            >
+              <RefreshCw className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {facilities.length > 1 && (

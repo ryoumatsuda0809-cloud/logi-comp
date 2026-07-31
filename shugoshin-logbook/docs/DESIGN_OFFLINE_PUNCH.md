@@ -1,7 +1,7 @@
 # 設計: オフライン打刻と圏外の例外救済
 
-> **ステータス**: 決定済み。**Phase 1 実装済み（本番DB未適用）**
-> **作成**: 2026-07-30 / **最終更新**: 2026-07-30
+> **ステータス**: 決定済み。**Phase 1 本番適用済み / Phase 2 実装済み（本番DB未適用）**
+> **作成**: 2026-07-30 / **最終更新**: 2026-07-31
 > **関連**: [`PROGRESS_LOG.md`](./PROGRESS_LOG.md) / [`CONTEXT_LEGAL_SPEC.md`](./CONTEXT_LEGAL_SPEC.md) / `src/lib/offlineQueue.ts`
 
 ---
@@ -278,6 +278,72 @@ Rule 1（RPCチェーン必須）に従い、`pending_punches` への直接 INSE
 - **完了打刻の圏外申請**。RPC とテーブルは `punch_type='completion'` を受けられるが、UI は到着打刻のみ。完了打刻には水産物情報（魚種・重量・漁獲番号）が伴い、これを圏外でどう入力させるかの検討が要るため Phase 2 に回す
 - **承認/却下**。`approve_pending_punch` / `reject_pending_punch` と管理者UIは Phase 2。現状、申請は溜まるだけで `wait_logs` へは昇格しない
 - **`wait_logs` への等級カラム追加**。昇格が実装されるまで等級Cの行は存在しないため不要
+
+---
+
+## 12. Phase 2 の実装状況（2026-07-31）
+
+### スコープを広げた理由
+
+当初の Phase 2 は「承認/却下＋等級カラム」だったが、**完了打刻の圏外申請まで含める**形に広げた。
+
+理由は本設計書 §4-2 自身が指摘している通り、実務で最も多いのは「到着はオンラインで正常、
+完了打刻だけ圏外」であり、Phase 1 が実装した到着申請はより起きにくい側だったため。
+到着の承認だけを実装すると、承認時に `wait_logs` が `status='waiting'` で作られたまま
+完了されず宙に浮き、`staleTicket.ts` の16時間警告に引っかかる。救済したつもりで
+別の詰まりを生むことになる。
+
+### 実装したもの
+
+| ファイル | 内容 |
+|---|---|
+| `supabase/migrations/20260731100000_approve_pending_punches.sql` | `wait_logs` の等級カラム、`waiting_minutes` GENERATED列の再定義、`approve_pending_punch` / `reject_pending_punch` RPC |
+| `src/pages/PendingPunches.tsx` | 管理者の承認/却下画面（`/pending-punches`、`AdminRoute` 配下） |
+| `src/pages/AdminDashboard.tsx` | 承認待ち件数のバッジと導線 |
+| `src/lib/waitLogToTimeline.ts` | `effectiveArrival` / `effectiveWorkEnd` / `isApprovedClaim` を追加。等級Cの時刻算定と法定乗務記録への注記 |
+| `src/pages/SharedReportView.tsx` | 等級Cの件数注記と該当行への「※」表示 |
+| `src/components/evidence/EvidenceCollector.tsx` | 圏外時の「作業完了を仮記録する」導線（水産物情報の入力を必須にする） |
+| `src/lib/offlinePunchQueue.ts` ほか | 完了申請に水産物情報を載せる |
+| `src/lib/waitLogToTimeline.test.ts` | 等級Cの時刻算定・等級伝播・注記の回帰テスト6件 |
+
+### 実装時に判明した重要な事実
+
+#### `waiting_minutes` は GENERATED 列で、`arrival_time` を参照していた
+
+`wait_logs.waiting_minutes` は `work_end_time - arrival_time` を計算する GENERATED ALWAYS 列。
+等級Cでは `arrival_time` が「承認処理を行った時刻」になるため、このままだと待機時間が
+実態とかけ離れた値（承認が翌日なら負の値）になる。
+
+決定②（証拠カラムはサーバー時刻のまま据え置き、主張時刻は別カラム）を守りつつ
+正しい値を出すため、GENERATED 列の定義を `COALESCE(claimed_at, arrival_time)` /
+`COALESCE(claimed_end_at, work_end_time)` を参照する形に再定義した。
+GENERATED 列は導出値しか持たないため、DROP して再定義しても元データは失われない。
+証拠カラム自体（`arrival_time` / `work_end_time`）とその強制上書きトリガーは無傷。
+
+#### 圏外の申請は承認しない
+
+承認RPCは、拠点からの距離を**承認時点で再計算**し、範囲外なら承認を拒否する。
+ここを緩めると `wait_logs` のジオフェンス保証が全体として失われ、待機料の算定根拠が崩れる。
+オンラインの打刻が圏外で弾かれるのと同じ扱いを、オフライン経由でも維持する。
+
+申請時の判定結果をそのまま使わず再計算するのは、拠点の `radius` 設定が実態に
+合っていない場合に設定を直せば承認できるようにするため（設定ミスで永久に救済不能に
+なるのを防ぐ）。承認画面にもその旨を表示する。
+
+#### 完了申請の承認は、待機ログ全体を等級Cにする
+
+到着がサーバー検証済み（等級A）でも、退出時刻が検証されていない以上、そこから
+算定される待機時間はサーバー検証済みとは言えない。したがって完了申請を承認すると
+その `wait_logs` 行は等級Cになる。
+
+### Phase 3 のうち前倒しで実装した部分
+
+§6（荷主への提示方法）のうち、**等級Cの注記と該当行のマーキングは Phase 2 で実装した**。
+Phase 2 で等級Cの行が実際に生まれるため、区別なしに出すと「証拠の強さを偽らない」という
+本設計の前提が崩れるため。
+
+Phase 3 に残るのは、待機料の内訳を「サーバー検証済分」と「管理者承認分」に分けた
+小計表示、`compliance_logs` の算定ソースからの除外、`offlineQueue.ts` の削除。
 
 ### 適用順序の注意
 

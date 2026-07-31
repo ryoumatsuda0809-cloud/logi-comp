@@ -25,6 +25,7 @@ import DeliveryStatus from "./pages/DeliveryStatus";
 import DailyReportConfirm from "./pages/DailyReportConfirm";
 import SharedReportView from "./pages/SharedReportView";
 import AdminDashboard from "./pages/AdminDashboard";
+import PendingPunches from "./pages/PendingPunches";
 
 const queryClient = new QueryClient();
 
@@ -191,6 +192,16 @@ const App = () => {
                 <ProtectedRoute>
                   <AdminRoute>
                     <AdminDashboard />
+                  </AdminRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pending-punches"
+              element={
+                <ProtectedRoute>
+                  <AdminRoute>
+                    <PendingPunches />
                   </AdminRoute>
                 </ProtectedRoute>
               }

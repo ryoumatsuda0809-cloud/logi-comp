@@ -16,6 +16,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import type { FisheryData } from "@/hooks/useEvidence";
+import type { Json } from "@/integrations/supabase/types";
 
 const QUEUE_KEY = "OFFLINE_PUNCH_QUEUE";
 const FAILED_KEY = "OFFLINE_PUNCH_FAILED";
@@ -34,6 +36,24 @@ export interface OfflinePunch {
   note: string | null;
   /** 完了打刻の申請の場合、対象の待機ログID */
   waitLogId: string | null;
+  /** 完了打刻の申請に付随する水産物情報。到着の申請では null */
+  fisheryData: FisheryData | null;
+}
+
+/**
+ * 水産物情報をRPCへ渡す形に整える。
+ *
+ * 漁獲番号は特定第一種水産動植物のみ法令上必要なため、対象外の魚種では
+ * catch_number を持たせない（useEvidence.completeTicket と同じ整形）。
+ */
+function toFisheryPayload(data: FisheryData | null): Json | null {
+  if (!data) return null;
+  return {
+    species: data.species,
+    weight_kg: data.weight_kg,
+    ...(data.species_id ? { species_id: data.species_id } : {}),
+    ...(data.catch_number ? { catch_number: data.catch_number } : {}),
+  };
 }
 
 /** 送信したがサーバーに恒久的に拒否された申請（理由をドライバーに見せるために保持する） */
@@ -144,6 +164,7 @@ export async function flushPunchQueue(): Promise<FlushResult> {
       p_accuracy_m: punch.accuracyM,
       p_note: punch.note,
       p_wait_log_id: punch.waitLogId,
+      p_fishery_data: toFisheryPayload(punch.fisheryData),
     });
 
     if (!error) {

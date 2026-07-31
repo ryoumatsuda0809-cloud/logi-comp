@@ -107,6 +107,101 @@ describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テス�
   });
 });
 
+describe("等級C（圏外申告の承認記録）の扱い", () => {
+  const facilityMap = { "facility-1": "下関中央卸売市場" };
+
+  // 圏外の到着を9:00に主張し、管理者が翌日15:00に承認したケース。
+  // arrival_time には承認時刻が入るため、これを起点にすると待機時間が壊れる。
+  const gradeCLog: WaitLogRow = {
+    id: "log-c",
+    facility_id: "facility-1",
+    ticket_number: 1,
+    status: "completed",
+    arrival_time: "2026-07-31T15:00:00.000Z", // 承認処理を行ったサーバー時刻
+    claimed_at: "2026-07-30T09:00:00.000Z", // ドライバーが主張する実際の到着
+    called_time: "2026-07-30T10:00:00.000Z", // 荷待ち60分
+    work_start_time: "2026-07-30T10:00:00.000Z",
+    work_end_time: "2026-07-31T15:00:00.000Z", // 承認時刻
+    claimed_end_at: "2026-07-30T11:00:00.000Z", // 主張する作業完了
+    evidence_grade: "C",
+    self_approved: false,
+  };
+
+  it("待機時間は承認時刻ではなく主張時刻から算出される", () => {
+    const { entries, totalWaitMinutes, waitMinutesPerEvent } = convertWaitLogsToTimeline(
+      [gradeCLog],
+      facilityMap
+    );
+
+    // 承認時刻(7/31 15:00)を起点にすると負の値になる。主張時刻(7/30 9:00)が使われること
+    expect(totalWaitMinutes).toBe(60);
+    expect(waitMinutesPerEvent).toEqual([60]);
+
+    const arrival = entries.find((e) => e.eventType === "arrival");
+    expect(arrival?.timestamp).toBe("2026-07-30T09:00:00.000Z");
+
+    const departure = entries.find((e) => e.eventType === "departure");
+    expect(departure?.timestamp).toBe("2026-07-30T11:00:00.000Z");
+  });
+
+  it("等級Cのエントリには等級が伝播し、荷主向けに区別できる", () => {
+    const { entries } = convertWaitLogsToTimeline([gradeCLog], facilityMap);
+    expect(entries.every((e) => e.evidenceGrade === "C")).toBe(true);
+  });
+
+  it("等級A（通常の打刻）には等級が付かず、従来通りの挙動になる", () => {
+    const gradeALog: WaitLogRow = {
+      id: "log-a",
+      facility_id: "facility-1",
+      ticket_number: 2,
+      status: "completed",
+      arrival_time: "2026-07-30T09:00:00.000Z",
+      called_time: "2026-07-30T09:40:00.000Z",
+      work_start_time: "2026-07-30T09:40:00.000Z",
+      work_end_time: "2026-07-30T10:00:00.000Z",
+    };
+
+    const { entries, totalWaitMinutes } = convertWaitLogsToTimeline([gradeALog], facilityMap);
+    expect(totalWaitMinutes).toBe(40);
+    expect(entries.every((e) => e.evidenceGrade === undefined)).toBe(true);
+  });
+
+  it("法定乗務記録に、サーバー検証されていない旨の注記が入る", () => {
+    const report = generateFormalReportFromWaitLogs([gradeCLog], facilityMap);
+    expect(report).toContain("運行管理者が承認した記録");
+    expect(report).toContain("時刻のサーバー自動検証は行われていません");
+    // 主張時刻ベースの荷待ち時間が出ていること
+    expect(report).toContain("60分");
+  });
+
+  it("自己承認の場合はその旨も法定乗務記録に明示される", () => {
+    const report = generateFormalReportFromWaitLogs(
+      [{ ...gradeCLog, self_approved: true }],
+      facilityMap
+    );
+    expect(report).toContain("承認者は運転者本人");
+  });
+
+  it("等級Aの記録には承認の注記が付かない", () => {
+    const report = generateFormalReportFromWaitLogs(
+      [
+        {
+          id: "log-a",
+          facility_id: "facility-1",
+          ticket_number: 1,
+          status: "completed",
+          arrival_time: "2026-07-30T09:00:00.000Z",
+          called_time: "2026-07-30T09:40:00.000Z",
+          work_start_time: "2026-07-30T09:40:00.000Z",
+          work_end_time: "2026-07-30T10:00:00.000Z",
+        },
+      ],
+      facilityMap
+    );
+    expect(report).not.toContain("運行管理者が承認した記録");
+  });
+});
+
 describe("sumWaitCost — 30分控除の適用単位（過大請求防止）", () => {
   it("30分の控除は待機1回ごとに適用される（日次合計に1回だけ適用しない）", () => {
     // 40分待機 × 2回、4t車（50円/分）

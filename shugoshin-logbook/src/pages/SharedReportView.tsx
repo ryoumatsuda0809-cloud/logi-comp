@@ -26,6 +26,9 @@ interface TimelineEntry {
   locationName?: string;
   waitMinutes?: number;
   waitCost?: number;
+  /** 'C'=通信圏外の申告を運行管理者が承認したもの。等級Aと区別して提示する */
+  evidenceGrade?: string;
+  selfApproved?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -215,6 +218,15 @@ export default function SharedReportView() {
     );
   }
 
+  // 等級C（通信圏外の申告を管理者が承認したもの）の件数。
+  // 到着イベントで数えることで、1回の待機を1件として数える。
+  const approvedClaimCount = report.timeline_snapshot.filter(
+    (t) => t.evidenceGrade === "C" && t.eventType === "arrival"
+  ).length;
+  const selfApprovedCount = report.timeline_snapshot.filter(
+    (t) => t.evidenceGrade === "C" && t.eventType === "arrival" && t.selfApproved
+  ).length;
+
   const cellClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm";
   const thClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm font-bold bg-gray-200 print:bg-gray-200 text-left";
 
@@ -355,6 +367,31 @@ export default function SharedReportView() {
         </section>
 
         {/* ══════════════════════════════════════════════ */}
+        {/*  等級Cの注記                                   */}
+        {/*  時刻がサーバー検証されていない記録を等級Aと    */}
+        {/*  同じ体裁で提示すると証拠の強さを偽ることになる */}
+        {/* ══════════════════════════════════════════════ */}
+        {approvedClaimCount > 0 && (
+          <div className="mb-8 print:mb-3 border-l-4 border-gray-500 bg-gray-50 px-4 py-3 break-inside-avoid print:bg-gray-50">
+            <p className="font-bold text-black text-sm">
+              ※ 通信圏外で記録された打刻が{approvedClaimCount}件含まれています
+            </p>
+            <p className="mt-1 text-xs text-gray-700 leading-relaxed">
+              これらは携帯電波の届かない場所で端末に記録され、通信復帰後に運行管理者が
+              内容を確認して承認した記録です。GPS座標は打刻時点で取得されていますが、
+              <strong>時刻についてはサーバーによる自動検証が行われていません</strong>。
+              下表では該当行に「※」を付しています。
+              {selfApprovedCount > 0 && (
+                <>
+                  {" "}
+                  うち{selfApprovedCount}件は承認者と運転者が同一です。
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════ */}
         {/*  DISCREPANCY WARNING                           */}
         {/* ══════════════════════════════════════════════ */}
         {report.has_discrepancy && (
@@ -415,6 +452,15 @@ export default function SharedReportView() {
                       </td>
                       <td className={cellClass}>
                         {item.source === "gps" ? "GPS" : "音声"}
+                        {item.evidenceGrade === "C" && (
+                          <span
+                            className="font-bold"
+                            title="通信圏外で記録され、運行管理者が承認した記録（時刻のサーバー検証なし）"
+                          >
+                            {" "}
+                            ※
+                          </span>
+                        )}
                       </td>
                       <td className={cellClass}>{item.locationName || "—"}</td>
                       <td className={`${cellClass} text-right ${isWait ? "font-bold" : ""}`}>

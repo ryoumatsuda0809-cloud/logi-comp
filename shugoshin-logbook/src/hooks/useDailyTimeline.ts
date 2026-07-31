@@ -23,6 +23,10 @@ export interface UnifiedTimelineItem {
   accuracy?: string | null; // from system_note or metadata
   isManual?: boolean;
   discrepancy?: boolean;
+  /** 'C' のとき管理者が承認した圏外申告。荷主への提示で等級Aと区別すること */
+  evidenceGrade?: string;
+  /** 等級Cで承認者と申請者が同一だった場合 true */
+  selfApproved?: boolean;
   // voice-specific
   summary?: string;
   shipperName?: string;
@@ -217,6 +221,10 @@ export function useDailyTimeline(): DailyTimelineResult {
         called_time: wl.called_time,
         work_start_time: wl.work_start_time,
         work_end_time: wl.work_end_time,
+        evidence_grade: wl.evidence_grade,
+        claimed_at: wl.claimed_at,
+        claimed_end_at: wl.claimed_end_at,
+        self_approved: wl.self_approved,
       }));
       const { entries } = convertWaitLogsToTimeline(waitLogRows, facilityMap);
       for (const entry of entries) {
@@ -231,6 +239,8 @@ export function useDailyTimeline(): DailyTimelineResult {
           location: entry.locationName,
           waitMinutes: wm > 0 ? wm : undefined,
           estimatedCost: cost,
+          evidenceGrade: entry.evidenceGrade,
+          selfApproved: entry.selfApproved,
           rawId: entry.ticketNumber?.toString() ?? "",
         });
       }
