@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { authErrorMessage, isEmailRateLimitError } from "@/lib/authErrors";
 
 
 export default function Auth() {
@@ -16,6 +17,8 @@ export default function Auth() {
   const [displayName, setDisplayName] = useState("");
   const [autoLogin, setAutoLogin] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // 利用者側で解決できないエラーは、消えるトーストではなく画面に残す
+  const [blockingError, setBlockingError] = useState<string | null>(null);
   const { toast } = useToast();
 
   if (loading) {
@@ -43,12 +46,16 @@ export default function Auth() {
       : await signUp(email, password, displayName);
 
     if (error) {
+      // Supabase のエラーは英語で返るため、そのまま出すと日本語話者に伝わらない。
+      // 送信上限のように利用者側で解決できないものは画面上にも残す。
+      setBlockingError(isEmailRateLimitError(error.message) ? error.message : null);
       toast({
         title: "エラー",
-        description: error.message,
+        description: authErrorMessage(error.message),
         variant: "destructive",
       });
     } else if (!isLogin) {
+      setBlockingError(null);
       toast({
         title: "登録完了",
         description: "確認メールをご確認ください。",
@@ -71,6 +78,17 @@ export default function Auth() {
         <h2 className="mb-6 text-center text-xl font-bold text-card-foreground">
           {isLogin ? "ログイン" : "新規登録"}
         </h2>
+
+        {/* 送信上限は利用者の操作では解消できないため、トーストが消えたあとも
+            状況が分かるように画面上に残す。 */}
+        {blockingError && (
+          <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+            <p className="text-sm font-bold text-destructive">登録を受け付けられません</p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              {authErrorMessage(blockingError)}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (

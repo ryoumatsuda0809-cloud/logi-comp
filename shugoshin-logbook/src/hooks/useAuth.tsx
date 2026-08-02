@@ -36,7 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName } },
+      options: {
+        data: { display_name: displayName },
+        // 確認メールのリンクから戻る先を、いま開いているオリジンに固定する。
+        // 未指定だと Supabase の Site URL 設定に依存するため、デプロイ先を
+        // 変更した際（本プロジェクトでは Vercel の接続先リポジトリを差し替えた
+        // 経緯がある）に古いURLへ飛ぶ事故が起きうる。
+        // ※ Supabase 側の Redirect URLs 許可リストに本番URLの登録が必要。
+        emailRedirectTo: `${window.location.origin}/`,
+      },
     });
     return { error: error ? new Error(error.message) : null };
   };
