@@ -22,7 +22,11 @@ import type { Json } from "@/integrations/supabase/types";
 const QUEUE_KEY = "OFFLINE_PUNCH_QUEUE";
 const FAILED_KEY = "OFFLINE_PUNCH_FAILED";
 
-export type PunchType = "arrival" | "completion";
+/**
+ * 'loading_start' は荷待ち時間の終端＝待機料の課金境界にあたる。
+ * 圏外でこれを記録できないと、その待機の待機料をまるごと失う。
+ */
+export type PunchType = "arrival" | "loading_start" | "completion";
 
 export interface OfflinePunch {
   /** 冪等キー。再送しても二重申請にならないよう端末側で発番する */

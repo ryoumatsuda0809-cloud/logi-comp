@@ -223,6 +223,7 @@ export function useDailyTimeline(): DailyTimelineResult {
         work_end_time: wl.work_end_time,
         evidence_grade: wl.evidence_grade,
         claimed_at: wl.claimed_at,
+        claimed_loading_at: wl.claimed_loading_at,
         claimed_end_at: wl.claimed_end_at,
         self_approved: wl.self_approved,
       }));

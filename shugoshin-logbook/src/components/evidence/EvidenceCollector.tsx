@@ -165,6 +165,24 @@ export function EvidenceCollector() {
     });
   };
 
+  // 圏外の荷役開始を仮記録する。
+  // 荷役開始は荷待ち時間の終端＝待機料の課金境界なので、ここを記録できないと
+  // その待機の待機料をまるごと失う。圏外救済の中で最も金額に直結する。
+  const handleRecordOfflineLoading = () => {
+    if (!position || !lastResult) return;
+    recordOfflinePunch({
+      punchType: "loading_start",
+      latitude: position.lat,
+      longitude: position.lon,
+      waitLogId: lastResult.logId,
+    });
+    toast({
+      title: "荷役開始を仮記録しました",
+      description:
+        "通信が回復すると自動で送信されます。管理者の承認後に荷待ち時間が確定します。",
+    });
+  };
+
   // 圏外の作業完了を仮記録する。
   // 実務では「到着はオンラインで正常、完了打刻だけ圏外」が最も多い。
   // 水産物情報は法令上の要求項目なので、完了の仮記録でも入力を必須にする。
@@ -470,6 +488,21 @@ export function EvidenceCollector() {
                   </span>
                 )}
               </Button>
+
+              {/* 圏外でも荷待ちの終端を残せるようにする。
+                  ここを取り逃すとこの待機の待機料がゼロになる。 */}
+              {canRecordOffline && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleRecordOfflineLoading}
+                  className="w-full border-amber-500 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-bold"
+                  style={{ minHeight: "64px" }}
+                >
+                  <FileClock className="mr-2 h-5 w-5" />
+                  通信がないので仮記録する
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center gap-3 rounded-xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 p-4">

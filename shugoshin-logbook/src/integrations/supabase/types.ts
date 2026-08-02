@@ -602,6 +602,7 @@ export type Database = {
           called_time: string | null
           claimed_at: string | null
           claimed_end_at: string | null
+          claimed_loading_at: string | null
           created_at: string
           evidence_grade: string
           facility_id: string

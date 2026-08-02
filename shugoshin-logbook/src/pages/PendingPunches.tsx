@@ -44,6 +44,7 @@ interface PendingPunchRow {
 
 const PUNCH_TYPE_LABELS: Record<string, string> = {
   arrival: "到着打刻",
+  loading_start: "荷役開始打刻",
   completion: "作業完了打刻",
 };
 

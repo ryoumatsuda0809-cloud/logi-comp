@@ -16,6 +16,8 @@ export interface WaitLogRow {
   evidence_grade?: string | null;
   /** 等級Cのみ。ドライバーが主張する到着時刻。arrival_time は承認処理を行った時刻 */
   claimed_at?: string | null;
+  /** 等級Cのみ。ドライバーが主張する荷役開始時刻。work_start_time は承認処理を行った時刻 */
+  claimed_loading_at?: string | null;
   /** 等級Cのみ。ドライバーが主張する作業完了時刻 */
   claimed_end_at?: string | null;
   /** 承認者と申請者が同一だった場合 true */
@@ -58,7 +60,9 @@ export function isApprovedClaim(log: WaitLogRow): boolean {
  * まるごと待機料に混入し、過大請求になる（同じ誤りを一度踏んでいる）。
  */
 export function loadingStartedAt(log: WaitLogRow): string | null {
-  return log.work_start_time ?? log.called_time;
+  // 等級Cでは work_start_time が承認処理を行ったサーバー時刻になるため、
+  // ドライバーの主張時刻を優先する（effectiveArrival と同じ理由）。
+  return log.claimed_loading_at ?? log.work_start_time ?? log.called_time;
 }
 
 export interface WaitLogTimelineEntry {

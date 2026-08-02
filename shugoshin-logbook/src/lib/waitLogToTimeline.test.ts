@@ -233,6 +233,32 @@ describe("等級C（圏外申告の承認記録）の扱い", () => {
     expect(departure?.timestamp).toBe("2026-07-30T11:00:00.000Z");
   });
 
+  it("圏外の荷役開始が承認された場合、荷待ちの終端は承認時刻ではなく主張時刻になる", () => {
+    // 到着はオンラインで正常（9:00）、荷役開始だけ圏外で申告（9:45）、
+    // 管理者の承認は翌日15:00。work_start_time には承認時刻が入る。
+    const logs: WaitLogRow[] = [
+      {
+        id: "log-ls",
+        facility_id: "facility-1",
+        ticket_number: 1,
+        status: "completed",
+        arrival_time: "2026-08-03T09:00:00.000Z",
+        called_time: null,
+        work_start_time: "2026-08-04T15:00:00.000Z", // 承認時刻
+        claimed_loading_at: "2026-08-03T09:45:00.000Z", // 主張する荷役開始
+        work_end_time: "2026-08-03T10:30:00.000Z",
+        evidence_grade: "C",
+      },
+    ];
+
+    const { totalWaitMinutes, entries } = convertWaitLogsToTimeline(logs, facilityMap);
+
+    // 承認時刻を終端にすると1日以上の待機になってしまう
+    expect(totalWaitMinutes).toBe(45);
+    const wait = entries.find((e) => e.eventType === "waiting_start");
+    expect(wait?.timestamp).toBe("2026-08-03T09:45:00.000Z");
+  });
+
   it("等級Cのエントリには等級が伝播し、荷主向けに区別できる", () => {
     const { entries } = convertWaitLogsToTimeline([gradeCLog], facilityMap);
     expect(entries.every((e) => e.evidenceGrade === "C")).toBe(true);
