@@ -19,6 +19,10 @@ interface ReportRow {
   location_name: string | null;
   report_month: string | null;
   total_visits: number | null;
+  /** 荷待ち時間を算定できなかった訪問数（荷役開始が未記録） */
+  unmeasured_visits: number | null;
+  /** 等級C＝通信圏外の申告を運行管理者が承認した訪問数 */
+  approved_claim_visits: number | null;
   total_wait_minutes: number | null;
   estimated_loss_jpy: number | null;
   gmen_risk_level: string | null;
@@ -86,6 +90,11 @@ export default function Report() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
+
+  // 帳票全体での内訳。0円や少ない金額が「待機が無かった」と読まれないよう、
+  // 算定できなかった訪問と時刻未検証の訪問を注記で明示するために集計する。
+  const totalUnmeasured = rows.reduce((s, r) => s + (r.unmeasured_visits ?? 0), 0);
+  const totalApprovedClaims = rows.reduce((s, r) => s + (r.approved_claim_visits ?? 0), 0);
 
   useEffect(() => {
     if (!orgId) return;
@@ -251,6 +260,19 @@ export default function Report() {
                     <TableCell className="print:text-black">{formatMonth(row.report_month)}</TableCell>
                     <TableCell className="text-right print:text-black">
                       {row.total_visits ?? 0}
+                      {/* 算定不能・等級Cが混ざっていることを帳票上で明示する。
+                          注記がないと「0円＝待機がなかった」と誤読される。 */}
+                      {((row.unmeasured_visits ?? 0) > 0 ||
+                        (row.approved_claim_visits ?? 0) > 0) && (
+                        <div className="text-xs text-muted-foreground print:text-gray-600">
+                          {(row.unmeasured_visits ?? 0) > 0 && (
+                            <div>うち算定不可 {row.unmeasured_visits}</div>
+                          )}
+                          {(row.approved_claim_visits ?? 0) > 0 && (
+                            <div>うち圏外承認 {row.approved_claim_visits}</div>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-semibold print:text-black">
                       {row.total_wait_minutes ?? 0}分
@@ -272,15 +294,36 @@ export default function Report() {
         )}
 
         {rows.length > 0 && (
-          <p className="mt-3 text-xs text-muted-foreground print:text-gray-600">
-            ※ 遅延損害金は月次推定損失を年換算し、取適法に定める年率14.6%を適用した参考値です。
-          </p>
+          <div className="mt-3 space-y-1 text-xs text-muted-foreground print:text-gray-600">
+            <p>
+              ※ 待機料は待機1回ごとに30分を控除して算定しています。
+            </p>
+            <p>
+              ※ 遅延損害金は月次推定損失を年換算し、取適法に定める年率14.6%を適用した参考値です。
+            </p>
+            {totalUnmeasured > 0 && (
+              <p>
+                ※「算定不可」は荷役開始が記録されておらず荷待ち時間を確定できなかった訪問です。
+                待機が無かったことを意味しません（{totalUnmeasured}件）。
+              </p>
+            )}
+            {totalApprovedClaims > 0 && (
+              <p>
+                ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
+                {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
+                時刻についてはサーバーによる自動検証が行われていません。
+              </p>
+            )}
+          </div>
         )}
 
         {/* Legal Disclaimer Footer */}
         <footer className="mt-8 border-t border-border pt-4 print:mt-12 print:border-black">
           <p className="text-sm font-semibold leading-relaxed text-foreground print:text-black">
-            本資料は、2026年施行の「中小受託取引適正化法」および国土交通省の監視基準に基づき生成されています。記録された待機時間はGPSおよび端末ログにより担保されており、法的な支払督促の根拠資料として有効です。
+            本資料は、2026年施行の「中小受託取引適正化法」および国土交通省の監視基準に基づき生成されています。
+            {totalApprovedClaims > 0
+              ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"
+              : "記録された待機時間はGPSおよび端末ログにより担保されており、法的な支払督促の根拠資料として有効です。"}
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground print:text-gray-600">
             取適法により、役務提供完了日から60日を超える支払遅延には年率14.6%の遅延利息が課されます。本レポートの数値はシステムが自動計算した参考値であり、法的助言を構成するものではありません。

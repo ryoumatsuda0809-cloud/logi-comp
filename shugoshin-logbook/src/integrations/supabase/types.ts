@@ -731,6 +731,7 @@ export type Database = {
     Views: {
       monthly_wait_risk_reports: {
         Row: {
+          approved_claim_visits: number | null
           client_organization_name: string | null
           estimated_loss_jpy: number | null
           gmen_risk_level: string | null
@@ -738,6 +739,7 @@ export type Database = {
           report_month: string | null
           total_visits: number | null
           total_wait_minutes: number | null
+          unmeasured_visits: number | null
         }
         Relationships: []
       }
