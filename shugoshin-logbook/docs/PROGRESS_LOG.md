@@ -468,6 +468,58 @@ Brevo（日300通）が選択肢になる。
 旧VIEWは90円としていた。**どちらが正しいかは業務判断**。単価を変更する場合は
 `waitCostCalc.ts` と本VIEWの両方を必ず同時に直すこと（片方だけ直すと今回と同じ不一致に戻る）。
 
+## 組織レコードの重複（2026-08-05）
+
+③（荷主側の可視性・操作権限）の調査中に、本番の `organizations` に
+**「下関唐戸魚市場株式会社」が2行存在する**ことが判明した。
+
+### 原因
+
+`create_organization_with_admin` が組織名の重複を一切チェックせず INSERT していた。
+同じ会社名を2人が入力すれば2組織できる。`organizations.name` に一意制約もない。
+
+### なぜ実害があるか
+
+同じ会社が2つの組織レコードに分かれると、**組織単位の権限判定が会社をまたげない**。
+
+最も直接的なのは圏外申請の承認。`approve_pending_punch` は
+`has_role_in_org(admin, pending_punches.organization_id, 'admin')` で判定し、
+`pending_punches.organization_id` はドライバーの `profiles.organization_id` 由来。
+ドライバーと管理者の所属が割れていると**同じ会社なのに承認できず、申請が
+処理されないまま溜まる**。`waiting_evidence` / `submitted_reports` の帰属も割れ、
+待機料の請求主体が分裂する。
+
+`facilities.client_name = organizations.name` の文字列一致による紐付けも、
+同名組織が2つあると両方に紐づくため成立しない。
+
+### 対応（`20260805100000`）
+
+**統合の実行そのものは migration に書いていない。** どちらを正とするかは
+参照件数や経緯を見た人間の判断であり、誤ると証拠の帰属が壊れるため。
+
+| 内容 | 実装 |
+|---|---|
+| 再発防止 | `create_organization_with_admin` に同名チェックを追加。同じ会社に参加する場合は招待コードを使う旨を案内する |
+| 統合履歴 | `organizations.merged_into` を追加。統合しても行は削除せず統合先を指すのみ（`cancel_ticket` と同じ思想） |
+| 統合の実行 | `merge_organizations(p_from, p_into)` RPC。IDを明示して呼ぶ |
+
+`merge_organizations` の設計上の要点:
+
+- 参照元テーブルは `information_schema` から**動的に洗い出す**。将来テーブルが増えても取りこぼさない
+- 権限は**統合先の管理者のみ**
+- **名称が一致する組織どうしに限る**。無関係な組織の誤統合は復元できないため。
+  表記ゆれのある重複（「A」と「A株式会社」等）はこの関数では扱わない
+- 一意制約に衝突した表（`organization_settings.organization_id` は UNIQUE、
+  `user_roles` は `(user_id, organization_id, role)` が UNIQUE）は
+  **スキップして報告する**。衝突行を削除するような破壊的な解決はしない
+
+### まだやっていないこと
+
+- **実際の統合の実行**。どちらの組織を残すかの判断待ち
+- **`organizations.name` への UNIQUE 制約**。既存の重複が解消されるまで張れないため、
+  統合完了後の別 migration で行う
+- ③本体（`facilities.client_organization_id` の FK 化と RLS 再設計）
+
 ## 運用開始後に直面する4つの実務上の懸念（2026-07-29 ユーザー指摘）
 
 コードの穴ではなく、実運用に入った際に必ず出てくる業務プロセス上の課題として記録する。

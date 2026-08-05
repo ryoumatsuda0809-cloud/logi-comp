@@ -863,6 +863,16 @@ export type Database = {
           rejected_at: string
         }[]
       }
+      merge_organizations: {
+        Args: { p_from: string; p_into: string }
+        Returns: {
+          column_name: string
+          moved_rows: number
+          note: string | null
+          skipped: boolean
+          table_name: string
+        }[]
+      }
       start_loading: {
         Args: {
           p_latitude: number
