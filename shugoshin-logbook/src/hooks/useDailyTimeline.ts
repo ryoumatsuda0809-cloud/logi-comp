@@ -1,3 +1,4 @@
+import { jstDateString, jstDayRange } from "@/lib/jstDate";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,11 +112,9 @@ export function useDailyTimeline(): DailyTimelineResult {
 
     setLoading(true);
 
-    // Local date string to avoid UTC/JST timezone mismatch
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const todayStart = `${todayStr}T00:00:00`;
-    const todayEnd = `${todayStr}T23:59:59`;
+    // 日本の暦日で「今日」を決める（端末TZ・UTCに依存しない）
+    const todayStr = jstDateString();
+    const { start: todayStart, end: todayEnd } = jstDayRange(todayStr);
 
     // Parallel fetches (including wait_logs + facilities)
     const [profileRes, logsRes, reportsRes, submittedRes, waitLogsRes, facilitiesRes] = await Promise.all([

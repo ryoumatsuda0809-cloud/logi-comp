@@ -119,8 +119,6 @@ export default function OrganizationSettings() {
   const [fetchingAddress, setFetchingAddress] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
-  const [forceJoinCode, setForceJoinCode] = useState("");
-  const [forceJoining, setForceJoining] = useState(false);
 
   // Stealth suggest (verify_company_name)
   const [verifiedName, setVerifiedName] = useState<string | null>(null);
@@ -410,29 +408,6 @@ export default function OrganizationSettings() {
       });
     } finally {
       setJoiningByCode(false);
-    }
-  }
-
-  async function handleForceJoin() {
-    setForceJoining(true);
-    try {
-      const { error } = await supabase.rpc("force_join_organization_by_invite_code", {
-        target_invite_code: forceJoinCode.trim(),
-      });
-      if (error) throw error;
-      toast({
-        title: "新しい組織に移動しました",
-        description: "ページを再読み込みします。",
-      });
-      window.location.reload();
-    } catch (e: any) {
-      toast({
-        title: "移動に失敗しました",
-        description: e.message || "招待コードを確認してください",
-        variant: "destructive",
-      });
-    } finally {
-      setForceJoining(false);
     }
   }
 
@@ -1106,63 +1081,6 @@ export default function OrganizationSettings() {
                 コードをドライバーに伝えてください。コードを入力するだけで組織に参加できます。
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* === 救済セクション: 別の組織に移動する === */}
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              別の組織に参加する
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              間違って組織を作成してしまった場合、正しい招待コードを入力して別の組織に移動できます。
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={forceJoinCode}
-                onChange={(e) => setForceJoinCode(e.target.value.toUpperCase())}
-                placeholder="招待コードを入力"
-                className="h-14 font-mono text-lg tracking-widest uppercase"
-                maxLength={10}
-              />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <FieldButton
-                    variant="destructive"
-                    size="default"
-                    fullWidth={false}
-                    disabled={forceJoinCode.trim().length < 4 || forceJoining}
-                    className="shrink-0"
-                  >
-                    {forceJoining ? <Loader2 className="animate-spin" /> : "参加する"}
-                  </FieldButton>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>⚠️ 組織を移動しますか？</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      現在の組織「{org?.name}」から離脱し、招待コード「{forceJoinCode}」の組織に移動します。この操作は取り消せません。
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleForceJoin}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      この組織を離れて参加する
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              ※ 現在の組織から離脱し、新しい組織に移動します。この操作は取り消せません。
-            </p>
           </CardContent>
         </Card>
       </main>

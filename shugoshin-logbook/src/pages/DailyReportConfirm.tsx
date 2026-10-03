@@ -1,3 +1,4 @@
+import { jstDateString, jstDayRange } from "@/lib/jstDate";
 import { ArrowLeft, MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,14 +131,15 @@ export default function DailyReportConfirm() {
     const resolvedOrgId = orgId || FALLBACK_ORG_ID;
 
     // Fetch today's wait_logs to include real data in snapshot
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = jstDateString();
+    const { start: dayStart, end: dayEnd } = jstDayRange(todayStr);
     const [logsRes, facilitiesRes] = await Promise.all([
       supabase
         .from("wait_logs")
         .select("*")
         .eq("user_id", user.id)
-        .gte("arrival_time", `${todayStr}T00:00:00`)
-        .lte("arrival_time", `${todayStr}T23:59:59`)
+        .gte("arrival_time", dayStart)
+        .lte("arrival_time", dayEnd)
         .order("arrival_time", { ascending: true }),
       supabase.from("facilities").select("id, name"),
     ]);

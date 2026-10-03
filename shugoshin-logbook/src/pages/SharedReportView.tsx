@@ -1,3 +1,4 @@
+import { jstDateString, jstDayRange } from "@/lib/jstDate";
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -126,9 +127,8 @@ export default function SharedReportView() {
 
       // Case 2: No ID or not found → fetch today's wait_logs for logged-in user
       if (user) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const todayStart = `${todayStr}T00:00:00`;
-        const todayEnd = `${todayStr}T23:59:59`;
+        const todayStr = jstDateString();
+        const { start: todayStart, end: todayEnd } = jstDayRange(todayStr);
 
         const [logsRes, facilitiesRes, profileRes] = await Promise.all([
           supabase
