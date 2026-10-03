@@ -79,6 +79,9 @@ type InviteCode = {
   code: string;
   is_active: boolean;
   created_at: string;
+  expires_at: string | null;
+  max_uses: number | null;
+  use_count: number;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -259,7 +262,7 @@ export default function OrganizationSettings() {
           .eq("organization_id", orgId),
         supabase
           .from("organization_invite_codes")
-          .select("id, code, is_active, created_at")
+          .select("id, code, is_active, created_at, expires_at, max_uses, use_count")
           .eq("organization_id", orgId)
           .eq("is_active", true)
           .order("created_at", { ascending: false }),
@@ -392,10 +395,14 @@ export default function OrganizationSettings() {
     }
     setJoiningByCode(true);
     try {
-      const { error } = await supabase.rpc("join_organization_by_invite_code", {
+      const { data, error } = await supabase.rpc("join_organization_by_invite_code", {
         _code: joinCode.trim(),
       });
       if (error) throw error;
+      // 無効・期限切れ・使用上限のコードは、失敗の記録を残すため例外ではなく NULL で返る
+      if (!data) {
+        throw new Error("招待コードが見つからないか、有効期限が切れています。管理者に確認してください。");
+      }
       toast({
         title: "組織に参加しました",
         description: "ドライバーとして登録されました。",
@@ -423,7 +430,7 @@ export default function OrganizationSettings() {
       // Refetch codes to get the full record with id
       const { data: codes } = await supabase
         .from("organization_invite_codes")
-        .select("id, code, is_active, created_at")
+        .select("id, code, is_active, created_at, expires_at, max_uses, use_count")
         .eq("organization_id", org.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
@@ -593,8 +600,8 @@ export default function OrganizationSettings() {
                       onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === "Enter" && handleJoinByInviteCode()}
                       className="h-14 text-center text-2xl font-mono tracking-[0.3em] uppercase"
-                      placeholder="ABC123"
-                      maxLength={6}
+                      placeholder="ABCD1234"
+                      maxLength={8}
                       autoFocus
                     />
                   </div>
@@ -1028,9 +1035,17 @@ export default function OrganizationSettings() {
                 <div className="divide-y divide-border rounded-lg border">
                   {inviteCodes.map((ic) => (
                     <div key={ic.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="flex-1 font-mono text-xl font-bold tracking-[0.3em] text-foreground">
-                        {ic.code}
-                      </span>
+                      <div className="flex-1">
+                        <span className="font-mono text-xl font-bold tracking-[0.3em] text-foreground">
+                          {ic.code}
+                        </span>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {ic.expires_at
+                            ? `有効期限 ${new Date(ic.expires_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}`
+                            : "有効期限なし"}
+                          {ic.max_uses !== null && `　使用 ${ic.use_count}/${ic.max_uses}回`}
+                        </p>
+                      </div>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(ic.code);

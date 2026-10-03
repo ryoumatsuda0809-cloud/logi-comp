@@ -277,22 +277,31 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          expires_at: string | null
           id: string
           is_active: boolean
+          max_uses: number | null
           organization_id: string
+          use_count: number
         }
         Insert: {
           code: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
+          max_uses?: number | null
+          use_count?: number
           organization_id: string
         }
         Update: {
           code?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
+          max_uses?: number | null
+          use_count?: number
           organization_id?: string
         }
         Relationships: [
@@ -790,10 +799,6 @@ export type Database = {
         Returns: string
       }
       deactivate_invite_code: { Args: { _code_id: string }; Returns: undefined }
-      force_join_organization_by_invite_code: {
-        Args: { target_invite_code: string }
-        Returns: undefined
-      }
       generate_invite_code: { Args: never; Returns: string }
       generate_ticket_number: {
         Args: {
@@ -860,7 +865,7 @@ export type Database = {
       }
       join_organization_by_invite_code: {
         Args: { _code: string }
-        Returns: string
+        Returns: string | null
       }
       approve_pending_punch: {
         Args: { p_punch_id: string; p_review_note?: string | null }

@@ -82,6 +82,34 @@ BEGIN
   WHEN OTHERS THEN v_res := v_res || E'\n[??] 未ログイン: ' || SQLERRM;
   END;
 
+
+  -- 招待コード: 無効なコードは NULL、5回失敗するとロックされる（所属のないユーザーで確認）
+  DECLARE
+    v_free uuid;
+    v_i integer;
+    v_all_null boolean := true;
+  BEGIN
+    SELECT u.id INTO v_free FROM auth.users u
+    WHERE NOT EXISTS (SELECT 1 FROM public.user_roles r WHERE r.user_id = u.id)
+    LIMIT 1;
+    IF v_free IS NULL THEN
+      v_res := v_res || E'\n[--] 所属なしのユーザーがいないため、招待コードのテストは省略';
+    ELSE
+      RESET ROLE;
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_free, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      FOR v_i IN 1..5 LOOP
+        IF public.join_organization_by_invite_code('ZZZZZZZZ') IS NOT NULL THEN v_all_null := false; END IF;
+      END LOOP;
+      v_res := v_res || CASE WHEN v_all_null THEN E'\n[OK] 無効な招待コードは NULL を返す' ELSE E'\n[NG] 無効なコードで参加できた' END;
+      BEGIN
+        PERFORM public.join_organization_by_invite_code('ZZZZZZZZ');
+        v_res := v_res || E'\n[NG] 5回失敗してもロックされない';
+      EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[OK] 5回失敗するとロックされる';
+      END;
+      RESET ROLE;
+    END IF;
+  END;
   RESET ROLE;
   RAISE EXCEPTION 'ROLLBACK_TEST_RESULT:%', v_res;
 END $$;
