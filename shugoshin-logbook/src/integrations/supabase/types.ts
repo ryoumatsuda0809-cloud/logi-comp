@@ -760,6 +760,10 @@ export type Database = {
         Args: { p_log_id: string; p_new_status: string }
         Returns: undefined
       }
+      shipper_advance_wait: {
+        Args: { p_log_id: string; p_new_status: string }
+        Returns: undefined
+      }
       cancel_ticket: {
         Args: { p_log_id: string }
         Returns: {

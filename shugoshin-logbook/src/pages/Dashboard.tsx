@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FieldButton } from "@/components/ui/field-button";
 import {
   LogOut, Truck, ClipboardList, MapPin,
-  Building2, Building, ArrowRight, Plus, FileWarning,
+  Building2, Building, ArrowRight, Plus, FileWarning, LayoutDashboard, ClipboardCheck,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
@@ -263,6 +263,24 @@ export default function Dashboard() {
               color="primary"
               onClick={() => navigate("/organization-settings")}
             />
+            {isAdmin && (
+              <MenuCard
+                icon={<LayoutDashboard className="h-8 w-8" />}
+                title="荷主カンバン"
+                description="施設の待機状況・呼出・荷役開始"
+                color="primary"
+                onClick={() => navigate("/admin")}
+              />
+            )}
+            {isAdmin && (
+              <MenuCard
+                icon={<ClipboardCheck className="h-8 w-8" />}
+                title="圏外申請の承認"
+                description="圏外で記録された打刻の確認・承認"
+                color="primary"
+                onClick={() => navigate("/pending-punches")}
+              />
+            )}
             {isAdmin && (
               <MenuCard
                 icon={<FileWarning className="h-8 w-8" />}

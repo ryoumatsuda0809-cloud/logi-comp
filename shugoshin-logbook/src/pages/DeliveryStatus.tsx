@@ -304,7 +304,7 @@ export default function DeliveryStatus() {
             <p className="text-lg font-bold text-foreground">現在追跡中の配送はありません</p>
             <p className="text-sm text-muted-foreground mt-1">承認済みの配送が作成されると、ここに表示されます。</p>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/")}
               className="mt-4 rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               ダッシュボードへ戻る

@@ -98,7 +98,7 @@ const ACTION_CONFIG: Record<string, {
 }> = {
   waiting: { label: "📢 呼出", nextStatus: "called", variant: "default", icon: Megaphone },
   called: { label: "▶ 作業開始", nextStatus: "working", variant: "secondary", icon: Play },
-  working: { label: "✅ 完了", nextStatus: "completed", variant: "outline", icon: CheckCircle2 },
+  // 完了は荷主側では行わない。署名とGPSを伴う complete_ticket（ドライバー側）だけが確定させる。
 };
 
 const EVENT_ICONS: Record<string, string> = {
@@ -300,6 +300,7 @@ export default function AdminDashboard() {
 
   // テナント情報
   const [orgName, setOrgName] = useState<string | null>(null);
+  const [orgId, setOrgId] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -329,6 +330,7 @@ export default function AdminDashboard() {
           return;
           return;
         }
+        setOrgId(data.organization_id);
         supabase
           .from("organizations")
           .select("name")
@@ -349,20 +351,20 @@ export default function AdminDashboard() {
       });
   }, [_user]);
 
-  // 施設一覧を取得（テナントフィルタ付き）
+  // 施設一覧を取得（荷主組織で絞り込む。組織名の文字列一致には依存しない）
   useEffect(() => {
-    if (!orgName) return;
+    if (!orgId) return;
     supabase
       .from("facilities")
       .select("id, name, client_name")
-      .eq("client_name", orgName)
+      .eq("client_organization_id", orgId)
       .then(({ data }) => {
         if (data && data.length > 0) {
           setFacilities(data);
           setSelectedFacilityId(data[0].id);
         }
       });
-  }, [orgName]);
+  }, [orgId]);
 
   // 初期データ取得
   const fetchLogs = useCallback(async () => {
@@ -472,7 +474,7 @@ export default function AdminDashboard() {
     async (logId: string, nextStatus: string) => {
       setLoadingId(logId);
       try {
-        const { error } = await supabase.rpc("advance_wait_status", {
+        const { error } = await supabase.rpc("shipper_advance_wait", {
           p_log_id: logId,
           p_new_status: nextStatus,
         });
