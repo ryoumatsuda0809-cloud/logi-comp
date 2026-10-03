@@ -211,6 +211,116 @@ function GpsPanel() {
   );
 }
 
+
+type KanbanStatus = "waiting" | "called" | "working";
+interface KanbanTicket {
+  no: number;
+  arrival: string;
+  status: KanbanStatus;
+  calledAt?: string;
+  startedAt?: string;
+}
+
+/** 荷主カンバンの再現用。時刻は固定（デモは常に 09:10 の時点） */
+const KANBAN_NOW = "2026-10-03T09:10:00+09:00";
+const KANBAN_INITIAL: KanbanTicket[] = [
+  { no: 13, arrival: "2026-10-03T08:20:00+09:00", status: "working", calledAt: "2026-10-03T08:38:00+09:00", startedAt: "2026-10-03T08:41:00+09:00" },
+  { no: 14, arrival: "2026-10-03T08:05:00+09:00", status: "called", calledAt: "2026-10-03T09:08:00+09:00" },
+  { no: 15, arrival: "2026-10-03T08:50:00+09:00", status: "waiting" },
+  { no: 16, arrival: "2026-10-03T09:02:00+09:00", status: "waiting" },
+];
+
+const KANBAN_COLUMNS: { status: KanbanStatus; label: string; action?: { label: string; next: KanbanStatus } }[] = [
+  { status: "waiting", label: "待機中", action: { label: "呼出", next: "called" } },
+  { status: "called", label: "呼出済", action: { label: "荷役開始", next: "working" } },
+  { status: "working", label: "荷役中" },
+];
+
+function elapsedMinutes(from: string) {
+  return Math.max(0, Math.round((new Date(KANBAN_NOW).getTime() - new Date(from).getTime()) / 60000));
+}
+
+function KanbanPanel() {
+  const [tickets, setTickets] = useState<KanbanTicket[]>(KANBAN_INITIAL);
+
+  const advance = (no: number, next: KanbanStatus) =>
+    setTickets((list) =>
+      list.map((t) =>
+        t.no !== no
+          ? t
+          : {
+              ...t,
+              status: next,
+              calledAt: next === "called" ? KANBAN_NOW : t.calledAt,
+              startedAt: next === "working" ? KANBAN_NOW : t.startedAt,
+            },
+      ),
+    );
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">荷主側の画面（施設の待機状況）</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          {DEMO_FACILITIES[0].name}・{formatTimeOrNull(KANBAN_NOW)} 時点。ボタンを押すと、実際の画面と同じように動きます。
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {KANBAN_COLUMNS.map((col) => {
+            const items = tickets.filter((t) => t.status === col.status);
+            return (
+              <div key={col.status} className="rounded-lg border bg-muted/30 p-2">
+                <div className="mb-2 flex items-center justify-between text-sm font-medium">
+                  <span>{col.label}</span>
+                  <Badge variant="secondary">{items.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {items.length === 0 && (
+                    <p className="py-3 text-center text-xs text-muted-foreground">なし</p>
+                  )}
+                  {items.map((t) => (
+                    <div key={t.no} className="rounded-md border bg-background p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl font-bold tabular-nums">#{String(t.no).padStart(3, "0")}</span>
+                        {col.status === "waiting" && (
+                          <span className="text-xs font-semibold text-amber-600 tabular-nums">
+                            待機 {elapsedMinutes(t.arrival)}分
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground tabular-nums">
+                        到着 {formatTimeOrNull(t.arrival)}
+                        {t.calledAt && <>　呼出 {formatTimeOrNull(t.calledAt)}</>}
+                        {t.startedAt && <>　開始 {formatTimeOrNull(t.startedAt)}</>}
+                      </div>
+                      {col.action && (
+                        <Button
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => advance(t.no, col.action!.next)}
+                        >
+                          {col.action.label}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          荷主側のボタンは「呼出」と「荷役開始」までです。完了は、GPS と署名を伴うドライバー側の打刻だけが確定させます。荷主が完了にできないことで、記録の信頼性を保っています。
+        </p>
+        <Button variant="outline" size="sm" onClick={() => setTickets(KANBAN_INITIAL)}>
+          最初の状態に戻す
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function FeePanel() {
   const rate = getRate(DEMO_VEHICLE_CLASS);
   const summary = useMemo(
@@ -338,6 +448,7 @@ export default function Demo() {
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-4 pb-16">
         <GpsPanel />
         <TimelinePanel />
+        <KanbanPanel />
         <FeePanel />
         <Card>
           <CardHeader className="pb-2">
