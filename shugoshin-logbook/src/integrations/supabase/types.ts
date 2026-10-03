@@ -136,6 +136,7 @@ export type Database = {
         Row: {
           address: string | null
           client_name: string
+          client_organization_id: string | null
           created_at: string
           id: string
           lat: number
@@ -147,6 +148,7 @@ export type Database = {
         Insert: {
           address?: string | null
           client_name: string
+          client_organization_id?: string | null
           created_at?: string
           id?: string
           lat: number
@@ -158,6 +160,7 @@ export type Database = {
         Update: {
           address?: string | null
           client_name?: string
+          client_organization_id?: string | null
           created_at?: string
           id?: string
           lat?: number
@@ -166,7 +169,15 @@ export type Database = {
           notification_number?: string | null
           radius?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "facilities_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_details: {
         Row: {
