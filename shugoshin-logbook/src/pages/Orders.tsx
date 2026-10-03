@@ -1,3 +1,4 @@
+import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,7 +172,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
         if (data?.payment_date) setDeliveryDate(data.payment_date);
       }
     } catch (e: any) {
-      toast({ title: "エラー", description: e.message || "AI解析に失敗しました", variant: "destructive" });
+      toast({ title: "エラー", description: toDisplayMessage(e, "AI解析に失敗しました"), variant: "destructive" });
     } finally {
       setIsParsing(false);
     }
@@ -284,7 +285,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
       if (orgId) await fetchOrders(orgId);
     } catch (e: any) {
       console.error("保存に失敗しました:", e);
-      toast({ title: "保存に失敗しました", description: e.message || "不明なエラーが発生しました", variant: "destructive" });
+      toast({ title: "保存に失敗しました", description: toDisplayMessage(e, "不明なエラーが発生しました"), variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -313,7 +314,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
         if (orgId) await fetchOrders(orgId);
       }
     } catch (e: any) {
-      toast({ title: "エラー", description: e.message, variant: "destructive" });
+      toast({ title: "エラー", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
       setApprovingId(null);
     }
@@ -363,7 +364,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
         if (orgId) fetchOrders(orgId);
       }
     } catch (e: any) {
-      toast({ title: "エラー", description: e.message, variant: "destructive" });
+      toast({ title: "エラー", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
       setUnlockingId(null);
     }
@@ -402,7 +403,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      toast({ title: "PDFエラー", description: e.message, variant: "destructive" });
+      toast({ title: "PDFエラー", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
       setDownloadingId(null);
     }

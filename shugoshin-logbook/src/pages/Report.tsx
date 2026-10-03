@@ -116,15 +116,6 @@ export default function Report() {
         const fetched = (data as ReportRow[]) || [];
         setRows(fetched);
         setLoading(false);
-
-        // 検算ログ
-        console.log(`[検算] 荷主別リスク診断レポート (${selectedMonth}):`);
-        fetched.forEach((r) => {
-          console.log(
-            `  荷主: ${r.client_organization_name ?? "不明"} | 拠点: ${r.location_name ?? "-"} | 月: ${r.report_month} | 件数: ${r.total_visits} | 待機: ${r.total_wait_minutes}分 | 損失: ¥${r.estimated_loss_jpy}`
-          );
-        });
-        console.log(`[検算] 合計行数: ${fetched.length}`);
       });
   }, [selectedMonth]);
 

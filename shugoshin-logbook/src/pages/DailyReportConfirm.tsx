@@ -1,3 +1,4 @@
+import { toDisplayMessage } from "@/lib/dbErrors";
 import { jstDateString, jstDayRange } from "@/lib/jstDate";
 import { ArrowLeft, MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -176,7 +177,7 @@ export default function DailyReportConfirm() {
       if (error.code === "23505") {
         toast({ title: "⚠️ 既に提出済みです", description: "本日の日報は提出済みです。", variant: "destructive" });
       } else {
-        toast({ title: "エラー", description: error.message, variant: "destructive" });
+        toast({ title: "エラー", description: toDisplayMessage(error), variant: "destructive" });
       }
       return;
     }

@@ -91,6 +91,10 @@ export default function SharedReportView() {
   const { user } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [parties, setParties] = useState<{ carrier: string | null; shippers: string[] }>({
+    carrier: null,
+    shippers: [],
+  });
   const inApp = useMemo(() => isInAppBrowser(), []);
 
   /* ---------- Data fetch with wait_logs fallback ---------- */
@@ -183,16 +187,42 @@ export default function SharedReportView() {
     load();
   }, [id, user]);
 
-  /* ---------- Silent read receipt ---------- */
+  /* ---------- 提出元（運送会社）と提出先（荷主）を実データから引く ---------- */
   useEffect(() => {
     if (!report) return;
-    const log = {
-      reportId: report.id,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
+    let cancelled = false;
+    (async () => {
+      let orgId = report.organization_id;
+      if (!orgId && user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        orgId = data?.organization_id ?? null;
+      }
+      const [orgRes, facRes] = await Promise.all([
+        orgId
+          ? supabase.from("organizations").select("name").eq("id", orgId).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase.from("facilities").select("name, client_name"),
+      ]);
+      const visited = new Set(
+        (report.timeline_snapshot ?? []).map((e) => e.locationName).filter(Boolean) as string[],
+      );
+      const shippers = Array.from(
+        new Set(
+          (facRes.data ?? [])
+            .filter((f) => visited.has(f.name))
+            .map((f) => f.client_name),
+        ),
+      );
+      if (!cancelled) setParties({ carrier: orgRes.data?.name ?? null, shippers });
+    })();
+    return () => {
+      cancelled = true;
     };
-    console.log("[Silent] 閲覧ログを記録しました:", log);
-  }, [report]);
+  }, [report, user]);
 
   /* ---------- Loading state ---------- */
   if (loading) {
@@ -298,13 +328,15 @@ export default function SharedReportView() {
               <div>
                 <p className="text-xs text-gray-500">提出先</p>
                 <p className="text-lg font-bold text-black border-b-2 border-black pb-0.5 inline-block">
-                  〇〇水産株式会社　御中
+                  {parties.shippers.length > 0
+                    ? `${parties.shippers.join("、")}　御中`
+                    : "（提出先未設定）"}
                 </p>
               </div>
               <div className="flex items-center gap-4">
                 <div>
                   <p className="text-xs text-gray-500">提出元</p>
-                  <p className="text-base font-bold text-black">〇〇運送株式会社</p>
+                  <p className="text-base font-bold text-black">{parties.carrier ?? "（提出元未設定）"}</p>
                 </div>
                 {/* ハンコ（印鑑）プレースホルダー */}
                 <div className="w-16 h-16 print:w-12 print:h-12 border-2 border-red-500/50 text-red-500/50 flex items-center justify-center rounded-sm shrink-0 font-serif text-xs">

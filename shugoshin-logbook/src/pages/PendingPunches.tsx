@@ -1,3 +1,4 @@
+import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, MapPin, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
@@ -55,11 +56,13 @@ export default function PendingPunches() {
 
   const [rows, setRows] = useState<PendingPunchRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
 
     const { data, error } = await supabase
       .from("pending_punches")
@@ -68,7 +71,9 @@ export default function PendingPunches() {
       .order("claimed_at", { ascending: true });
 
     if (error || !data) {
+      // 取得に失敗した場合を「申請なし」と表示しない（見落としの原因になる）
       setRows([]);
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -115,7 +120,7 @@ export default function PendingPunches() {
       toast({
         variant: "destructive",
         title: "承認できませんでした",
-        description: error.message ?? "再試行してください。",
+        description: toDisplayMessage(error, "再試行してください。"),
       });
       return;
     }
@@ -152,7 +157,7 @@ export default function PendingPunches() {
       toast({
         variant: "destructive",
         title: "却下できませんでした",
-        description: error.message ?? "再試行してください。",
+        description: toDisplayMessage(error, "再試行してください。"),
       });
       return;
     }
@@ -190,7 +195,16 @@ export default function PendingPunches() {
           </div>
         )}
 
-        {!loading && rows.length === 0 && (
+        {!loading && loadError && (
+          <div className="rounded-xl border border-destructive/40 p-6 text-center text-sm">
+            <p className="font-medium text-destructive">申請を読み込めませんでした。</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={fetchRows}>
+              再読み込み
+            </Button>
+          </div>
+        )}
+
+        {!loading && !loadError && rows.length === 0 && (
           <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
             承認待ちの申請はありません。
           </div>

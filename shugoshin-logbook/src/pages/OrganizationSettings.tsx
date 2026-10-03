@@ -1,3 +1,4 @@
+import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
@@ -376,7 +377,7 @@ export default function OrganizationSettings() {
       console.error("組織作成失敗:", e);
       toast({
         title: "作成に失敗しました",
-        description: e.message || "不明なエラーが発生しました",
+        description: toDisplayMessage(e, "不明なエラーが発生しました"),
         variant: "destructive",
       });
     } finally {
@@ -403,7 +404,7 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "参加に失敗しました",
-        description: e.message || "招待コードを確認してください",
+        description: toDisplayMessage(e, "招待コードを確認してください"),
         variant: "destructive",
       });
     } finally {
@@ -431,7 +432,7 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "発行に失敗しました",
-        description: e.message,
+        description: toDisplayMessage(e),
         variant: "destructive",
       });
     } finally {
@@ -451,7 +452,7 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "無効化に失敗しました",
-        description: e.message,
+        description: toDisplayMessage(e),
         variant: "destructive",
       });
     } finally {
@@ -520,7 +521,7 @@ export default function OrganizationSettings() {
 
       toast({ title: "保存しました", description: "組織情報を更新しました。" });
     } catch (e: any) {
-      toast({ title: "保存失敗", description: e.message, variant: "destructive" });
+      toast({ title: "保存失敗", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
       setSaving(false);
     }
