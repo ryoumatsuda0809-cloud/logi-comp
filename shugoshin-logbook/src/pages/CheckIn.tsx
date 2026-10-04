@@ -27,7 +27,7 @@ export default function CheckIn() {
             className="h-6 w-6 rounded-md"
           />
           <h1 className="text-lg font-bold text-primary-foreground">
-            守護神 Driver Mode
+            守護神 打刻
           </h1>
         </div>
       </header>

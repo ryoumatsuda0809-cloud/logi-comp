@@ -461,7 +461,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
             {!editingOrderId && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">発注内容を入力・ラインをする時みたいでもOK（テキストまたは音声）</CardTitle>
+                  <CardTitle className="text-base">発注内容を入力（テキストまたは音声）</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Textarea
@@ -482,6 +482,8 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                     </FieldButton>
                     <FieldButton
                       variant="accent"
+                      fullWidth={false}
+                      className="min-w-0 flex-1"
                       onClick={handleParse}
                       disabled={!inputText.trim() || isParsing}>
                       {isParsing ? <Loader2 className="animate-spin" /> : <Sparkles />}
