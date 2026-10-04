@@ -142,12 +142,12 @@ function GpsPanel() {
             <div className="font-semibold tabular-nums">{formatTimeOrNull(current.t)}</div>
           </div>
           <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">施設までの距離</div>
+            <div className="text-xs text-muted-foreground">施設まで</div>
             <div className="font-semibold tabular-nums">{distance.toLocaleString()} m</div>
           </div>
           <div className="rounded-lg border p-2">
             <div className="text-xs text-muted-foreground">状態</div>
-            <div className="font-semibold">{PHASE_LABEL[current.phase]}</div>
+            <div className="font-semibold text-balance">{PHASE_LABEL[current.phase]}</div>
           </div>
         </div>
 
