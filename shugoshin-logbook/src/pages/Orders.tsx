@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, ArrowLeft, Mic, MicOff, Sparkles, AlertTriangle, Check, Loader2, Download, FileText, Pencil, CheckCircle, Lock, Truck } from "lucide-react";
+import { Mic, MicOff, Sparkles, AlertTriangle, Check, Loader2, Download, FileText, Pencil, CheckCircle, Lock, Truck } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { isSpeechSupported, startListening, stopListening } from "@/lib/speech";
@@ -28,7 +28,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cleanText, displayRoute, displayText, displayYen, missingForApproval } from "@/lib/orderContent";
+import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { PageHeader } from "@/components/PageHeader";
 
 type ParsedOrder = {
   item_name: string;
@@ -195,7 +196,11 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
           destination: cleanText(data.destination) ?? "",
           payment_date: cleanText(data.payment_date),
         });
-        if (cleanText(data?.payment_date)) setDeliveryDate(data.payment_date);
+        // 温度帯と納品日は AI が返さないので、入力文から読み取って補う
+        const hints = orderHintsFromText(inputText);
+        if (hints.temperatureZone) setTemperatureZone(hints.temperatureZone);
+        if (hints.deliveryDate) setDeliveryDate(hints.deliveryDate);
+        else if (cleanText(data?.payment_date)) setDeliveryDate(data.payment_date);
       }
     } catch (e: any) {
       toast({ title: "エラー", description: toDisplayMessage(e, "AI解析に失敗しました"), variant: "destructive" });
@@ -424,15 +429,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-primary px-4 py-4 shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <button onClick={() => navigate("/")} className="text-primary-foreground/70 hover:text-primary-foreground">
-            <ArrowLeft className="h-6 w-6" />
-          </button>
-          <Shield className="h-6 w-6 text-accent" />
-          <h1 className="text-lg font-bold text-primary-foreground">発注管理</h1>
-        </div>
-      </header>
+      <PageHeader title="発注管理" />
 
       <main className="mx-auto max-w-4xl p-4 pb-24">
         <Tabs
@@ -449,7 +446,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
         >
           <TabsList className="mb-4 w-full">
             <TabsTrigger value="new" className="flex-1">
-              {editingOrderId ? "📝 発注の編集" : "新規発注"}
+              {editingOrderId ? "発注の編集" : "新規発注"}
             </TabsTrigger>
             <TabsTrigger value="list" className="flex-1">発注一覧</TabsTrigger>
           </TabsList>
@@ -509,7 +506,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
               <Card className="border-accent">
                 <CardHeader>
                   <CardTitle className="text-base">
-                    {editingOrderId ? "✏️ 発注の編集" : "解析結果（編集可能）"}
+                    {editingOrderId ? "発注の編集" : "解析結果（編集可能）"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -596,9 +593,9 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                       {isPaymentLate ?
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-5 w-5 shrink-0" />
-                          <span>⚠️ 支払期日が60日ルールを超過しています。期限: {paymentDeadline}</span>
+                          <span>支払期日が60日ルールを超過しています。期限: {paymentDeadline}</span>
                         </div> :
-                        <span className="text-[#11192d] text-left font-bold">✅ 支払期限（納品日+60日）: {paymentDeadline}</span>
+                        <span className="text-left font-bold text-foreground">支払期限（納品日+60日）: {paymentDeadline}</span>
                       }
                     </div>
                   }
@@ -628,7 +625,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                   onClick={() => setStatusFilter(s)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     statusFilter === s ?
-                    "bg-accent text-accent-foreground" :
+                    "bg-primary text-primary-foreground" :
                     "bg-muted text-muted-foreground hover:bg-muted/80"}`
                   }>
                   {s === "all" ? "すべて" : STATUS_LABELS[s]?.label}
@@ -720,7 +717,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                             ) : (
                               <FileText className="h-5 w-5" />
                             )}
-                            📄 発注書PDFをダウンロード
+                            発注書PDFをダウンロード
                           </button>
                         )}
 
@@ -736,7 +733,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                             ) : (
                               <Download className="h-4 w-4" />
                             )}
-                            ⚠️ DRAFT確認用PDF
+                            下書きの確認用PDF
                           </button>
                         )}
 
@@ -750,14 +747,14 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                               }
                             }}
                             disabled={approvingId === order.id}
-                            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
                           >
                             {approvingId === order.id ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                               <CheckCircle className="h-5 w-5" />
                             )}
-                            ✅ 承認して確定する
+                            承認して確定する
                           </button>
                         )}
 

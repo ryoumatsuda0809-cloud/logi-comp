@@ -1,7 +1,6 @@
 import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +23,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Shield,
-  ArrowLeft,
   Building2,
   Users,
   AlertTriangle,
@@ -42,6 +40,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { PageHeader } from "@/components/PageHeader";
 
 type Organization = {
   id: string;
@@ -111,7 +110,6 @@ function parseAddress(fullAddress: string): { prefecture: string; city: string; 
 
 export default function OrganizationSettings() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [org, setOrg] = useState<Organization | null>(null);
@@ -583,10 +581,10 @@ export default function OrganizationSettings() {
           <Tabs defaultValue="join" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-14 text-base">
               <TabsTrigger value="join" className="text-base py-3">
-                🔑 招待コードで参加
+                招待コードで参加
               </TabsTrigger>
               <TabsTrigger value="create" className="text-base py-3">
-                🏢 新規に組織を作成
+                新規に組織を作成
               </TabsTrigger>
             </TabsList>
 
@@ -701,37 +699,23 @@ export default function OrganizationSettings() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-primary px-4 py-4 shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/70 hover:bg-primary-foreground/10"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-              <Building2 className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-primary-foreground">組織管理</h1>
-              <p className="text-xs text-primary-foreground/60">{org.name}</p>
-            </div>
-          </div>
-          {/* 特定荷主バッジ (ヘッダー) */}
-          {isRegulated ? (
-            <Badge variant="destructive" className="ml-auto flex items-center gap-1">
+      <PageHeader
+        title="組織管理"
+        subtitle={org.name}
+        right={
+          isRegulated ? (
+            <Badge variant="destructive" className="flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />
               特定荷主
             </Badge>
           ) : (
-            <Badge variant="outline" className="ml-auto flex items-center gap-1 border-primary/40 text-primary">
+            <Badge variant="outline" className="flex items-center gap-1 border-primary-foreground/40 text-primary-foreground">
               <CheckCircle2 className="h-3 w-3" />
               規制対象外
             </Badge>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       <main className="mx-auto max-w-4xl space-y-6 p-4 pb-24">
 

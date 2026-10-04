@@ -80,3 +80,40 @@ export function missingForApproval(content: OrderFields, deliveryDueDate: string
   if (!cleanText(deliveryDueDate)) missing.push("納品日");
   return missing;
 }
+
+/**
+ * 発注の入力文から、AI解析が拾わない温度帯と納品日を読み取る。
+ * 「冷凍」「冷蔵（チルド）」と、「今日・明日・明後日・M月D日・M/D」に対応する。
+ * 読めないものは返さない（勝手に既定値で埋めない）。
+ */
+export function orderHintsFromText(
+  text: string,
+  today: Date = new Date(),
+): { temperatureZone?: "冷凍" | "冷蔵"; deliveryDate?: string } {
+  const s = text.normalize("NFKC");
+  const hints: { temperatureZone?: "冷凍" | "冷蔵"; deliveryDate?: string } = {};
+  if (/冷凍|フローズン/.test(s)) hints.temperatureZone = "冷凍";
+  else if (/冷蔵|チルド|要冷/.test(s)) hints.temperatureZone = "冷蔵";
+
+  const ymd = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const plus = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
+
+  if (/明後日|あさって/.test(s)) hints.deliveryDate = ymd(plus(2));
+  else if (/明日|あした|あす/.test(s)) hints.deliveryDate = ymd(plus(1));
+  else if (/今日|本日/.test(s)) hints.deliveryDate = ymd(plus(0));
+  else {
+    const m = s.match(/(\d{1,2})\s*(?:月|\/)\s*(\d{1,2})\s*日?/);
+    if (m) {
+      const month = Number(m[1]);
+      const day = Number(m[2]);
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        let d = new Date(today.getFullYear(), month - 1, day);
+        // 過去の日付なら来年のこととみなす（12月に「1月5日」と書いた場合など）
+        if (d < plus(0)) d = new Date(today.getFullYear() + 1, month - 1, day);
+        if (d.getMonth() === month - 1) hints.deliveryDate = ymd(d);
+      }
+    }
+  }
+  return hints;
+}

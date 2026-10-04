@@ -1,9 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/hooks/useOrganization";
 import { BottomNav } from "@/components/BottomNav";
-import { ArrowLeft, Printer, FileText } from "lucide-react";
+import { Printer, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead,
@@ -13,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/PageHeader";
 
 interface ReportRow {
   client_organization_name: string | null;
@@ -82,7 +82,6 @@ function getCurrentMonthValue(): string {
 }
 
 export default function Report() {
-  const navigate = useNavigate();
   const { orgId } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ReportRow[]>([]);
@@ -128,24 +127,7 @@ export default function Report() {
   return (
     <div className="min-h-screen bg-background print:bg-white print:text-black">
       {/* App Header — hidden on print */}
-      <header className="bg-primary px-4 py-4 shadow-lg print:hidden">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 hover:bg-primary-foreground/20"
-            >
-              <ArrowLeft className="h-5 w-5 text-primary-foreground" />
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-                <img src="/icon-192.png" alt="守護神" className="h-5 w-5 rounded-md" />
-              </div>
-              <h1 className="text-lg font-bold text-primary-foreground">守護神</h1>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="警告レポート" className="print:hidden" />
 
       <main className="mx-auto max-w-4xl p-4 pb-28 print:max-w-none print:p-0 print:pb-0">
         {/* Report Title */}
@@ -311,10 +293,10 @@ export default function Report() {
         {/* Legal Disclaimer Footer */}
         <footer className="mt-8 border-t border-border pt-4 print:mt-12 print:border-black">
           <p className="text-sm font-semibold leading-relaxed text-foreground print:text-black">
-            本資料は、2026年施行の「中小受託取引適正化法」および国土交通省の監視基準に基づき生成されています。
+            本資料は、2026年施行の「中小受託取引適正化法」および国土交通省の監視基準を参考に作成しています。
             {totalApprovedClaims > 0
               ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"
-              : "記録された待機時間はGPSおよび端末ログにより担保されており、法的な支払督促の根拠資料として有効です。"}
+              : "記録された待機時間は、到着時の位置情報（GPS）とサーバー時刻にもとづく記録です。荷主との協議や待機料の請求の際の資料としてご利用いただけます。"}
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground print:text-gray-600">
             取適法により、役務提供完了日から60日を超える支払遅延には年率14.6%の遅延利息が課されます。本レポートの数値はシステムが自動計算した参考値であり、法的助言を構成するものではありません。

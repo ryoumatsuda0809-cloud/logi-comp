@@ -285,7 +285,7 @@ export default function Dashboard() {
             {isAdmin && (
               <MenuCard
                 icon={<FileWarning className="h-8 w-8" />}
-                title="📑 警告レポート"
+                title="警告レポート"
                 description="荷主別・取適法リスク診断"
                 color="primary"
                 onClick={() => navigate("/report")}

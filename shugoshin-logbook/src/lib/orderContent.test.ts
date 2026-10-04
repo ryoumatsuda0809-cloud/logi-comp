@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanText, displayRoute, displayText, displayYen, missingForApproval, parseYen } from "./orderContent";
+import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText, parseYen } from "./orderContent";
 
 describe("cleanText / displayText", () => {
   it("AI が埋めた仮の値は未入力として扱う", () => {
@@ -56,5 +56,24 @@ describe("missingForApproval", () => {
   });
   it("運賃が読めなければ承認できない", () => {
     expect(missingForApproval({ ...full, price: "応相談" }, "2026-10-10")).toEqual(["運賃"]);
+  });
+});
+
+describe("orderHintsFromText", () => {
+  const today = new Date(2026, 9, 4); // 2026-10-04
+  it("冷蔵・明日を読む", () => {
+    expect(orderHintsFromText("唐戸からトラフグ20箱 冷蔵 明日納品 3万円", today)).toEqual({
+      temperatureZone: "冷蔵",
+      deliveryDate: "2026-10-05",
+    });
+  });
+  it("冷凍・M月D日を読む", () => {
+    expect(orderHintsFromText("冷凍マグロ 10月12日着", today)).toEqual({ temperatureZone: "冷凍", deliveryDate: "2026-10-12" });
+  });
+  it("過去の月日は来年とみなす", () => {
+    expect(orderHintsFromText("1/5 納品", today).deliveryDate).toBe("2027-01-05");
+  });
+  it("書かれていなければ何も返さない", () => {
+    expect(orderHintsFromText("フグ10箱を長府まで、運賃5万円", today)).toEqual({});
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Check, Truck, Package, Clock, User, AlertCircle } from "lucide-react";
+import { MapPin, Check, Truck, Package, Clock, User, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
 import { displayText } from "@/lib/orderContent";
+import { PageHeader } from "@/components/PageHeader";
 
 type ComplianceEvent = Database["public"]["Enums"]["compliance_event"];
 
@@ -270,23 +271,7 @@ export default function DeliveryStatus() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-primary px-4 py-4 shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center">
-          <button
-            onClick={() => navigate(-1)}
-            className="mr-3 flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground hover:bg-primary-foreground/10"
-            aria-label="戻る"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-              <img src="/icon-192.png" alt="守護神" className="h-4 w-4 rounded" />
-            </div>
-            <h1 className="text-lg font-bold text-primary-foreground">配送ステータス</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="配送ステータス" />
 
       <main className="mx-auto max-w-4xl space-y-6 p-4 pb-28">
         {/* Stepper */}

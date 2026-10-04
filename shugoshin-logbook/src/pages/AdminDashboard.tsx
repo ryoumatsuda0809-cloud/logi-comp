@@ -7,14 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -28,6 +20,7 @@ import {
   RefreshCw,
   
 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 /* ─── 型定義 ─── */
 interface WaitLog {
@@ -96,8 +89,8 @@ const ACTION_CONFIG: Record<string, {
   variant: "default" | "destructive" | "outline" | "secondary";
   icon: typeof Megaphone;
 }> = {
-  waiting: { label: "📢 呼出", nextStatus: "called", variant: "default", icon: Megaphone },
-  called: { label: "▶ 作業開始", nextStatus: "working", variant: "secondary", icon: Play },
+  waiting: { label: "呼出", nextStatus: "called", variant: "default", icon: Megaphone },
+  called: { label: "作業開始", nextStatus: "working", variant: "secondary", icon: Play },
   // 完了は荷主側では行わない。署名とGPSを伴う complete_ticket（ドライバー側）だけが確定させる。
 };
 
@@ -192,6 +185,7 @@ function WaitLogCard({
             disabled={loading}
             onClick={() => onAction(log.id, action.nextStatus)}
           >
+            <action.icon className="mr-1 h-5 w-5" />
             {action.label}
           </Button>
         )}
@@ -302,7 +296,6 @@ export default function AdminDashboard() {
   const [orgName, setOrgName] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // logsRefを常に最新に保つ
   useEffect(() => {
@@ -339,11 +332,6 @@ export default function AdminDashboard() {
           .then(({ data: org }) => {
             if (org?.name) {
               setOrgName(org.name);
-              // 初回確認が済んでいなければオンボーディングを表示
-              const alreadyOnboarded = localStorage.getItem(`onboarded_admin_${_user.id}`);
-              if (!alreadyOnboarded) {
-                setShowOnboarding(true);
-              }
             } else {
             }
             setOrgLoading(false);
@@ -499,14 +487,7 @@ export default function AdminDashboard() {
   if (!orgLoading && !orgName) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-              <img src="/icon-192.png" alt="守護神" className="h-6 w-6 rounded" />
-            </div>
-            <h1 className="text-lg font-bold text-primary-foreground">管理ダッシュボード</h1>
-          </div>
-        </header>
+        <PageHeader title="管理ダッシュボード" />
         <div className="flex flex-col items-center justify-center gap-6 p-8 pt-24">
           <div className="text-6xl">🏢</div>
           <h2 className="text-xl font-bold">組織設定が完了していません</h2>
@@ -537,49 +518,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* 初回確認ダイアログ */}
-      <Dialog open={showOnboarding} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md [&>button]:hidden" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="text-xl">所属組織の確認</DialogTitle>
-            <DialogDescription className="text-base pt-2">
-              あなたの所属組織は以下の通りです。この組織のカンバンを表示してよろしいですか？
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10">
-            <span className="text-3xl">🏢</span>
-            <span className="text-lg font-bold">{orgName}</span>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => navigate("/settings/organization")}>
-              いいえ、設定をやり直す
-            </Button>
-            <Button
-              className="font-bold"
-              onClick={() => {
-                setShowOnboarding(false);
-                localStorage.setItem(`onboarded_admin_${_user?.id}`, "true");
-              }}
-            >
-              はい、この組織で始める
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ヘッダー */}
-      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-              <img src="/icon-192.png" alt="守護神" className="h-6 w-6 rounded" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-primary-foreground">管理ダッシュボード</h1>
-              <p className="text-xs text-primary-foreground/60">🏢 {orgName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
+      <PageHeader
+        title="管理ダッシュボード"
+        subtitle={orgName}
+        right={
+          <>
             {/* 圏外申請は放置するとドライバーが待機料を請求できないままになる。
                 件数を常に見せて承認画面への導線にする。 */}
             <Button
@@ -603,9 +547,9 @@ export default function AdminDashboard() {
             >
               <RefreshCw className="h-5 w-5" />
             </Button>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         {facilities.length > 1 && (
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
             {facilities.map((f) => (
@@ -621,7 +565,7 @@ export default function AdminDashboard() {
             ))}
           </div>
         )}
-      </header>
+      </PageHeader>
 
       {/* サマリーバー */}
       <div className="flex gap-2 px-4 py-3 border-b">

@@ -1,7 +1,6 @@
 import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, MapPin, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, MapPin, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArrivalDateTime, formatElapsed } from "@/lib/staleTicket";
+import { PageHeader } from "@/components/PageHeader";
 
 /**
  * 圏外申請の承認画面（オフライン打刻 Phase 2）
@@ -50,7 +50,6 @@ const PUNCH_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PendingPunches() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -167,15 +166,9 @@ export default function PendingPunches() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            戻る
-          </Button>
-          <h1 className="text-xl font-bold">圏外打刻の承認</h1>
-        </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="圏外打刻の承認" backTo="/admin" />
+      <div className="mx-auto max-w-3xl space-y-4 p-4">
 
         <Alert>
           <AlertTitle>承認の意味</AlertTitle>
