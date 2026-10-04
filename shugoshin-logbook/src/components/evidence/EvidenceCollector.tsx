@@ -20,6 +20,7 @@ export function EvidenceCollector() {
   const {
     position,
     gpsError,
+    retryGps,
     isSubmitting,
     submitError,
     lastResult,
@@ -342,7 +343,7 @@ export function EvidenceCollector() {
               variant="outline"
               size="sm"
               className="min-h-11 text-foreground"
-              onClick={() => window.location.reload()}
+              onClick={retryGps}
             >
               <RotateCcw className="mr-2 h-4 w-4" />
               位置情報を再取得する

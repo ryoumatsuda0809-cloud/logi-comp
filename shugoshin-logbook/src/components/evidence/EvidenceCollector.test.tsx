@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { EvidenceCollector } from "./EvidenceCollector";
 
@@ -70,15 +70,17 @@ function mockGeolocation(
     }
   );
 
+  const clearWatch = vi.fn();
   Object.defineProperty(global.navigator, "geolocation", {
     value: {
       watchPosition,
-      clearWatch: vi.fn(),
+      clearWatch,
       getCurrentPosition: vi.fn(),
     },
     writable: true,
     configurable: true,
   });
+  return { watchPosition, clearWatch };
 }
 
 describe("EvidenceCollector — GPS 状態によるUIフェイルセーフ検証", () => {
@@ -112,6 +114,31 @@ describe("EvidenceCollector — GPS 状態によるUIフェイルセーフ検証
     const button = screen.getByRole("button", { name: /GPSが使えません/ });
     expect(button).toBeDisabled();
     expect(screen.getByRole("button", { name: /位置情報を再取得する/ })).toBeEnabled();
+  });
+
+  it("再取得ボタンはページを再読み込みせず、GPS監視だけをやり直す（入力済みの内容を失わない）", async () => {
+    const { watchPosition, clearWatch } = mockGeolocation("error", 3 /* TIMEOUT */);
+    const reload = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, reload },
+      configurable: true,
+    });
+
+    render(<EvidenceCollector />);
+    const retry = await screen.findByRole("button", { name: /位置情報を再取得する/ });
+    expect(watchPosition).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2));
+    expect(clearWatch).toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      configurable: true,
+    });
   });
 
   it("異常系(取得失敗): POSITION_UNAVAILABLEエラー時もAlertが表示されボタンがロックされる", async () => {

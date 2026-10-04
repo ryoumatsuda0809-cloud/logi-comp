@@ -74,6 +74,8 @@ function gpsErrorMessage(err: GeolocationPositionError): string {
 export interface UseEvidenceReturn {
   position: GpsPosition | null;
   gpsError: string | null;
+  /** GPS監視をやり直す。ページを再読み込みしないので入力済みのフォームは消えない */
+  retryGps: () => void;
   isSubmitting: boolean;
   submitError: string | null;
   lastResult: EvidenceResult | null;
@@ -108,6 +110,7 @@ export function useEvidence(): UseEvidenceReturn {
   const { user } = useAuth();
   const [position, setPosition] = useState<GpsPosition | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsAttempt, setGpsAttempt] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitFailedOffline, setSubmitFailedOffline] = useState(false);
@@ -137,6 +140,11 @@ export function useEvidence(): UseEvidenceReturn {
       { enableHighAccuracy: true, timeout: 15000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
+  }, [gpsAttempt]);
+
+  const retryGps = useCallback(() => {
+    setGpsError(null);
+    setGpsAttempt((n) => n + 1);
   }, []);
 
   // ── 状態の永続化復元 ──
@@ -498,6 +506,7 @@ export function useEvidence(): UseEvidenceReturn {
   return {
     position,
     gpsError,
+    retryGps,
     isSubmitting,
     submitError,
     lastResult,
