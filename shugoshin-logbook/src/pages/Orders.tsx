@@ -446,15 +446,14 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
           {/* 新規発注タブ */}
           <TabsContent value="new" className="space-y-4">
             {!orgId && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-                <strong>⚠️ 組織への参加が必要です</strong>
-                <p className="mt-1">発注を作成するには、組織への参加が必要です。管理者に招待を依頼するか、組織設定ページで組織を作成してください。</p>
+              <p className="text-sm text-muted-foreground">
+                組織に参加するまで、発注は保存できません（上の帯から招待コードを入力できます）。
                 <button
                   onClick={() => navigate("/organization-settings")}
-                  className="mt-2 text-sm underline">
+                  className="ml-1 underline">
                   組織設定へ →
                 </button>
-              </div>
+              </p>
             )}
 
             {/* 編集モード中のみ AI入力欄を非表示 */}

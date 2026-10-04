@@ -544,6 +544,12 @@ export default function DailyReportConfirm() {
                 {submitting ? "提出中..." : holdProgress > 0 ? "長押し中..." : "ヨシ！（長押しで提出）➔"}
               </span>
             </button>
+            {/* 無効のときは理由を出す（灰色のまま理由が分からない状態を避ける） */}
+            {!submitting && isSubmitDisabled && (
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                {loading ? "記録を読み込み中です" : "本日の打刻記録がないため、提出できません"}
+              </p>
+            )}
             {/* Progress indicator below button */}
             {holdProgress > 0 && holdProgress < 100 && (
               <Progress value={holdProgress} className="mt-2 h-1.5" />
