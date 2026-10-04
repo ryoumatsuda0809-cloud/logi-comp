@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Json } from "@/integrations/supabase/types";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
+import { cleanText } from "@/lib/orderContent";
 
 type OrderStatus = "draft" | "approved" | "delivered";
 
@@ -184,9 +185,9 @@ export default function Dashboard() {
             <div className="space-y-3">
               {recentOrders.map((order) => {
                 const content = getJson(order.content_json);
-                const itemName = (content.item_name as string) || "（品目未設定）";
-                const origin = (content.origin as string) || "";
-                const destination = (content.destination as string) || "";
+                const itemName = cleanText(content.item_name) ?? "（品名未入力）";
+                const origin = cleanText(content.origin) ?? "";
+                const destination = cleanText(content.destination) ?? "";
                 const cfg = STATUS_CONFIG[order.status];
                 return (
                   <button

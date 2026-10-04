@@ -11,13 +11,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, ArrowLeft, Mic, MicOff, Sparkles, AlertTriangle, Check, Loader2, Download, FileText, Pencil, CheckCircle, Lock, RotateCcw } from "lucide-react";
+import { Shield, ArrowLeft, Mic, MicOff, Sparkles, AlertTriangle, Check, Loader2, Download, FileText, Pencil, CheckCircle, Lock, Truck } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { isSpeechSupported, startListening, stopListening } from "@/lib/speech";
 import { addDays, format, isAfter, isToday, isYesterday } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import { BottomNav } from "@/components/BottomNav";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cleanText, displayRoute, displayText, displayYen, missingForApproval } from "@/lib/orderContent";
 
 type ParsedOrder = {
   item_name: string;
@@ -54,7 +65,14 @@ export default function Orders() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [unlockingId, setUnlockingId] = useState<string | null>(null);
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
+  // 取り消せない操作（承認・配送完了）の前に出す確認
+  const [confirming, setConfirming] = useState<
+    | { kind: "approve-form" }
+    | { kind: "approve"; order: Tables<"transport_orders"> }
+    | { kind: "deliver"; order: Tables<"transport_orders"> }
+    | null
+  >(null);
   const [temperatureZone, setTemperatureZone] = useState<string>("常温");
 
   // Get user's org + check admin role
@@ -168,8 +186,16 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
       if (!data || data.error) {
         toast({ title: "AI解析エラー", description: data?.error || "応答を解析できませんでした", variant: "destructive" });
       } else {
-        setParsed(data as ParsedOrder);
-        if (data?.payment_date) setDeliveryDate(data.payment_date);
+        // AI は入力に無い項目を "null" や "不明" で埋めることがある。空欄に戻して人に入れてもらう。
+        setParsed({
+          item_name: cleanText(data.item_name) ?? "",
+          quantity: cleanText(data.quantity) ?? "",
+          price: cleanText(data.price) ?? "",
+          origin: cleanText(data.origin) ?? "",
+          destination: cleanText(data.destination) ?? "",
+          payment_date: cleanText(data.payment_date),
+        });
+        if (cleanText(data?.payment_date)) setDeliveryDate(data.payment_date);
       }
     } catch (e: any) {
       toast({ title: "エラー", description: toDisplayMessage(e, "AI解析に失敗しました"), variant: "destructive" });
@@ -219,6 +245,18 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
     isAfter(new Date(parsed.payment_date), addDays(new Date(deliveryDate), 60)) :
     false;
 
+  // 承認に必要な項目が欠けていれば知らせて false を返す
+  const checkApprovable = (content: Parameters<typeof missingForApproval>[0], dueDate: string | null | undefined, hint: string) => {
+    const missing = missingForApproval(content, dueDate);
+    if (missing.length === 0) return true;
+    toast({
+      title: "承認できません",
+      description: `${missing.join("・")}が入っていません。${hint}`,
+      variant: "destructive",
+    });
+    return false;
+  };
+
   const handleSave = async (status: "draft" | "approved") => {
     if (!parsed) return;
     if (!orgId) {
@@ -229,6 +267,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
       });
       return;
     }
+    if (status === "approved" && !checkApprovable(parsed, deliveryDate, "入力してから承認してください。")) return;
     setIsSaving(true);
     try {
       if (editingOrderId) {
@@ -283,6 +322,8 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
       setEditingOrderId(null);
       setTab("list");
       if (orgId) await fetchOrders(orgId);
+      // 保存した発注は一覧の先頭に出るので、先頭から見せる
+      window.scrollTo({ top: 0 });
     } catch (e: any) {
       console.error("保存に失敗しました:", e);
       toast({ title: "保存に失敗しました", description: toDisplayMessage(e, "不明なエラーが発生しました"), variant: "destructive" });
@@ -291,7 +332,9 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
     }
   };
 
-  const handleApprove = async (orderId: string) => {
+  const handleApprove = async (order: Tables<"transport_orders">) => {
+    const orderId = order.id;
+    if (!checkApprovable((order.content_json ?? {}) as any, order.delivery_due_date, "カードをタップして入力してから承認してください。")) return;
     setApprovingId(orderId);
     try {
       const { error } = await supabase
@@ -320,53 +363,21 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
     }
   };
 
-  const handleUnlock = async (order: Tables<"transport_orders">) => {
-    setUnlockingId(order.id);
+  // 承認済み → 配送完了。DB 側（RLS とトリガー）でも管理者の approved → delivered だけを許している。
+  const handleDeliver = async (order: Tables<"transport_orders">) => {
+    setDeliveringId(order.id);
     try {
       const { error } = await supabase
         .from("transport_orders")
-        .update({
-          status: "draft",
-          approved_at: null,
-          approved_by: null,
-        } as any)
+        .update({ status: "delivered" } as any)
         .eq("id", order.id);
-
-      if (error) {
-        if (error.code === "42501" || error.message.includes("row-level security")) {
-          toast({
-            title: "操作できません",
-            description: "承認取り消しの権限がありません",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
-      } else {
-        toast({
-          title: "🔓 承認を取り消しました",
-          description: "発注が下書きに戻りました。内容を修正して再承認してください。",
-        });
-        const content = order.content_json as any;
-        setParsed({
-          item_name: content.item_name || "",
-          quantity: content.quantity || "",
-          price: content.price || "",
-          origin: content.origin || "",
-          destination: content.destination || "",
-          payment_date: content.payment_date || null,
-        });
-        setDeliveryDate(order.delivery_due_date || "");
-        setTemperatureZone((order as any).temperature_zone || content.temperature_zone || "常温");
-        setEditingOrderId(order.id);
-        setInputText("");
-        setTab("new");
-        if (orgId) fetchOrders(orgId);
-      }
+      if (error) throw error;
+      toast({ title: "配送完了にしました" });
+      if (orgId) await fetchOrders(orgId);
     } catch (e: any) {
-      toast({ title: "エラー", description: toDisplayMessage(e), variant: "destructive" });
+      toast({ title: "配送完了にできませんでした", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
-      setUnlockingId(null);
+      setDeliveringId(null);
     }
   };
 
@@ -596,7 +607,9 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                     <FieldButton variant="outline" onClick={() => handleSave("draft")} disabled={isSaving}>
                       {editingOrderId ? "下書きを更新" : "下書き保存"}
                     </FieldButton>
-                    <FieldButton variant="accent" onClick={() => handleSave("approved")} disabled={isSaving}>
+                    <FieldButton variant="accent" onClick={() => {
+                      if (checkApprovable(parsed, deliveryDate, "入力してから承認してください。")) setConfirming({ kind: "approve-form" });
+                    }} disabled={isSaving}>
                       {isSaving ? <Loader2 className="animate-spin" /> : <Check />}
                       {editingOrderId ? "承認・更新" : "承認・保存"}
                     </FieldButton>
@@ -651,7 +664,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                             return <Badge variant={ts.variant} className={`text-base ${ts.variant === "default" ? "bg-orange-500 text-white border-orange-500 hover:bg-orange-600" : ""}`}>{ts.label}</Badge>;
                           })()}
                           <span className="font-bold text-card-foreground">
-                            {content?.item_name || "品名不明"}
+                            {displayText(content?.item_name)}
                           </span>
                           <Badge className={st?.color}>{st?.label}</Badge>
                           {(() => {
@@ -675,10 +688,10 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {content?.origin} → {content?.destination}
+                          {displayRoute(content?.origin, content?.destination)}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          数量: {content?.quantity} / 運賃: ¥{Number(content?.price || 0).toLocaleString()}
+                          数量: {displayText(content?.quantity)} / 運賃: {displayYen(content?.price)}
                         </p>
                         {order.delivery_due_date &&
                           <p className="text-xs text-muted-foreground">
@@ -730,7 +743,12 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                         {/* 管理者のみ：draft カードに承認ボタン */}
                         {isAdmin && isDraft && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleApprove(order.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (checkApprovable((order.content_json ?? {}) as any, order.delivery_due_date, "カードをタップして入力してから承認してください。")) {
+                                setConfirming({ kind: "approve", order });
+                              }
+                            }}
                             disabled={approvingId === order.id}
                             className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                           >
@@ -743,19 +761,20 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                           </button>
                         )}
 
-                        {/* 管理者のみ：approved カードに「取り消し」ボタン */}
+                        {/* 管理者のみ：approved カードに「配送完了にする」ボタン。
+                            承認済みの発注は書面として確定しているので、取り消し・修正はできない */}
                         {isAdmin && isApproved && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleUnlock(order); }}
-                            disabled={unlockingId === order.id}
-                            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                            onClick={(e) => { e.stopPropagation(); setConfirming({ kind: "deliver", order }); }}
+                            disabled={deliveringId === order.id}
+                            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
                           >
-                            {unlockingId === order.id ? (
+                            {deliveringId === order.id ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
-                              <RotateCcw className="h-5 w-5" />
+                              <Truck className="h-5 w-5" />
                             )}
-                            🔓 承認を取り消して修正する
+                            配送完了にする
                           </button>
                         )}
                       </div>
@@ -767,6 +786,36 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
           </TabsContent>
         </Tabs>
       </main>
+
+      <AlertDialog open={confirming !== null} onOpenChange={(open) => { if (!open) setConfirming(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirming?.kind === "deliver" ? "配送完了にしますか？" : "この発注を承認しますか？"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming?.kind === "deliver"
+                ? "配送完了にすると、元の「承認済」には戻せません。"
+                : "承認すると発注書（4条書面）として確定し、内容は後から変更・削除できません。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>やめる</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const c = confirming;
+                setConfirming(null);
+                if (!c) return;
+                if (c.kind === "approve-form") handleSave("approved");
+                else if (c.kind === "approve") handleApprove(c.order);
+                else handleDeliver(c.order);
+              }}
+            >
+              {confirming?.kind === "deliver" ? "配送完了にする" : "承認して確定する"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
