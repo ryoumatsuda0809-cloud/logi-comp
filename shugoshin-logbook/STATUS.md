@@ -51,5 +51,5 @@
 ## 4. 本番の状態
 
 `20260806100000` 〜 `20260806180000` と `20260807100000_report_share_links`（荷主への署名付き閲覧リンク）まで適用済み（`docs/PROGRESS_LOG.md` による）。`20260731100000`・`20260731110000` も本番の履歴にあることを 2026-10-04 に確認済み。
-`20261004100000_require_order_fields_on_approval`（承認時の必須項目チェック）は未適用。
+`20261004100000_require_order_fields_on_approval`（承認時の必須項目チェック）と `20261004110000_shared_report_shippers_by_facility_id`（共有帳票の荷主名を施設IDで引く、R4）は未適用。
 DB を変えたら `supabase/tests/security_checks.sql` を実行し、全項目 `[OK]` を確認する。
