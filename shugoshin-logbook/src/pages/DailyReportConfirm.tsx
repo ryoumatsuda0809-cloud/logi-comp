@@ -211,7 +211,7 @@ export default function DailyReportConfirm() {
   const isSubmitDisabled = submitting || loading || timeline.length === 0;
 
   return (
-    <div className="min-h-screen bg-background pb-52">
+    <div className="min-h-screen bg-background pb-44">
       {/* Back button (print:hidden) */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur px-4 py-3 print:hidden">
         <button
@@ -508,14 +508,14 @@ export default function DailyReportConfirm() {
       </div>
 
       {/* ========== 4. Fixed footer with press-hold button ========== */}
-      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 pt-3 pb-3">
+      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 py-2">
         {alreadySubmitted ? (
-          <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <div className="flex items-center gap-2 text-2xl text-muted-foreground font-bold">
-              <CheckCircle2 className="h-8 w-8" />
+          <div className="flex flex-col items-center justify-center h-14 gap-0.5">
+            <div className="flex items-center gap-2 text-xl text-muted-foreground font-bold">
+              <CheckCircle2 className="h-6 w-6" />
               本日は提出済みです
             </div>
-            <p className="text-sm text-muted-foreground">🔒 送信済みの法定記録のため変更できません</p>
+            <p className="text-xs text-muted-foreground">🔒 送信済みの法定記録のため変更できません</p>
           </div>
         ) : (
           <div className="relative">
@@ -526,7 +526,7 @@ export default function DailyReportConfirm() {
               onPointerLeave={onPointerUpOrLeave}
               onContextMenu={(e) => e.preventDefault()}
               disabled={isSubmitDisabled}
-              className="relative w-full h-20 rounded-xl text-2xl font-bold overflow-hidden border-2 border-primary bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative w-full h-14 rounded-xl text-xl font-bold overflow-hidden border-2 border-primary bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 userSelect: "none",
                 WebkitTouchCallout: "none",
