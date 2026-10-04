@@ -31,7 +31,7 @@ interface KpiCounts {
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; bg: string; text: string }> = {
   draft:     { label: "下書き",   bg: "bg-muted",    text: "text-muted-foreground" },
-  approved:  { label: "承認済",   bg: "bg-accent",   text: "text-accent-foreground" },
+  approved:  { label: "承認済",   bg: "bg-emerald-100", text: "text-emerald-800" },
   delivered: { label: "配送完了", bg: "bg-primary",  text: "text-primary-foreground" },
 };
 
@@ -153,7 +153,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-3 gap-3">
               <KpiCard label="下書き" count={kpi.draft} colorClass="bg-muted text-muted-foreground" />
-              <KpiCard label="承認済" count={kpi.approved} colorClass="bg-accent text-accent-foreground" />
+              <KpiCard label="承認済" count={kpi.approved} colorClass="bg-emerald-100 text-emerald-800" />
               <KpiCard label="配送完了" count={kpi.delivered} colorClass="bg-primary text-primary-foreground" />
             </div>
           )}
