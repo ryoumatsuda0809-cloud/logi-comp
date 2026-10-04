@@ -11,6 +11,7 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
+import { displayText } from "@/lib/orderContent";
 
 type ComplianceEvent = Database["public"]["Enums"]["compliance_event"];
 
@@ -255,10 +256,10 @@ export default function DeliveryStatus() {
   }, [orgId, orgLoading, toast]);
 
   const contentJson = order?.content_json as Record<string, any> | undefined;
-  const itemName = contentJson?.item_name ?? contentJson?.itemName ?? "—";
-  const origin = contentJson?.origin ?? "—";
-  const destination = contentJson?.destination ?? "—";
-  const shipperName = contentJson?.shipper_name ?? contentJson?.shipperName ?? "—";
+  const itemName = displayText(contentJson?.item_name ?? contentJson?.itemName);
+  const origin = displayText(contentJson?.origin);
+  const destination = displayText(contentJson?.destination);
+  const shipperName = displayText(contentJson?.shipper_name ?? contentJson?.shipperName);
 
   const currentStep = order ? resolveStep(logs, order.status) : 0;
   const steps = buildSteps(logs);
@@ -325,19 +326,6 @@ export default function DeliveryStatus() {
             </button>
           </div>
         )}
-
-        {/* Map Placeholder */}
-        <Card className="min-h-[250px] border-dashed bg-muted/50">
-          <CardContent className="flex h-full min-h-[250px] flex-col items-center justify-center gap-3 p-6">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <MapPin className="h-7 w-7 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="text-base font-semibold text-muted-foreground">📍 地図エリア（現在はモック表示）</p>
-              <p className="mt-1 text-sm text-muted-foreground/70">将来のアップデートで地図が表示されます</p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Delivery Info Card */}
         {!isDataReady ? (

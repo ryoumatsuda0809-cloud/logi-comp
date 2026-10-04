@@ -360,7 +360,7 @@ export function EvidenceCollector() {
             <span>{submitError}</span>
             <button
               onClick={clearSubmitError}
-              className="self-start text-xs underline underline-offset-2 text-destructive-foreground/70 hover:text-destructive-foreground transition-colors"
+              className="self-start text-sm font-medium underline underline-offset-2 text-destructive hover:text-destructive/80 transition-colors"
             >
               エラーを閉じて再試行
             </button>
