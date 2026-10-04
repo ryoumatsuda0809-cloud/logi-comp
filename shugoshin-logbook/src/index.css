@@ -146,7 +146,7 @@
     margin: 10mm;
 
     @bottom-center {
-      content: "Page " counter(page);
+      content: counter(page) " ページ";
       font-size: 8pt;
       color: #666;
     }

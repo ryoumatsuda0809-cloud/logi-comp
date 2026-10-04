@@ -76,7 +76,7 @@ export default function DailyReportConfirm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { orgId } = useOrganization();
-  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport } = useDailyTimeline();
+  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames } = useDailyTimeline();
   const [submitting, setSubmitting] = useState(false);
 
   // Dialog & editable parameters
@@ -91,8 +91,12 @@ export default function DailyReportConfirm() {
     setDraftExtraWork(hasExtraWork);
     setDialogOpen(true);
   };
-  // Derive shipper name from timeline data (first location found)
-  const derivedShipper = timeline.find((t) => t.location)?.location ?? "（荷主未記録）";
+  // 荷主名は、その日に打刻した施設の荷主（facilities.client_name）。
+  // 以前は最初の施設「名」を入れていたため、報告書の宛名（荷主名）と食い違った。
+  const derivedShipper =
+    shipperNames.length > 0
+      ? shipperNames.join("、")
+      : timeline.find((t) => t.shipperName)?.shipperName ?? "（荷主未記録）";
 
   // Sync hook data into editable state
   useEffect(() => {
@@ -537,6 +541,8 @@ export default function DailyReportConfirm() {
       </div>
 
       {/* ========== 4. Fixed footer with press-hold button ========== */}
+      {/* 記録0件の日は、押せない提出バーを出さない（打刻へ誘導する表示が上にある） */}
+      {(loading || timeline.length > 0 || alreadySubmitted) && (
       <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 py-2">
         {alreadySubmitted ? (
           <div className="flex flex-col items-center justify-center h-14 gap-0.5">
@@ -586,6 +592,7 @@ export default function DailyReportConfirm() {
           </div>
         )}
       </div>
+      )}
 
       <div className="print:hidden">
         <BottomNav />

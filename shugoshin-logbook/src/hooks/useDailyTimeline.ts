@@ -46,6 +46,8 @@ export interface DailyTimelineResult {
   loading: boolean;
   alreadySubmitted: boolean;
   latestFormalReport: string | null;
+  /** その日に打刻した施設の荷主名（facilities.client_name）。施設名ではない */
+  shipperNames: string[];
 }
 
 // ---------- Event label mapping ----------
@@ -103,6 +105,7 @@ export function useDailyTimeline(): DailyTimelineResult {
   const [loading, setLoading] = useState(true);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [latestFormalReport, setLatestFormalReport] = useState<string | null>(null);
+  const [shipperNames, setShipperNames] = useState<string[]>([]);
 
   const fetchTimeline = useCallback(async () => {
     if (!user) {
@@ -150,7 +153,7 @@ export function useDailyTimeline(): DailyTimelineResult {
         .gte("arrival_time", todayStart)
         .lte("arrival_time", todayEnd)
         .order("arrival_time", { ascending: true }),
-      supabase.from("facilities").select("id, name"),
+      supabase.from("facilities").select("id, name, client_name"),
     ]);
 
     const vc = profileRes.data?.vehicle_class ?? "4t";
@@ -226,6 +229,17 @@ export function useDailyTimeline(): DailyTimelineResult {
         claimed_end_at: wl.claimed_end_at,
         self_approved: wl.self_approved,
       }));
+      const visitedIds = new Set(waitLogRows.map((w) => w.facility_id));
+      setShipperNames(
+        Array.from(
+          new Set(
+            (facilitiesRes.data ?? [])
+              .filter((f) => visitedIds.has(f.id))
+              .map((f) => f.client_name)
+              .filter((n): n is string => !!n),
+          ),
+        ),
+      );
       const { entries } = convertWaitLogsToTimeline(waitLogRows, facilityMap);
       for (const entry of entries) {
         const wm = entry.waitMinutes ?? 0;
@@ -292,5 +306,6 @@ export function useDailyTimeline(): DailyTimelineResult {
     loading,
     alreadySubmitted,
     latestFormalReport,
+    shipperNames,
   };
 }

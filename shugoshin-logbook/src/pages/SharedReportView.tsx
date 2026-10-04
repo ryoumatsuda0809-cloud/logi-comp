@@ -47,6 +47,8 @@ interface ReportData {
   timeline_snapshot: TimelineEntry[];
   submitted_at: string;
   organization_id: string | null;
+  /** 荷主名を打刻の施設IDから引くために使う。共有リンク経由では持たない */
+  user_id: string | null;
 }
 
 /* (MOCK_REPORT deleted — all data comes from Supabase) */
@@ -78,6 +80,12 @@ function formatDate(dateStr: string): string {
   }
 }
 
+/** 記録方法の表示。証拠の強さが読み手に伝わるよう、記録の出どころを明記する */
+function recordMethodLabel(item: TimelineEntry): string {
+  if (item.evidenceGrade === "C") return "圏外仮記録（承認済）";
+  return item.source === "gps" ? "GPS（サーバー記録）" : "音声（本人申告）";
+}
+
 function parseTimeline(json: Json): TimelineEntry[] {
   if (!Array.isArray(json)) return [];
   return json as unknown as TimelineEntry[];
@@ -106,7 +114,7 @@ export default function SharedReportView() {
       // Case 0: 共有リンク（荷主・ログイン不要）。専用 RPC だけが入口。
       if (token) {
         const { data, error } = await supabase.rpc("get_shared_report", { p_token: token });
-        const r = data as unknown as (Omit<ReportData, "organization_id" | "timeline_snapshot"> & {
+        const r = data as unknown as (Omit<ReportData, "organization_id" | "user_id" | "timeline_snapshot"> & {
           timeline_snapshot: Json;
           carrier_name: string | null;
           shipper_names: string[];
@@ -123,6 +131,7 @@ export default function SharedReportView() {
             timeline_snapshot: parseTimeline(r.timeline_snapshot),
             submitted_at: r.submitted_at,
             organization_id: null,
+            user_id: null,
           });
           setParties({ carrier: r.carrier_name ?? null, shippers: r.shipper_names ?? [] });
         } else {
@@ -152,6 +161,7 @@ export default function SharedReportView() {
             timeline_snapshot: parseTimeline(data.timeline_snapshot),
             submitted_at: data.submitted_at,
             organization_id: data.organization_id,
+            user_id: data.user_id,
           });
           setLoading(false);
           setLoading(false);
@@ -203,6 +213,7 @@ export default function SharedReportView() {
             timeline_snapshot: entries,
             submitted_at: new Date().toISOString(),
             organization_id: null,
+            user_id: user.id,
           });
           setLoading(false);
           setLoading(false);
@@ -231,21 +242,28 @@ export default function SharedReportView() {
           .maybeSingle();
         orgId = data?.organization_id ?? null;
       }
-      const [orgRes, facRes] = await Promise.all([
+      // 荷主名は、提出者がその日に打刻した記録の施設IDから引く。
+      // タイムラインの施設「名」で照合すると、同名の施設があるとき関係のない荷主名が載る。
+      const { start, end } = jstDayRange(report.report_date);
+      const [orgRes, logRes] = await Promise.all([
         orgId
           ? supabase.from("organizations").select("name").eq("id", orgId).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from("facilities").select("name, client_name"),
+        report.user_id
+          ? supabase
+              .from("wait_logs")
+              .select("facility_id")
+              .eq("user_id", report.user_id)
+              .gte("arrival_time", start)
+              .lte("arrival_time", end)
+          : Promise.resolve({ data: [] as { facility_id: string }[] }),
       ]);
-      const visited = new Set(
-        (report.timeline_snapshot ?? []).map((e) => e.locationName).filter(Boolean) as string[],
-      );
+      const facilityIds = Array.from(new Set((logRes.data ?? []).map((l) => l.facility_id)));
+      const facRes = facilityIds.length
+        ? await supabase.from("facilities").select("client_name").in("id", facilityIds)
+        : { data: [] as { client_name: string | null }[] };
       const shippers = Array.from(
-        new Set(
-          (facRes.data ?? [])
-            .filter((f) => visited.has(f.name))
-            .map((f) => f.client_name),
-        ),
+        new Set((facRes.data ?? []).map((f) => f.client_name).filter((n): n is string => !!n)),
       );
       if (!cancelled) setParties({ carrier: orgRes.data?.name ?? null, shippers });
     })();
@@ -313,7 +331,7 @@ export default function SharedReportView() {
   ).length;
 
   const cellClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm";
-  const thClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm font-bold bg-gray-200 print:bg-gray-200 text-left";
+  const thClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm font-bold bg-gray-200 print:bg-gray-200 text-left whitespace-nowrap";
 
   /* ================================================================ */
   /*  Render                                                          */
@@ -354,7 +372,7 @@ export default function SharedReportView() {
           onClick={() => window.print()}
         >
           <Printer className="h-6 w-6" />
-          🖨️ この報告書を印刷・PDF保存する
+          この報告書を印刷・PDF保存する
         </Button>
       </div>
 
@@ -415,16 +433,12 @@ export default function SharedReportView() {
             {/* Right: Date / Doc No */}
             <div className="text-right space-y-1 font-mono text-sm shrink-0">
               <div>
-                <span className="text-gray-500">発行日: </span>
-                <span className="font-bold text-black">{formatDate(report.report_date)}</span>
+                <span className="text-gray-500">{report.id.startsWith("live-") ? "作成日時: " : "提出日時: "}</span>
+                <span className="font-bold text-black">{new Date(report.submitted_at).toLocaleString("ja-JP")}</span>
               </div>
               <div>
                 <span className="text-gray-500">報告書番号: </span>
                 <span className="font-bold text-black">{report.id.slice(0, 8).toUpperCase()}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">車格: </span>
-                <span className="font-bold text-black">{report.vehicle_class}</span>
               </div>
             </div>
           </div>
@@ -526,6 +540,7 @@ export default function SharedReportView() {
             <h2 className="text-base font-bold text-black border-b border-black pb-1 mb-4 print:mb-1">
               タイムライン明細
             </h2>
+            <div className="overflow-x-auto print:overflow-visible">
             <table
               className="w-full border-collapse text-black font-mono text-sm"
               style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
@@ -550,7 +565,7 @@ export default function SharedReportView() {
                         {EVENT_LABELS[item.eventType] || item.eventType}
                       </td>
                       <td className={cellClass}>
-                        {item.source === "gps" ? "GPS" : "音声"}
+                        {recordMethodLabel(item)}
                         {item.evidenceGrade === "C" && (
                           <span
                             className="font-bold"
@@ -573,6 +588,7 @@ export default function SharedReportView() {
                 })}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 
@@ -580,14 +596,11 @@ export default function SharedReportView() {
         {/*  FOOTER — Legal Disclaimer                     */}
         {/* ══════════════════════════════════════════════ */}
         <footer className="border-t-2 border-black mt-12 pt-4 print:mt-4 print:pt-2 break-inside-avoid">
-          <p className="text-xs text-gray-700 font-mono leading-relaxed">
-            ※本システムにより、送信および閲覧ログ（IP・タイムスタンプ）は法的に保全されています。
-          </p>
-          <p className="text-xs text-gray-500 mt-1 font-mono">
-            提出日時: {new Date(report.submitted_at).toLocaleString("ja-JP")}
+          <p className="text-xs text-gray-700 font-mono leading-relaxed print:hidden">
+            ※共有リンクで開かれた回数と最終閲覧日時は記録されます。
           </p>
           <p className="text-xs text-gray-400 mt-3 font-mono text-right">
-            — 本書は電子的に生成された正式な報告書です —
+            — 本書は電子的に生成されました —
           </p>
         </footer>
       </article>
