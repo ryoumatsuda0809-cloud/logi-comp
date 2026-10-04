@@ -620,7 +620,7 @@ export function EvidenceCollector() {
                 <p className="text-xl font-mono font-black text-blue-700 dark:text-blue-300 tabular-nums">
                   {completeResult.waitingMinutes} 分
                 </p>
-                <p className="text-sm text-blue-600 dark:text-blue-400">待機</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">滞在（到着〜作業完了）</p>
               </div>
             )}
             <p className="text-sm text-muted-foreground">
