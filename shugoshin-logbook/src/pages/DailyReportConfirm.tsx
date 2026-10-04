@@ -13,6 +13,7 @@ import { useDailyTimeline, type UnifiedTimelineItem } from "@/hooks/useDailyTime
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { BottomNav } from "@/components/BottomNav";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
 import type { Json } from "@/integrations/supabase/types";
@@ -210,7 +211,7 @@ export default function DailyReportConfirm() {
   const isSubmitDisabled = submitting || loading || timeline.length === 0;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-52">
       {/* Back button (print:hidden) */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur px-4 py-3 print:hidden">
         <button
@@ -507,7 +508,7 @@ export default function DailyReportConfirm() {
       </div>
 
       {/* ========== 4. Fixed footer with press-hold button ========== */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 pt-3 pb-3">
         {alreadySubmitted ? (
           <div className="flex flex-col items-center justify-center h-24 gap-1">
             <div className="flex items-center gap-2 text-2xl text-muted-foreground font-bold">
@@ -549,6 +550,10 @@ export default function DailyReportConfirm() {
             )}
           </div>
         )}
+      </div>
+
+      <div className="print:hidden">
+        <BottomNav />
       </div>
     </div>
   );
