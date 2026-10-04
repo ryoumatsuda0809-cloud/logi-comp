@@ -4,7 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Printer, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Printer, AlertTriangle, ArrowLeft, Link2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 import { convertWaitLogsToTimeline, generateFormalReportFromWaitLogs } from "@/lib/waitLogToTimeline";
 import { sumWaitCost } from "@/lib/waitCostCalc";
@@ -86,7 +87,7 @@ function parseTimeline(json: Json): TimelineEntry[] {
 /*  SharedReportView Component                                        */
 /* ================================================================== */
 export default function SharedReportView() {
-  const { id } = useParams<{ id: string }>();
+  const { id, token } = useParams<{ id: string; token: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
@@ -101,6 +102,35 @@ export default function SharedReportView() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+
+      // Case 0: 共有リンク（荷主・ログイン不要）。専用 RPC だけが入口。
+      if (token) {
+        const { data, error } = await supabase.rpc("get_shared_report", { p_token: token });
+        const r = data as unknown as (Omit<ReportData, "organization_id" | "timeline_snapshot"> & {
+          timeline_snapshot: Json;
+          carrier_name: string | null;
+          shipper_names: string[];
+        }) | null;
+        if (!error && r) {
+          setReport({
+            id: r.id,
+            report_date: r.report_date,
+            vehicle_class: r.vehicle_class,
+            total_wait_minutes: r.total_wait_minutes,
+            estimated_wait_cost: r.estimated_wait_cost,
+            formal_report: r.formal_report ?? null,
+            has_discrepancy: r.has_discrepancy,
+            timeline_snapshot: parseTimeline(r.timeline_snapshot),
+            submitted_at: r.submitted_at,
+            organization_id: null,
+          });
+          setParties({ carrier: r.carrier_name ?? null, shippers: r.shipper_names ?? [] });
+        } else {
+          setReport(null);
+        }
+        setLoading(false);
+        return;
+      }
 
       // Case 1: URL has a submitted_reports ID → fetch it
       if (id) {
@@ -185,11 +215,11 @@ export default function SharedReportView() {
       setLoading(false);
     }
     load();
-  }, [id, user]);
+  }, [id, token, user]);
 
   /* ---------- 提出元（運送会社）と提出先（荷主）を実データから引く ---------- */
   useEffect(() => {
-    if (!report) return;
+    if (!report || token) return;
     let cancelled = false;
     (async () => {
       let orgId = report.organization_id;
@@ -222,7 +252,28 @@ export default function SharedReportView() {
     return () => {
       cancelled = true;
     };
-  }, [report, user]);
+  }, [report, user, token]);
+
+  /* ---------- 共有リンクの発行 ---------- */
+  const handleShare = async () => {
+    if (!id) return;
+    const { data, error } = await supabase.rpc("create_report_share_link", { p_report_id: id, p_days: 30 });
+    if (error || !data) {
+      toast({ title: "リンクを作れませんでした", description: "日報の持ち主のみ共有できます。", variant: "destructive" });
+      return;
+    }
+    const url = `${window.location.origin}/shared/${data}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "待機時間報告書", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "リンクをコピーしました", description: "30日間、ログインなしで閲覧できます。" });
+      }
+    } catch {
+      /* 共有シートのキャンセルは無視 */
+    }
+  };
 
   /* ---------- Loading state ---------- */
   if (loading) {
@@ -239,7 +290,11 @@ export default function SharedReportView() {
         <div className="text-center space-y-4 px-6">
           <p className="text-5xl">📄</p>
           <h2 className="text-xl font-bold text-foreground">レポートが見つかりません</h2>
-          <p className="text-muted-foreground text-base">本日の乗務記録はまだありません。</p>
+          <p className="text-muted-foreground text-base">
+            {token
+              ? "このリンクは無効か、有効期限が切れています。送付元の運送会社にご確認ください。"
+              : "本日の乗務記録はまだありません。"}
+          </p>
           <a href="/" className="inline-block mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-bold">
             トップページへ戻る
           </a>
@@ -277,6 +332,7 @@ export default function SharedReportView() {
       )}
 
       {/* ---- Back button (print:hidden) ---- */}
+      {!token && (
       <div className="mx-auto max-w-4xl px-4 pt-4 print:hidden">
         <Button
           variant="ghost"
@@ -288,6 +344,7 @@ export default function SharedReportView() {
           ホームに戻る
         </Button>
       </div>
+      )}
 
       {/* ---- Print button ---- */}
       <div className="mx-auto max-w-4xl px-4 pt-6 print:hidden">
@@ -300,6 +357,16 @@ export default function SharedReportView() {
           🖨️ この報告書を印刷・PDF保存する
         </Button>
       </div>
+
+      {/* ---- 荷主への共有リンク（提出済みの日報の持ち主のみ） ---- */}
+      {!token && id && !id.startsWith("live-") && user && (
+        <div className="mx-auto max-w-4xl px-4 pt-3 print:hidden">
+          <Button variant="outline" size="lg" className="w-full gap-3 h-12" onClick={handleShare}>
+            <Link2 className="h-5 w-5" />
+            荷主に送る閲覧リンクを作る（30日間有効）
+          </Button>
+        </div>
+      )}
 
       {/* ---- A4 Paper Container ---- */}
       <article

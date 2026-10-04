@@ -188,6 +188,7 @@ const App = () => {
             <Route path="/simulator" element={<Simulator />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/shared-report/:id" element={<SharedReportView />} />
+            <Route path="/shared/:token" element={<SharedReportView />} />
             <Route
               path="/admin"
               element={

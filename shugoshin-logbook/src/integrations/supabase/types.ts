@@ -773,6 +773,18 @@ export type Database = {
         Args: { p_log_id: string; p_new_status: string }
         Returns: undefined
       }
+      create_report_share_link: {
+        Args: { p_report_id: string; p_days?: number }
+        Returns: string
+      }
+      revoke_report_share_links: {
+        Args: { p_report_id: string }
+        Returns: number
+      }
+      get_shared_report: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       cancel_ticket: {
         Args: { p_log_id: string }
         Returns: {

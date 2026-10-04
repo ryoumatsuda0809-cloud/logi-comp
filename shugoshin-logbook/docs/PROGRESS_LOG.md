@@ -616,3 +616,18 @@ Brevo（日300通）が選択肢になる。
 - 未検証: 実機（GPS・圏外・iOS PWA）での打刻、ブラウザでの画面通し操作。
 
 次: 送達経路の最小実装を決め、パイロット（ドライバー1〜2名・実在施設2〜3か所・2週間）へ。2番・3番は保留。
+
+## 荷主への共有リンク（2026-10-04）
+
+マイグレーション `20260807100000_report_share_links.sql`（本番適用済み・履歴の version もファイルに一致）。
+
+- `report_share_links`（RLS 有効・ポリシーなし = RPC のみ）。トークンは SHA-256 ハッシュのみ保存。
+- `create_report_share_link(report_id, days=30, 最大90)`: 日報の持ち主のみ。トークンは発行時に1度だけ返る。
+- `revoke_report_share_links(report_id)`: 持ち主のみ。
+- `get_shared_report(token)`: 未ログイン可。無効・期限切れ・失効は一律 NULL。user_id・organization_id は返さない。
+- フロント: `/shared/:token`（荷主・ログイン不要）。日報の画面に「荷主に送る閲覧リンクを作る」。提出後は日報の画面へ遷移。
+- 検証: 本番で他人の発行拒否・365日拒否・直接SELECT拒否・不正トークン NULL・未ログイン取得・失効後 NULL を確認（ロールバック付き）。
+  `security_checks.sql` に同じ項目を追加。
+- 未検証: **期限切れの動作**。SQL ツール経由で report_share_links に直接 INSERT/UPDATE すると応答が返らず、
+  期限切れの再現ができなかった（原因未特定。コードは `expires_at > now()` の条件のみ）。
+- 未対応: 荷主がリンクを開いた通知、リンクの一覧・個別失効の画面、`/shared/:token` の総当たり対策（トークンは約244bitで実用上は不要）。

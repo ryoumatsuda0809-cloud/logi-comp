@@ -157,7 +157,7 @@ export default function DailyReportConfirm() {
       snapshotData = [...snapshotData, ...entries.map(e => ({ ...e, source: "wait_log" }))];
     }
 
-    const { error } = await supabase.from("submitted_reports").insert([{
+    const { data: inserted, error } = await supabase.from("submitted_reports").insert([{
       user_id: user.id,
       organization_id: resolvedOrgId,
       report_date: todayStr,
@@ -169,7 +169,7 @@ export default function DailyReportConfirm() {
       original_ai_output: originalAiOutput || null,
       is_edited: isEdited,
       formal_report: formalReportText || null,
-    }]);
+    }]).select("id").single();
 
     setSubmitting(false);
 
@@ -186,8 +186,8 @@ export default function DailyReportConfirm() {
       navigator.vibrate(200);
     }
 
-    toast({ title: "✅ 日報を提出しました！", description: "本日もお疲れ様でした。" });
-    navigate("/");
+    toast({ title: "✅ 日報を提出しました！", description: "荷主に送る場合は、次の画面でリンクを作れます。" });
+    navigate(inserted?.id ? `/shared-report/${inserted.id}` : "/");
   };
 
   const onPointerDown = useCallback(() => {

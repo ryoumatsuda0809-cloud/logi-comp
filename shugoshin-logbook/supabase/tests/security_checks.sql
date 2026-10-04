@@ -111,6 +111,46 @@ BEGIN
       RESET ROLE;
     END IF;
   END;
+  -- 共有リンク: 他人は発行できない／持ち主は発行できる／未ログインは取得でき内部IDを返さない／失効後は取得できない
+  DECLARE
+    v_rep record;
+    v_other uuid;
+    v_tok text;
+    v_j jsonb;
+  BEGIN
+    RESET ROLE;
+    SELECT * INTO v_rep FROM public.submitted_reports ORDER BY submitted_at DESC LIMIT 1;
+    SELECT id INTO v_other FROM auth.users WHERE id <> v_rep.user_id LIMIT 1;
+    IF v_rep.id IS NULL OR v_other IS NULL THEN
+      v_res := v_res || E'\n[--] 提出済み日報または別ユーザーがいないため、共有リンクのテストは省略';
+    ELSE
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_other, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      BEGIN
+        PERFORM public.create_report_share_link(v_rep.id, 30);
+        v_res := v_res || E'\n[NG] 他人の日報の共有リンクを発行できた';
+      EXCEPTION WHEN no_data_found THEN v_res := v_res || E'\n[OK] 他人の日報の共有リンクは発行拒否';
+      END;
+      RESET ROLE;
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_rep.user_id, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      v_tok := public.create_report_share_link(v_rep.id, 30);
+      RESET ROLE;
+      SET LOCAL ROLE anon;
+      v_j := public.get_shared_report(v_tok);
+      v_res := v_res || CASE WHEN v_j IS NOT NULL AND NOT (v_j ? 'user_id') AND NOT (v_j ? 'organization_id')
+        THEN E'\n[OK] 未ログインで共有リンクを開け、内部IDは含まれない' ELSE E'\n[NG] 共有リンクの取得または項目' END;
+      RESET ROLE;
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_rep.user_id, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      PERFORM public.revoke_report_share_links(v_rep.id);
+      RESET ROLE;
+      SET LOCAL ROLE anon;
+      v_res := v_res || CASE WHEN public.get_shared_report(v_tok) IS NULL
+        THEN E'\n[OK] 失効後の共有リンクは取得できない' ELSE E'\n[NG] 失効が効かない' END;
+      RESET ROLE;
+    END IF;
+  END;
   RESET ROLE;
   RAISE EXCEPTION 'ROLLBACK_TEST_RESULT:%', v_res;
 END $$;
