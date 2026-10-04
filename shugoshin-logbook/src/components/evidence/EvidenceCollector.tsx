@@ -335,7 +335,19 @@ export function EvidenceCollector() {
       {gpsError && (
         <Alert variant="destructive">
           <AlertTitle>GPS エラー</AlertTitle>
-          <AlertDescription>{gpsError}</AlertDescription>
+          <AlertDescription className="space-y-3">
+            <p>{gpsError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-11 text-foreground"
+              onClick={() => window.location.reload()}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              位置情報を再取得する
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -379,7 +391,7 @@ export function EvidenceCollector() {
           ) : !isGpsReady ? (
             <span className="flex flex-col items-center gap-3 opacity-60">
               <MapPin className="h-10 w-10" />
-              <span>GPS取得中</span>
+              <span>{gpsError ? "GPSが使えません" : "GPS取得中"}</span>
             </span>
           ) : (
             <span className="flex flex-col items-center gap-3">
@@ -561,7 +573,7 @@ export function EvidenceCollector() {
             ) : !isGpsReady ? (
               <span className="flex flex-col items-center gap-3 opacity-60">
                 <LogOut className="h-10 w-10" />
-                <span>GPS取得中</span>
+                <span>{gpsError ? "GPSが使えません" : "GPS取得中"}</span>
               </span>
             ) : !isFisheryDataValid ? (
               <span className="flex flex-col items-center gap-3 opacity-60">

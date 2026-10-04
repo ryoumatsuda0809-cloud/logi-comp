@@ -108,9 +108,10 @@ describe("EvidenceCollector — GPS 状態によるUIフェイルセーフ検証
       expect(alert).toHaveTextContent("GPS エラー");
     });
 
-    // 打刻ボタンが disabled であること（物理ロック）
-    const button = screen.getByRole("button", { name: /GPS取得中/ });
+    // 打刻ボタンが disabled であること（物理ロック）。「取得中」と偽らず、次の行動も示す
+    const button = screen.getByRole("button", { name: /GPSが使えません/ });
     expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: /位置情報を再取得する/ })).toBeEnabled();
   });
 
   it("異常系(取得失敗): POSITION_UNAVAILABLEエラー時もAlertが表示されボタンがロックされる", async () => {
@@ -121,7 +122,7 @@ describe("EvidenceCollector — GPS 状態によるUIフェイルセーフ検証
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
 
-    const button = screen.getByRole("button", { name: /GPS取得中/ });
+    const button = screen.getByRole("button", { name: /GPSが使えません/ });
     expect(button).toBeDisabled();
   });
 });
