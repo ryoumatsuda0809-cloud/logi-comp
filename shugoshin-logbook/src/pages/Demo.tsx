@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,15 +168,17 @@ function GpsPanel() {
 
         <div className="flex items-center gap-3">
           <Button
-            size="icon"
+            size="sm"
             variant="outline"
-            aria-label={playing ? "一時停止" : "再生"}
+            className="shrink-0 gap-2"
+            aria-label={playing ? "一時停止" : "1日の流れを再生"}
             onClick={() => {
               if (!playing && index >= last) setIndex(0);
               setPlaying((p) => !p);
             }}
           >
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {playing ? "一時停止" : "1日の流れを再生"}
           </Button>
           <Slider
             value={[index]}
@@ -359,7 +360,7 @@ function FeePanel() {
                 <span className="text-muted-foreground">
                   到着 {formatTimeOrNull(effectiveArrival(log))} → 荷役開始 {formatTimeOrNull(loadingStartedAt(log))}（{mins ?? "-"}分）
                 </span>
-                <span className="text-base font-semibold">
+                <span className="shrink-0 whitespace-nowrap pl-2 text-base font-semibold">
                   {fee === null ? "算定不能" : `${fee.toLocaleString()}円`}
                 </span>
               </div>
@@ -378,7 +379,7 @@ function FeePanel() {
           <span className="text-sm text-muted-foreground">
             1日の合計（待機1回ごとに30分を控除）
           </span>
-          <span className="text-2xl font-bold tabular-nums">{total.toLocaleString()}円</span>
+          <span className="shrink-0 whitespace-nowrap pl-2 text-2xl font-bold tabular-nums">{total.toLocaleString()}円</span>
         </div>
       </CardContent>
     </Card>
@@ -435,9 +436,6 @@ export default function Demo() {
             <h1 className="text-lg font-bold text-primary-foreground">守護神 デモ</h1>
             <p className="text-xs text-primary-foreground/70">荷待ちの記録から待機料の算定まで</p>
           </div>
-          <Button asChild variant="secondary" size="sm">
-            <Link to="/auth">ログイン</Link>
-          </Button>
         </div>
       </header>
 

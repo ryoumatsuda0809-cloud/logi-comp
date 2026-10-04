@@ -82,8 +82,8 @@ function formatDate(dateStr: string): string {
 
 /** 記録方法の表示。証拠の強さが読み手に伝わるよう、記録の出どころを明記する */
 function recordMethodLabel(item: TimelineEntry): string {
-  if (item.evidenceGrade === "C") return "圏外仮記録（承認済）";
-  return item.source === "gps" ? "GPS（サーバー記録）" : "音声（本人申告）";
+  if (item.evidenceGrade === "C") return "等級C：承認済みの申告";
+  return item.source === "gps" ? "等級A：サーバー検証済" : "音声（本人申告）";
 }
 
 function parseTimeline(json: Json): TimelineEntry[] {
