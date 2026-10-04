@@ -89,6 +89,7 @@ BEGIN
     v_i integer;
     v_all_null boolean := true;
   BEGIN
+    RESET ROLE;  -- 直前の未ログインのテストで anon になっているため、auth.users を読む前に戻す
     SELECT u.id INTO v_free FROM auth.users u
     WHERE NOT EXISTS (SELECT 1 FROM public.user_roles r WHERE r.user_id = u.id)
     LIMIT 1;
