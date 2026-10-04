@@ -88,11 +88,12 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "管理者",
   dispatcher: "配車担当",
   driver: "ドライバー",
+  receiver: "荷主",
   user: "一般ユーザー",
 };
 
 function roleBadgeVariant(role: string | null): "destructive" | "default" | "secondary" | "outline" {
-  if (role === "admin") return "destructive";
+  if (role === "admin") return "default";
   if (role === "dispatcher") return "default";
   return "secondary";
 }
@@ -256,10 +257,13 @@ export default function OrganizationSettings() {
           .select("id, capital_amount, employee_count, is_regulated")
           .eq("organization_id", orgId)
           .maybeSingle(),
+        // 所属の正は user_roles（is_member_of_org もここを見る）。
+        // organization_members には組織を作った管理者が入らないので使わない。
         supabase
-          .from("organization_members")
+          .from("user_roles")
           .select("id, user_id, role, created_at")
-          .eq("organization_id", orgId),
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: true }),
         supabase
           .from("organization_invite_codes")
           .select("id, code, is_active, created_at, expires_at, max_uses, use_count")
@@ -295,7 +299,17 @@ export default function OrganizationSettings() {
       }
 
       if (membersResult.data && membersResult.data.length > 0) {
-        const userIds = membersResult.data.map((m) => m.user_id).filter(Boolean) as string[];
+        // 1人が複数の役割を持つことがあるので、1人1行にまとめ、上位の役割を出す
+        const rank = (r: string | null) => (r === "admin" ? 0 : r === "receiver" ? 1 : r === "driver" ? 2 : 3);
+        const byUser = new Map<string, (typeof membersResult.data)[number]>();
+        for (const m of membersResult.data) {
+          const prev = byUser.get(m.user_id);
+          if (!prev || rank(m.role) < rank(prev.role)) {
+            byUser.set(m.user_id, { ...m, created_at: prev && prev.created_at < m.created_at ? prev.created_at : m.created_at });
+          }
+        }
+        const memberRows = [...byUser.values()];
+        const userIds = memberRows.map((m) => m.user_id);
         const { data: profiles } = await supabase
           .from("profiles")
           .select("user_id, display_name")
@@ -304,7 +318,7 @@ export default function OrganizationSettings() {
         const profileMap = new Map(profiles?.map((p) => [p.user_id, p.display_name]) ?? []);
 
         setMembers(
-          membersResult.data.map((m) => ({
+          memberRows.map((m) => ({
             ...m,
             display_name: m.user_id ? (profileMap.get(m.user_id) ?? "未設定") : "未設定",
           }))
@@ -967,11 +981,7 @@ export default function OrganizationSettings() {
           <CardContent>
             {members.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
-                メンバーが見つかりません。
-                <br />
-                <span className="text-sm">
-                  ※ RLSポリシーが未適用の場合、ここは常に空になります。
-                </span>
+                メンバーはまだいません。下の「チームメンバー招待」から招待コードを発行できます。
               </p>
             ) : (
               <div className="divide-y divide-border">
