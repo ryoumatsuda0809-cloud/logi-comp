@@ -107,7 +107,7 @@ function GpsPanel() {
       <CardContent className="space-y-3">
         <svg
           viewBox={`0 0 ${VIEW_HALF_M * 2} ${VIEW_HALF_M * 2}`}
-          className="w-full rounded-lg border bg-muted/40"
+          className="mx-auto w-full max-w-md rounded-lg border bg-muted/40"
           role="img"
           aria-label="施設周辺のGPS軌跡"
         >
