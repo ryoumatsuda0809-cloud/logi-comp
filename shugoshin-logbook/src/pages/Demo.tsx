@@ -453,6 +453,20 @@ export default function Demo() {
         <DemoSubmitPanel />
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-base">発注の流れ</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              発注の文面を読み取り（デモでは擬似の AI 解析）、必須項目がそろっているかを確かめて承認し、取適法の4条書面にするまでの流れです。
+              項目が欠けたままの承認は拒否されます。
+            </p>
+            <Button asChild variant="outline">
+              <Link to="/demo/orders">発注の流れを見る</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">荷主に渡す報告書</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
