@@ -99,7 +99,13 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
 要対応:
 - 🔴 **帳票の中身を端末が決めている。** `DailyReportConfirm.tsx:177` が `submitted_reports` へ直接 insert し、`timeline_snapshot`・`total_wait_minutes`・`estimated_wait_cost`・`formal_report` を端末から送る。
   持ち主は `evidenceGrade` を含む任意の内容で提出でき、荷主の共有帳票には「等級A：サーバー検証済」と出る。提出後は書き換えられない（トリガー）が、偽の内容もそのまま固定される。
-  直し方: 提出を SECURITY DEFINER の RPC にし、`wait_logs` からサーバー側でスナップショットと合計を作り、`submitted_reports` への直接 INSERT を REVOKE する（§3 の「数値のサーバー側再計算」と同じ課題。優先度を上げる）。
+  **扱い: デモ後。デモの道筋（`/demo` は架空データだけで動く）には無い。** 本番の `submitted_reports` は5件で、すべて 2026-03-18〜04-09 のテスト期のもの（2026-10-06 に件数だけ確認）。今、実害の出る状況ではない。
+  直す前に決めること: 今の合計待機時間は `wait_logs` だけでなく、旧 `compliance_logs` と音声日報（本人申告）の待機分も足している（`useDailyTimeline.ts:285`）。
+  サーバーで作り直すと「日報が何を数えるか」が変わるので、先にそこを決める。また、このマシンには Docker・`supabase` CLI・`psql` が無く、ローカルで動作を確かめられない。
+  壊れた BEFORE INSERT トリガーは日報の提出を全部止めるので、本番へ出す前に、ロールバック付きの検査を別環境で通す。
+  案: （小）`submitted_reports` に BEFORE INSERT トリガーを足し、`wait_logs` 由来の行と合計をサーバーが作り直して、端末が送った等級A/Cの行は捨てる／（大）提出専用の RPC にして直接 INSERT を REVOKE する。
+- 🟡 **重複行の疑い（未確認）**: 提出時、同じ `wait_logs` の訪問が `timeline` に1回（`useDailyTimeline.ts` が `source: "gps"` で入れる）、`DailyReportConfirm.tsx:174` でもう1回（`source: "wait_log"`）入る。
+  表示側（`ReportDocument.tsx`）に重複を除く処理が無いので、実際の共有帳票で同じ行が2回出る可能性がある。本番の5件は、この経路ができる前のデータで、確認も反証もできていない。ログインして1日分を提出し、共有帳票を開けば分かる。
 - 🟡 1本のリンクで、その日の全荷主の訪問（施設名・時刻・待機料）が見える。帳票は複数荷主宛の1通のため、荷主Aに渡したリンクで荷主B・Cの訪問も見える。荷主ごとに絞るかは本人の判断。
 - 🟡 `vercel.json` にヘッダーが無い。トークンが URL のパスに入るので、`/shared/*` に `Referrer-Policy: no-referrer`・`X-Robots-Tag: noindex`・`X-Frame-Options: DENY` を足したい（効いたかは Vercel のプレビューで確認が要る）。
 - ⚪ 宛名の荷主名（`shipper_names`）は、その日の `wait_logs` を状態で絞らずに引くので、キャンセルした訪問の荷主名も載りうる。
@@ -109,7 +115,7 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
 
 - 施設・組織の登録手段と、荷主による施設の所有確認
 - 発注データに相手先（中小受託事業者）の名称を持たせる（取適法第4条の必須項目。今は PDF の「会社名」が空欄の下線のまま。デモ書面は架空の社名を入れた）
-- `submitted_reports` の数値のサーバー側再計算（料率表の DB 化と合わせて。§2d の 🔴 と同じ課題で、共有リンクの信頼性に直結する）
+- `submitted_reports` の数値のサーバー側再計算（料率表の DB 化と合わせて。§2d の 🔴 と同じ課題。共有リンクの信頼性に関わるが、デモ後。進める前に §2d の「直す前に決めること」を決める）
 - Supabase ダッシュボードで Auth の「漏洩パスワード保護」を有効化
 - `wait_logs.waiting_minutes` の列名の是正（表示は是正済み。列名は migration が要る）
 - 未送信の打刻件数をホームにも出す（現状は打刻画面のみ。デモには不要。デモ後の候補）
