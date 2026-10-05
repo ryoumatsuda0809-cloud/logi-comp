@@ -26,6 +26,28 @@ const fmtDate = (d: string | null | undefined): string => {
   return `${dt.getFullYear()}年${dt.getMonth() + 1}月${dt.getDate()}日`;
 };
 
+// 取適法第3条: 支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）。
+// 定めてよい最も遅い日は受領日の59日後。src/lib/paymentDeadline.ts の latestPaymentDate と同じ計算
+// （画面と書面で日付が食い違わないよう、変えるときは両方を直す。src 側にテストがある）。
+const latestPaymentDate = (receivedIso: string | null | undefined): Date | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(receivedIso || "");
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  dt.setUTCDate(dt.getUTCDate() + 59);
+  return dt;
+};
+
+// created_at（UTC の時刻）を日本時間の日付で出す。0〜9時に作った発注が前日の日付にならないように。
+const fmtDateJst = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (isNaN(t)) return String(iso);
+  const dt = new Date(t + 9 * 60 * 60 * 1000);
+  return `${dt.getUTCFullYear()}年${dt.getUTCMonth() + 1}月${dt.getUTCDate()}日`;
+};
+
 const fmtCurrency = (v: string | undefined | null): string => {
   if (!v) return "—";
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
@@ -200,13 +222,13 @@ Deno.serve(async (req) => {
     // ========== HEADER BAR ==========
     page.drawRectangle({ x: 0, y: height - 70, width, height: 70, color: navy });
     drawText("発注書 兼 取引条件通知書", margin, height - 42, 18, white);
-    drawText("特定受託事業者に係る取引の適正化等に関する法律 第4条書面", margin, height - 60, 7.5, rgb(0.7, 0.8, 0.95));
+    drawText("製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律 第4条の明示", margin, height - 60, 7.5, rgb(0.7, 0.8, 0.95));
 
     let y = height - 90;
 
     // ========== DATE / ORDER NUM + HANKO ==========
     const orderNum = `Order_${order_id.slice(0, 8)}`;
-    const createdDate = fmtDate(order.created_at);
+    const createdDate = fmtDateJst(order.created_at);
 
     drawText(`発行日: ${createdDate}`, margin, y, 9, gray);
     drawText(`発注番号: ${orderNum}`, margin, y - 14, 9, gray);
@@ -255,12 +277,9 @@ Deno.serve(async (req) => {
     y -= 22;
 
     // Payment deadline calc
-    let paymentDeadlineStr = "—";
-    if (order.delivery_due_date) {
-      const due = new Date(order.delivery_due_date);
-      due.setDate(due.getDate() + 60);
-      paymentDeadlineStr = fmtDate(due.toISOString());
-    }
+    // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
+    const latestDue = latestPaymentDate(order.delivery_due_date);
+    const paymentDeadlineStr = latestDue ? fmtDate(latestDue.toISOString()) : "—";
 
     const tableData: Array<{
       label: string;
@@ -274,8 +293,9 @@ Deno.serve(async (req) => {
       { label: "出発地", value: clean(content?.origin), emphasize: true },
       { label: "到着地", value: clean(content?.destination), emphasize: true },
       { label: "運賃（税抜）", value: fmtCurrency(content?.price), emphasize: true },
-      { label: "納品日", value: fmtDate(order.delivery_due_date), emphasize: true },
-      { label: "支払期日（60日ルール）", value: `${paymentDeadlineStr}（物品受領日から60日以内）`, highlight: true },
+      { label: "委託日（発注日）", value: createdDate },
+      { label: "納品日（役務の提供を受ける日）", value: fmtDate(order.delivery_due_date), emphasize: true },
+      { label: "支払期日（60日以内）", value: `${paymentDeadlineStr}（役務の提供を受けた日から起算して60日以内）`, highlight: true },
     ];
 
     const colW = 150;
@@ -377,13 +397,13 @@ Deno.serve(async (req) => {
     });
 
     const legalLines = [
-      "■ 法的注釈（特定受託事業者に係る取引の適正化等に関する法律 第4条書面）",
-      "本書面は2026年施行の取適法第4条に基づき交付する書面です。",
-      "・本取引は下請法および取適法に基づき、物品受領後60日以内の支払いを厳守します。",
-      "・支払期日を超過した場合、遅延損害金が発生します。",
+      "■ 法的注釈（製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律 第4条の明示）",
+      "本書面は、中小受託取引適正化法（取適法。2026年1月1日施行）第4条に基づく明示事項を記載した書面です。",
+      "・代金の支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）に定めます。",
+      "・支払期日までに支払わない場合、役務の提供を受けた日から60日を経過した日から支払日まで、年率14.6%の遅延利息を支払います。",
       "・本書面の記載事項に変更が生じた場合は、速やかに書面にて通知します。",
-      "・下請代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
-      "備考: 特段の検収期間を定めない限り、物品受領日をもって検査完了とする。",
+      "・代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
+      "備考: 特段の検収期間を定めない限り、役務の提供を受けた日をもって検査完了とする。",
     ];
 
     let fy = footerY + footerH - 14;

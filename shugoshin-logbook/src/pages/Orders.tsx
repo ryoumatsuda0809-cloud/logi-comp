@@ -15,7 +15,8 @@ import { Mic, MicOff, Sparkles, AlertTriangle, Check, Loader2, Download, FileTex
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { isSpeechSupported, startListening, stopListening } from "@/lib/speech";
-import { addDays, format, isAfter, isToday, isYesterday } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
+import { isPaymentDateTooLate, latestPaymentDate } from "@/lib/paymentDeadline";
 import type { Tables } from "@/integrations/supabase/types";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -242,12 +243,11 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
     setTab("new");
   };
 
-  const paymentDeadline = deliveryDate ?
-    format(addDays(new Date(deliveryDate), 60), "yyyy-MM-dd") :
-    null;
+  // 取適法第3条: 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
+  const paymentDeadline = deliveryDate ? latestPaymentDate(deliveryDate) : null;
 
   const isPaymentLate = parsed?.payment_date && deliveryDate ?
-    isAfter(new Date(parsed.payment_date), addDays(new Date(deliveryDate), 60)) :
+    isPaymentDateTooLate(parsed.payment_date, deliveryDate) :
     false;
 
   // 承認に必要な項目が欠けていれば知らせて false を返す
@@ -593,9 +593,9 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                       {isPaymentLate ?
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-5 w-5 shrink-0" />
-                          <span>支払期日が60日ルールを超過しています。期限: {paymentDeadline}</span>
+                          <span>支払期日が60日以内の上限を超えています。期限: {paymentDeadline}</span>
                         </div> :
-                        <span className="text-left font-bold text-foreground">支払期限（納品日+60日）: {paymentDeadline}</span>
+                        <span className="text-left font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
                       }
                     </div>
                   }
@@ -693,7 +693,7 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                         {order.delivery_due_date &&
                           <p className="text-xs text-muted-foreground">
                             納品日: {order.delivery_due_date}
-                            {" "}&nbsp;→&nbsp; 支払期日: {format(new Date(new Date(order.delivery_due_date).getTime() + 60 * 86400000), "yyyy-MM-dd")}
+                            {" "}&nbsp;→&nbsp; 支払期限: {latestPaymentDate(order.delivery_due_date) ?? "—"}
                           </p>
                         }
                         {isApproved && approvedAt && (
