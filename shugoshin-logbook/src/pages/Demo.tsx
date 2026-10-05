@@ -465,6 +465,19 @@ export default function Demo() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-base">荷主別の警告レポート</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              1か月分の記録を荷主ごとにまとめた、待機のリスク診断です。算定できなかった訪問や、圏外で申告して承認された訪問も、件数と注記で区別して示します。
+            </p>
+            <Button asChild variant="outline">
+              <Link to="/demo/warning">警告レポートを見る</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">記録が改ざんされにくい理由</CardTitle>
           </CardHeader>
           <CardContent>
