@@ -68,6 +68,12 @@
 
 ## 4. 本番の状態
 
+フロントエンド: 2026-10-05 に PR #2（10/3〜10/5 の 51 コミット）と PR #3（`vercel.json` の追加）を `main` に入れ、本番（shugoshin-logbook.vercel.app）に反映済み。
+`vercel.json` が無かったため、`/demo`・`/demo/report`・`/shared/:token` を直接開くと Vercel の 404 になっていた（curl で確認）。PR #3 で直り、4 パスとも 200 を返すことを確認した（画面の見た目は未確認）。
+本番でのログイン→打刻→日報提出と、375px 幅の提出バーとナビの重なりは、まだ本人の目視確認が済んでいない。
+
+DB:
+
 `20260806100000` 〜 `20260806180000` と `20260807100000_report_share_links`（荷主への署名付き閲覧リンク）まで適用済み（`docs/PROGRESS_LOG.md` による）。`20260731100000`・`20260731110000` も本番の履歴にあることを 2026-10-04 に確認済み。
 `20261004100000_require_order_fields_on_approval`（承認時の必須項目チェック）と `20261004110000_shared_report_shippers_by_facility_id`（共有帳票の荷主名を施設IDで引く、R4）も 2026-10-04 に `supabase db push` で適用済み。
 `list_migrations` で2本とも履歴にあること、本番の関数定義が新版であること（`guard_transport_orders` に必須項目チェックがある／`get_shared_report` が施設IDで引く）、
