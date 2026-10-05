@@ -1,6 +1,11 @@
 import { cleanText, displayText, displayYen } from "@/lib/orderContent";
 import { latestPaymentDate } from "@/lib/paymentDeadline";
-import { DEMO_ORDER_ISSUER, DEMO_ORDER_NUMBER, DEMO_ORDER_TODAY_ISO } from "@/demo/demoOrders";
+import {
+  DEMO_ORDER_CONTRACTOR,
+  DEMO_ORDER_ISSUER,
+  DEMO_ORDER_NUMBER,
+  DEMO_ORDER_TODAY_ISO,
+} from "@/demo/demoOrders";
 
 /**
  * 以下の文言は、実際の発注書PDF（supabase/functions/generate-order-pdf）と同じにしてある。
@@ -115,7 +120,7 @@ export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
 
         <section className="space-y-1 text-xs text-muted-foreground">
           <h4 className="text-sm font-bold text-foreground">【発注先（運送事業者）】</h4>
-          <p>会社名: ___________________</p>
+          <p>会社名: {DEMO_ORDER_CONTRACTOR}</p>
           <p>担当者名: ___________________</p>
         </section>
 

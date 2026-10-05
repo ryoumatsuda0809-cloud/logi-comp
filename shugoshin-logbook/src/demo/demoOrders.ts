@@ -12,6 +12,7 @@ export const DEMO_ORDER_TODAY_ISO = "2026-10-03";
 
 /** 4条書面の発注元（架空） */
 export const DEMO_ORDER_ISSUER = "架空運送株式会社";
+export const DEMO_ORDER_CONTRACTOR = "架空協同運輸株式会社";
 /** 4条書面の発注番号（架空） */
 export const DEMO_ORDER_NUMBER = "Order_demo0001";
 /** 承認日時の表示（デモは常にこの時刻に承認したことにする） */

@@ -79,7 +79,7 @@ export default function ROISimulator() {
           {/* C: 月間支払総額 */}
           <div className="space-y-3">
             <div className="flex items-baseline justify-between">
-              <span className="text-base text-muted-foreground">月間下請支払総額</span>
+              <span className="text-base text-muted-foreground">月間の委託代金の支払総額</span>
               <span className="text-2xl font-bold text-foreground">{monthlyPayment.toLocaleString()}<span className="text-base font-normal text-muted-foreground ml-1">万円</span></span>
             </div>
             <Slider
