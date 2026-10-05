@@ -1,4 +1,6 @@
-import { ArrowLeft, MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
+import { toDisplayMessage } from "@/lib/dbErrors";
+import { jstDateString, jstDayRange } from "@/lib/jstDate";
+import { MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,9 +13,11 @@ import { useDailyTimeline, type UnifiedTimelineItem } from "@/hooks/useDailyTime
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { BottomNav } from "@/components/BottomNav";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
 import type { Json } from "@/integrations/supabase/types";
+import { PageHeader } from "@/components/PageHeader";
 
 // ---------- 定型文生成関数 ----------
 function generateFormalReport(waitMinutes: number, hasExtraWork: boolean, shipperName: string): string {
@@ -72,15 +76,27 @@ export default function DailyReportConfirm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { orgId } = useOrganization();
-  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport } = useDailyTimeline();
+  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames } = useDailyTimeline();
   const [submitting, setSubmitting] = useState(false);
 
   // Dialog & editable parameters
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editWaitMinutes, setEditWaitMinutes] = useState(0);
   const [hasExtraWork, setHasExtraWork] = useState(false);
-  // Derive shipper name from timeline data (first location found)
-  const derivedShipper = timeline.find((t) => t.location)?.location ?? "（荷主未記録）";
+  // ダイアログ内では下書きを編集し、「確定」したときだけ反映する（×や外側タップは取り消し）
+  const [draftWaitMinutes, setDraftWaitMinutes] = useState(0);
+  const [draftExtraWork, setDraftExtraWork] = useState(false);
+  const openEditor = () => {
+    setDraftWaitMinutes(editWaitMinutes);
+    setDraftExtraWork(hasExtraWork);
+    setDialogOpen(true);
+  };
+  // 荷主名は、その日に打刻した施設の荷主（facilities.client_name）。
+  // 以前は最初の施設「名」を入れていたため、報告書の宛名（荷主名）と食い違った。
+  const derivedShipper =
+    shipperNames.length > 0
+      ? shipperNames.join("、")
+      : timeline.find((t) => t.shipperName)?.shipperName ?? "（荷主未記録）";
 
   // Sync hook data into editable state
   useEffect(() => {
@@ -91,6 +107,9 @@ export default function DailyReportConfirm() {
   const formalReportText = generateFormalReport(editWaitMinutes, hasExtraWork, derivedShipper);
   const originalAiOutput = generateFormalReport(totalWaitMinutes, false, derivedShipper);
   const isEdited = editWaitMinutes !== totalWaitMinutes || hasExtraWork;
+  const isWaitEdited = editWaitMinutes !== totalWaitMinutes;
+  const draftReportText = generateFormalReport(draftWaitMinutes, draftExtraWork, derivedShipper);
+  const hasRecords = !loading && timeline.length > 0;
 
   // ---------- Press-and-hold logic ----------
   const [holdProgress, setHoldProgress] = useState(0);
@@ -130,14 +149,15 @@ export default function DailyReportConfirm() {
     const resolvedOrgId = orgId || FALLBACK_ORG_ID;
 
     // Fetch today's wait_logs to include real data in snapshot
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = jstDateString();
+    const { start: dayStart, end: dayEnd } = jstDayRange(todayStr);
     const [logsRes, facilitiesRes] = await Promise.all([
       supabase
         .from("wait_logs")
         .select("*")
         .eq("user_id", user.id)
-        .gte("arrival_time", `${todayStr}T00:00:00`)
-        .lte("arrival_time", `${todayStr}T23:59:59`)
+        .gte("arrival_time", dayStart)
+        .lte("arrival_time", dayEnd)
         .order("arrival_time", { ascending: true }),
       supabase.from("facilities").select("id, name"),
     ]);
@@ -154,7 +174,7 @@ export default function DailyReportConfirm() {
       snapshotData = [...snapshotData, ...entries.map(e => ({ ...e, source: "wait_log" }))];
     }
 
-    const { error } = await supabase.from("submitted_reports").insert([{
+    const { data: inserted, error } = await supabase.from("submitted_reports").insert([{
       user_id: user.id,
       organization_id: resolvedOrgId,
       report_date: todayStr,
@@ -166,7 +186,7 @@ export default function DailyReportConfirm() {
       original_ai_output: originalAiOutput || null,
       is_edited: isEdited,
       formal_report: formalReportText || null,
-    }]);
+    }]).select("id").single();
 
     setSubmitting(false);
 
@@ -174,7 +194,7 @@ export default function DailyReportConfirm() {
       if (error.code === "23505") {
         toast({ title: "⚠️ 既に提出済みです", description: "本日の日報は提出済みです。", variant: "destructive" });
       } else {
-        toast({ title: "エラー", description: error.message, variant: "destructive" });
+        toast({ title: "エラー", description: toDisplayMessage(error), variant: "destructive" });
       }
       return;
     }
@@ -183,8 +203,8 @@ export default function DailyReportConfirm() {
       navigator.vibrate(200);
     }
 
-    toast({ title: "✅ 日報を提出しました！", description: "本日もお疲れ様でした。" });
-    navigate("/");
+    toast({ title: "✅ 日報を提出しました！", description: "荷主に送る場合は、次の画面でリンクを作れます。" });
+    navigate(inserted?.id ? `/shared-report/${inserted.id}` : "/");
   };
 
   const onPointerDown = useCallback(() => {
@@ -207,23 +227,33 @@ export default function DailyReportConfirm() {
   const isSubmitDisabled = submitting || loading || timeline.length === 0;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      {/* Back button (print:hidden) */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur px-4 py-3 print:hidden">
-        <button
-          onClick={() => navigate("/")}
-          className="inline-flex items-center gap-1 text-muted-foreground text-base min-h-[48px] min-w-[48px] select-none"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          ホームに戻る
-        </button>
-      </div>
+    <div className="min-h-screen bg-background pb-44">
+      <PageHeader title="日報" className="print:hidden" />
 
       {/* ========== 1. Header ========== */}
+      {!loading && !hasRecords && (
+        <div className="px-4 pt-2 pb-6">
+          <Card className="border-dashed">
+            <CardContent className="py-10 text-center space-y-3">
+              <h1 className="text-xl font-bold text-foreground">本日の記録はまだありません</h1>
+              <p className="text-base text-muted-foreground">
+                現場に着いたら到着打刻をしてください。打刻の記録から日報が作られます。
+              </p>
+              <button
+                onClick={() => navigate("/check-in")}
+                className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground hover:bg-primary/90"
+              >
+                <MapPin className="h-5 w-5" />
+                打刻画面へ
+              </button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {hasRecords && (
       <div className="px-4 pt-2 pb-6">
         <Card className="border-success/40 bg-success/10">
           <CardContent className="py-6 text-center">
-            <p className="text-3xl mb-2">🟢</p>
             <h1 className="text-xl font-bold text-foreground leading-relaxed">
               今日もお疲れ様でした！
             </h1>
@@ -244,14 +274,15 @@ export default function DailyReportConfirm() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* ========== 2. Formal Report — Button + Dialog ========== */}
-      {!loading && (
+      {hasRecords && (
         <div className="px-4 pb-6">
           <Card className="border-border">
             <CardContent className="py-4 px-4">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg font-bold text-foreground">📋 法定乗務記録</span>
+                <span className="text-lg font-bold text-foreground">法定乗務記録</span>
                 {isEdited && (
                   <Badge variant="outline" className="text-xs border-primary/40 text-primary">
                     修正済み
@@ -259,17 +290,28 @@ export default function DailyReportConfirm() {
                 )}
               </div>
 
+              {/* E13: 手修正は報告書の文面だけ。提出する待機時間（証拠）は GPS の記録のまま */}
+              {isWaitEdited && (
+                <div className="mb-3 rounded-lg border border-border bg-muted/50 p-3 text-sm text-foreground">
+                  <p className="font-semibold">待機時間を手で修正しています</p>
+                  <p className="text-muted-foreground">
+                    GPSの記録 {totalWaitMinutes}分（変更不可）／ 報告書の記載 {editWaitMinutes}分。
+                    提出する記録には両方が残り、修正したことも記録されます。
+                  </p>
+                </div>
+              )}
+
               {/* Preview snippet */}
               <div className="bg-muted rounded-lg p-3 mb-3">
                 <pre className="whitespace-pre-wrap text-sm font-mono text-foreground leading-relaxed">{formalReportText}</pre>
               </div>
 
               <button
-                onClick={() => setDialogOpen(true)}
+                onClick={openEditor}
                 disabled={alreadySubmitted}
                 className="w-full h-16 rounded-xl text-xl font-bold bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed select-none"
               >
-                📝 報告書を確認・修正する
+                報告書を確認・修正する
               </button>
             </CardContent>
           </Card>
@@ -280,34 +322,40 @@ export default function DailyReportConfirm() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">📋 報告書の確認・修正</DialogTitle>
-            <DialogDescription>パラメータを修正すると、報告書がリアルタイムで更新されます。</DialogDescription>
+            <DialogTitle className="text-xl">報告書の確認・修正</DialogTitle>
+            <DialogDescription>
+              ここで変えられるのは報告書の文面です。GPSで記録した待機時間（{totalWaitMinutes}分）は変わりません。
+            </DialogDescription>
           </DialogHeader>
 
           {/* Preview */}
           <div className="bg-muted rounded-lg p-4">
-            <pre className="whitespace-pre-wrap text-lg font-mono text-foreground leading-relaxed">{formalReportText}</pre>
+            <pre className="whitespace-pre-wrap text-lg font-mono text-foreground leading-relaxed">{draftReportText}</pre>
           </div>
 
           {/* Parameter controls */}
           <div className="space-y-6 py-2">
             {/* Wait minutes */}
             <div>
-              <label className="text-base font-bold text-foreground mb-2 block">⏱ 荷待ち時間</label>
+              <label className="text-base font-bold text-foreground mb-1 block">荷待ち時間（報告書の記載）</label>
+              <p className="mb-2 text-sm text-muted-foreground">
+                GPSの記録：{totalWaitMinutes}分
+                {draftWaitMinutes !== totalWaitMinutes && `（${draftWaitMinutes - totalWaitMinutes > 0 ? "+" : ""}${draftWaitMinutes - totalWaitMinutes}分 修正）`}
+              </p>
               <div className="flex items-center justify-center gap-6">
                 <button
-                  onClick={() => setEditWaitMinutes((v) => Math.max(0, v - 15))}
-                  className="h-14 w-20 rounded-xl text-xl font-bold bg-destructive text-destructive-foreground shadow active:scale-95 transition-transform select-none"
+                  onClick={() => setDraftWaitMinutes((v) => Math.max(0, v - 15))}
+                  className="h-14 w-20 rounded-xl text-base font-bold border-2 border-border bg-card text-foreground shadow-sm active:scale-95 transition-transform select-none"
                 >
                   <Minus className="h-6 w-6 mx-auto" />
                   -15分
                 </button>
                 <span className="text-4xl font-bold text-foreground min-w-[5rem] text-center tabular-nums">
-                  {editWaitMinutes}<span className="text-lg">分</span>
+                  {draftWaitMinutes}<span className="text-lg">分</span>
                 </span>
                 <button
-                  onClick={() => setEditWaitMinutes((v) => v + 15)}
-                  className="h-14 w-20 rounded-xl text-xl font-bold bg-primary text-primary-foreground shadow active:scale-95 transition-transform select-none"
+                  onClick={() => setDraftWaitMinutes((v) => v + 15)}
+                  className="h-14 w-20 rounded-xl text-base font-bold border-2 border-border bg-card text-foreground shadow-sm active:scale-95 transition-transform select-none"
                 >
                   <Plus className="h-6 w-6 mx-auto" />
                   +15分
@@ -316,28 +364,26 @@ export default function DailyReportConfirm() {
             </div>
 
             {/* Extra work toggle */}
-            <div className="flex flex-col items-start gap-3">
-              <label className="text-base font-bold text-foreground">🔧 附帯作業（無償荷役）</label>
-              <div className="flex items-center gap-6">
-                <span className="text-base text-muted-foreground">{hasExtraWork ? "あり" : "なし"}</span>
-                <Switch
-                  checked={hasExtraWork}
-                  onCheckedChange={setHasExtraWork}
-                  className="scale-150 origin-right"
-                />
-              </div>
-            </div>
+            <label className="flex min-h-[48px] cursor-pointer items-center justify-between gap-4 rounded-lg border border-border px-4">
+              <span className="text-base font-bold text-foreground">附帯作業（無償荷役）</span>
+              <span className="flex items-center gap-3">
+                <span className="text-base text-muted-foreground">{draftExtraWork ? "あり" : "なし"}</span>
+                <Switch checked={draftExtraWork} onCheckedChange={setDraftExtraWork} />
+              </span>
+            </label>
           </div>
 
           {/* Submit from dialog */}
           <button
             onClick={() => {
+              setEditWaitMinutes(draftWaitMinutes);
+              setHasExtraWork(draftExtraWork);
               setDialogOpen(false);
-              toast({ title: "✅ 報告書を確定しました", description: "送信ボタンで提出できます。" });
+              toast({ title: "報告書を確定しました", description: "下の提出ボタンを長押しすると提出できます。" });
             }}
             className="w-full h-16 rounded-xl text-xl font-bold bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-[0.98] select-none"
           >
-            🚀 この内容で確定する
+            この内容で確定する
           </button>
         </DialogContent>
       </Dialog>
@@ -361,16 +407,7 @@ export default function DailyReportConfirm() {
               </div>
             ))}
           </div>
-        ) : timeline.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground text-lg">本日の記録がありません</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                GPS打刻または音声日報を記録してから確認できます。
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
+        ) : timeline.length === 0 ? null : (
           <div className="relative">
             {timeline.map((item, idx) => {
               const isLast = idx === timeline.length - 1;
@@ -451,7 +488,7 @@ export default function DailyReportConfirm() {
                           <div className="mt-2 space-y-1.5">
                             <Badge variant="destructive" className="text-sm px-3 py-1">
                               <AlertTriangle className="h-4 w-4 mr-1" />
-                              {item.waitMinutes > 30 ? "⚠️ 無償待機" : "待機"}：{item.waitMinutes}分
+                              {item.waitMinutes > 30 ? "無償待機" : "待機"}：{item.waitMinutes}分
                             </Badge>
                             {item.estimatedCost != null && item.estimatedCost > 0 && (
                               <p className="text-base font-semibold text-destructive">
@@ -504,14 +541,16 @@ export default function DailyReportConfirm() {
       </div>
 
       {/* ========== 4. Fixed footer with press-hold button ========== */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      {/* 記録0件の日は、押せない提出バーを出さない（打刻へ誘導する表示が上にある） */}
+      {(loading || timeline.length > 0 || alreadySubmitted) && (
+      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 z-20 bg-background/95 backdrop-blur border-t border-border px-4 py-2">
         {alreadySubmitted ? (
-          <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <div className="flex items-center gap-2 text-2xl text-muted-foreground font-bold">
-              <CheckCircle2 className="h-8 w-8" />
+          <div className="flex flex-col items-center justify-center h-14 gap-0.5">
+            <div className="flex items-center gap-2 text-xl text-muted-foreground font-bold">
+              <CheckCircle2 className="h-6 w-6" />
               本日は提出済みです
             </div>
-            <p className="text-sm text-muted-foreground">🔒 送信済みの法定記録のため変更できません</p>
+            <p className="text-xs text-muted-foreground">送信済みの法定記録のため変更できません</p>
           </div>
         ) : (
           <div className="relative">
@@ -522,7 +561,7 @@ export default function DailyReportConfirm() {
               onPointerLeave={onPointerUpOrLeave}
               onContextMenu={(e) => e.preventDefault()}
               disabled={isSubmitDisabled}
-              className="relative w-full h-20 rounded-xl text-2xl font-bold overflow-hidden border-2 border-primary bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative w-full h-14 rounded-xl text-xl font-bold overflow-hidden border-2 border-primary bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 userSelect: "none",
                 WebkitTouchCallout: "none",
@@ -540,12 +579,23 @@ export default function DailyReportConfirm() {
                 {submitting ? "提出中..." : holdProgress > 0 ? "長押し中..." : "ヨシ！（長押しで提出）➔"}
               </span>
             </button>
+            {/* 無効のときは理由を出す（灰色のまま理由が分からない状態を避ける） */}
+            {!submitting && isSubmitDisabled && (
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                {loading ? "記録を読み込み中です" : "本日の打刻記録がないため、提出できません"}
+              </p>
+            )}
             {/* Progress indicator below button */}
             {holdProgress > 0 && holdProgress < 100 && (
               <Progress value={holdProgress} className="mt-2 h-1.5" />
             )}
           </div>
         )}
+      </div>
+      )}
+
+      <div className="print:hidden">
+        <BottomNav />
       </div>
     </div>
   );

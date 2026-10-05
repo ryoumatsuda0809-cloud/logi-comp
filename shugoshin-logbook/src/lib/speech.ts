@@ -8,6 +8,14 @@ type SpeechCallback = {
   onError?: (error: string) => void;
 };
 
+/** lib.dom に型が無いため、使う範囲だけ定義する */
+interface SpeechRecognitionEvent {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
 let recognition: any = null;
 
 export function isSpeechSupported(): boolean {

@@ -17,8 +17,10 @@
 - **Before starting any new feature design or implementation (Plan Mode)**, always load `@docs/IMPLEMENTATION_SUMMARY.md` as context to understand the current baseline, existing components, and implemented logic — this prevents duplicate implementations and unintended regressions.
 ## Development Rules
 1. **DB変更の禁止**: コンソールからの直接編集やクライアントからの安易な`insert/update`を避け、必ずSupabase Migration (`supabase migration new`) と RPC を経由すること。
-2. **型安全性の担保**: 変更後は必ず `npm run build` または `tsc --noEmit` で型エラーがないことを確認する。
-3. **コンテキストの参照**: 
+2. **証拠系テーブルへの書き込み**: `wait_logs` / `waiting_evidence` / `pending_punches` は直接書き込み不可。必ず SECURITY DEFINER の RPC を入口にする。新しい関数は既定で誰も実行できないので、必要なロールにだけ `GRANT EXECUTE` する。DB変更の後は `supabase/tests/security_checks.sql` を実行する。
+3. **型安全性の担保**: 変更後は必ず `npx tsc -p tsconfig.app.json --noEmit` で型エラーがないことを確認する。
+   ルートの `tsconfig.json` は `files: []` なので `tsc --noEmit` だけでは何も検査されず、`npm run build`（`vite build`）も型を検査しない。
+4. **コンテキストの参照**: 
    - データベース設計・RLSについては `@docs/CONTEXT_SUPABASE.md` を参照。
    - 取適法のビジネスロジックについては `@docs/CONTEXT_LEGAL_SPEC.md` を参照。
    - 水産流通適正化法（漁獲番号・対象魚種）については `@docs/CONTEXT_FISHERY_LAW.md` を参照。水産物情報の入力まわりを変更する前に必ず読むこと。

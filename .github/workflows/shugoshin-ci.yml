@@ -1,0 +1,32 @@
+name: shugoshin-logbook CI
+
+on:
+  push:
+    paths: ["shugoshin-logbook/**", ".github/workflows/shugoshin-ci.yml"]
+  pull_request:
+    paths: ["shugoshin-logbook/**", ".github/workflows/shugoshin-ci.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shugoshin-logbook
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: shugoshin-logbook/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Type check
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Unit tests
+        run: npx vitest run
+      - name: Build
+        run: npm run build
+        env:
+          # ビルドにはダミー値で足りる（実接続はしない）
+          VITE_SUPABASE_URL: https://example.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-dummy

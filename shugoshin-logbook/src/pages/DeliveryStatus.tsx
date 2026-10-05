@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Check, Truck, Package, Clock, User, AlertCircle } from "lucide-react";
+import { MapPin, Check, Truck, Package, Clock, User, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,8 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
+import { displayText } from "@/lib/orderContent";
+import { PageHeader } from "@/components/PageHeader";
 
 type ComplianceEvent = Database["public"]["Enums"]["compliance_event"];
 
@@ -255,10 +257,10 @@ export default function DeliveryStatus() {
   }, [orgId, orgLoading, toast]);
 
   const contentJson = order?.content_json as Record<string, any> | undefined;
-  const itemName = contentJson?.item_name ?? contentJson?.itemName ?? "—";
-  const origin = contentJson?.origin ?? "—";
-  const destination = contentJson?.destination ?? "—";
-  const shipperName = contentJson?.shipper_name ?? contentJson?.shipperName ?? "—";
+  const itemName = displayText(contentJson?.item_name ?? contentJson?.itemName);
+  const origin = displayText(contentJson?.origin);
+  const destination = displayText(contentJson?.destination);
+  const shipperName = displayText(contentJson?.shipper_name ?? contentJson?.shipperName);
 
   const currentStep = order ? resolveStep(logs, order.status) : 0;
   const steps = buildSteps(logs);
@@ -269,23 +271,7 @@ export default function DeliveryStatus() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-primary px-4 py-4 shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center">
-          <button
-            onClick={() => navigate(-1)}
-            className="mr-3 flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground hover:bg-primary-foreground/10"
-            aria-label="戻る"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-              <img src="/icon-192.png" alt="守護神" className="h-4 w-4 rounded" />
-            </div>
-            <h1 className="text-lg font-bold text-primary-foreground">配送ステータス</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="配送ステータス" />
 
       <main className="mx-auto max-w-4xl space-y-6 p-4 pb-28">
         {/* Stepper */}
@@ -304,7 +290,7 @@ export default function DeliveryStatus() {
             <p className="text-lg font-bold text-foreground">現在追跡中の配送はありません</p>
             <p className="text-sm text-muted-foreground mt-1">承認済みの配送が作成されると、ここに表示されます。</p>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/")}
               className="mt-4 rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               ダッシュボードへ戻る
@@ -325,19 +311,6 @@ export default function DeliveryStatus() {
             </button>
           </div>
         )}
-
-        {/* Map Placeholder */}
-        <Card className="min-h-[250px] border-dashed bg-muted/50">
-          <CardContent className="flex h-full min-h-[250px] flex-col items-center justify-center gap-3 p-6">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <MapPin className="h-7 w-7 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="text-base font-semibold text-muted-foreground">📍 地図エリア（現在はモック表示）</p>
-              <p className="mt-1 text-sm text-muted-foreground/70">将来のアップデートで地図が表示されます</p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Delivery Info Card */}
         {!isDataReady ? (

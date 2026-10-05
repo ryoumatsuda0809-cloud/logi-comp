@@ -136,6 +136,7 @@ export type Database = {
         Row: {
           address: string | null
           client_name: string
+          client_organization_id: string | null
           created_at: string
           id: string
           lat: number
@@ -147,6 +148,7 @@ export type Database = {
         Insert: {
           address?: string | null
           client_name: string
+          client_organization_id?: string | null
           created_at?: string
           id?: string
           lat: number
@@ -158,6 +160,7 @@ export type Database = {
         Update: {
           address?: string | null
           client_name?: string
+          client_organization_id?: string | null
           created_at?: string
           id?: string
           lat?: number
@@ -166,7 +169,15 @@ export type Database = {
           notification_number?: string | null
           radius?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "facilities_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_details: {
         Row: {
@@ -266,22 +277,31 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          expires_at: string | null
           id: string
           is_active: boolean
+          max_uses: number | null
           organization_id: string
+          use_count: number
         }
         Insert: {
           code: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
+          max_uses?: number | null
+          use_count?: number
           organization_id: string
         }
         Update: {
           code?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
+          max_uses?: number | null
+          use_count?: number
           organization_id?: string
         }
         Relationships: [
@@ -749,6 +769,22 @@ export type Database = {
         Args: { p_log_id: string; p_new_status: string }
         Returns: undefined
       }
+      shipper_advance_wait: {
+        Args: { p_log_id: string; p_new_status: string }
+        Returns: undefined
+      }
+      create_report_share_link: {
+        Args: { p_report_id: string; p_days?: number }
+        Returns: string
+      }
+      revoke_report_share_links: {
+        Args: { p_report_id: string }
+        Returns: number
+      }
+      get_shared_report: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       cancel_ticket: {
         Args: { p_log_id: string }
         Returns: {
@@ -775,10 +811,6 @@ export type Database = {
         Returns: string
       }
       deactivate_invite_code: { Args: { _code_id: string }; Returns: undefined }
-      force_join_organization_by_invite_code: {
-        Args: { target_invite_code: string }
-        Returns: undefined
-      }
       generate_invite_code: { Args: never; Returns: string }
       generate_ticket_number: {
         Args: {
@@ -845,7 +877,7 @@ export type Database = {
       }
       join_organization_by_invite_code: {
         Args: { _code: string }
-        Returns: string
+        Returns: string | null
       }
       approve_pending_punch: {
         Args: { p_punch_id: string; p_review_note?: string | null }

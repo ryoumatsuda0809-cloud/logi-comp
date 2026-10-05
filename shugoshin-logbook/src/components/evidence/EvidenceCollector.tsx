@@ -20,6 +20,7 @@ export function EvidenceCollector() {
   const {
     position,
     gpsError,
+    retryGps,
     isSubmitting,
     submitError,
     lastResult,
@@ -335,7 +336,19 @@ export function EvidenceCollector() {
       {gpsError && (
         <Alert variant="destructive">
           <AlertTitle>GPS エラー</AlertTitle>
-          <AlertDescription>{gpsError}</AlertDescription>
+          <AlertDescription className="space-y-3">
+            <p>{gpsError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-11 text-foreground"
+              onClick={retryGps}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              位置情報を再取得する
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -347,7 +360,7 @@ export function EvidenceCollector() {
             <span>{submitError}</span>
             <button
               onClick={clearSubmitError}
-              className="self-start text-xs underline underline-offset-2 text-destructive-foreground/70 hover:text-destructive-foreground transition-colors"
+              className="self-start text-sm font-medium underline underline-offset-2 text-destructive hover:text-destructive/80 transition-colors"
             >
               エラーを閉じて再試行
             </button>
@@ -379,7 +392,7 @@ export function EvidenceCollector() {
           ) : !isGpsReady ? (
             <span className="flex flex-col items-center gap-3 opacity-60">
               <MapPin className="h-10 w-10" />
-              <span>GPS取得中</span>
+              <span>{gpsError ? "GPSが使えません" : "GPS取得中"}</span>
             </span>
           ) : (
             <span className="flex flex-col items-center gap-3">
@@ -561,7 +574,7 @@ export function EvidenceCollector() {
             ) : !isGpsReady ? (
               <span className="flex flex-col items-center gap-3 opacity-60">
                 <LogOut className="h-10 w-10" />
-                <span>GPS取得中</span>
+                <span>{gpsError ? "GPSが使えません" : "GPS取得中"}</span>
               </span>
             ) : !isFisheryDataValid ? (
               <span className="flex flex-col items-center gap-3 opacity-60">
@@ -620,7 +633,7 @@ export function EvidenceCollector() {
                 <p className="text-xl font-mono font-black text-blue-700 dark:text-blue-300 tabular-nums">
                   {completeResult.waitingMinutes} 分
                 </p>
-                <p className="text-sm text-blue-600 dark:text-blue-400">待機</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">滞在（到着〜作業完了）</p>
               </div>
             )}
             <p className="text-sm text-muted-foreground">

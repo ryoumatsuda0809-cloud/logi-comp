@@ -23,6 +23,7 @@ function makePunch(overrides: Partial<Parameters<typeof enqueuePunch>[0]> = {}) 
     accuracyM: 12,
     note: null,
     waitLogId: null,
+    fisheryData: null,
     ...overrides,
   });
 }

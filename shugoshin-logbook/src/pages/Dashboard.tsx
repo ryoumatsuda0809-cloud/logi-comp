@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FieldButton } from "@/components/ui/field-button";
 import {
   LogOut, Truck, ClipboardList, MapPin,
-  Building2, Building, ArrowRight, Plus, FileWarning,
+  Building2, Building, ArrowRight, Plus, FileWarning, LayoutDashboard, ClipboardCheck,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Json } from "@/integrations/supabase/types";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
+import { cleanText } from "@/lib/orderContent";
 
 type OrderStatus = "draft" | "approved" | "delivered";
 
@@ -31,7 +32,7 @@ interface KpiCounts {
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; bg: string; text: string }> = {
   draft:     { label: "下書き",   bg: "bg-muted",    text: "text-muted-foreground" },
-  approved:  { label: "承認済",   bg: "bg-accent",   text: "text-accent-foreground" },
+  approved:  { label: "承認済",   bg: "bg-emerald-100", text: "text-emerald-800" },
   delivered: { label: "配送完了", bg: "bg-primary",  text: "text-primary-foreground" },
 };
 
@@ -153,7 +154,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-3 gap-3">
               <KpiCard label="下書き" count={kpi.draft} colorClass="bg-muted text-muted-foreground" />
-              <KpiCard label="承認済" count={kpi.approved} colorClass="bg-accent text-accent-foreground" />
+              <KpiCard label="承認済" count={kpi.approved} colorClass="bg-emerald-100 text-emerald-800" />
               <KpiCard label="配送完了" count={kpi.delivered} colorClass="bg-primary text-primary-foreground" />
             </div>
           )}
@@ -184,9 +185,9 @@ export default function Dashboard() {
             <div className="space-y-3">
               {recentOrders.map((order) => {
                 const content = getJson(order.content_json);
-                const itemName = (content.item_name as string) || "（品目未設定）";
-                const origin = (content.origin as string) || "";
-                const destination = (content.destination as string) || "";
+                const itemName = cleanText(content.item_name) ?? "（品名未入力）";
+                const origin = cleanText(content.origin) ?? "";
+                const destination = cleanText(content.destination) ?? "";
                 const cfg = STATUS_CONFIG[order.status];
                 return (
                   <button
@@ -265,8 +266,26 @@ export default function Dashboard() {
             />
             {isAdmin && (
               <MenuCard
+                icon={<LayoutDashboard className="h-8 w-8" />}
+                title="荷主カンバン"
+                description="施設の待機状況・呼出・荷役開始"
+                color="primary"
+                onClick={() => navigate("/admin")}
+              />
+            )}
+            {isAdmin && (
+              <MenuCard
+                icon={<ClipboardCheck className="h-8 w-8" />}
+                title="圏外申請の承認"
+                description="圏外で記録された打刻の確認・承認"
+                color="primary"
+                onClick={() => navigate("/pending-punches")}
+              />
+            )}
+            {isAdmin && (
+              <MenuCard
                 icon={<FileWarning className="h-8 w-8" />}
-                title="📑 警告レポート"
+                title="警告レポート"
                 description="荷主別・取適法リスク診断"
                 color="primary"
                 onClick={() => navigate("/report")}

@@ -13,8 +13,16 @@ vi.mock("@/hooks/useAuth", () => ({
 // ── モック: supabase rpc ─────────────────────────────────────────────────────
 // vi.mock はファイル先頭にホイストされるため、vi.hoisted() で参照を先行確保する
 const mockRpc = vi.hoisted(() => vi.fn());
+// 起動時の「進行中の打刻の復元」が supabase.from(...) のチェーンを呼ぶ。
+// 復元対象なし（data: null）を返す、チェーン可能なモックにしておく。
+const mockFrom = vi.hoisted(() => {
+  const chain: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "in", "order", "limit"]) chain[m] = () => chain;
+  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  return vi.fn(() => chain);
+});
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: mockRpc },
+  supabase: { rpc: mockRpc, from: mockFrom },
 }));
 
 // ── Geolocation ヘルパー ─────────────────────────────────────────────────────

@@ -132,7 +132,7 @@ export default function Auth() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="6文字以上"
               required
               minLength={6}
               className="h-12 text-base"

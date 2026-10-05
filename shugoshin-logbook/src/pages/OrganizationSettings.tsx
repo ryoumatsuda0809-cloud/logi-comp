@@ -1,6 +1,6 @@
+import { toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Shield,
-  ArrowLeft,
   Building2,
   Users,
   AlertTriangle,
@@ -41,6 +40,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { PageHeader } from "@/components/PageHeader";
 
 type Organization = {
   id: string;
@@ -78,17 +78,21 @@ type InviteCode = {
   code: string;
   is_active: boolean;
   created_at: string;
+  expires_at: string | null;
+  max_uses: number | null;
+  use_count: number;
 };
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "管理者",
   dispatcher: "配車担当",
   driver: "ドライバー",
+  receiver: "荷主",
   user: "一般ユーザー",
 };
 
 function roleBadgeVariant(role: string | null): "destructive" | "default" | "secondary" | "outline" {
-  if (role === "admin") return "destructive";
+  if (role === "admin") return "default";
   if (role === "dispatcher") return "default";
   return "secondary";
 }
@@ -106,7 +110,6 @@ function parseAddress(fullAddress: string): { prefecture: string; city: string; 
 
 export default function OrganizationSettings() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [org, setOrg] = useState<Organization | null>(null);
@@ -119,8 +122,6 @@ export default function OrganizationSettings() {
   const [fetchingAddress, setFetchingAddress] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
-  const [forceJoinCode, setForceJoinCode] = useState("");
-  const [forceJoining, setForceJoining] = useState(false);
 
   // Stealth suggest (verify_company_name)
   const [verifiedName, setVerifiedName] = useState<string | null>(null);
@@ -254,13 +255,16 @@ export default function OrganizationSettings() {
           .select("id, capital_amount, employee_count, is_regulated")
           .eq("organization_id", orgId)
           .maybeSingle(),
+        // 所属の正は user_roles（is_member_of_org もここを見る）。
+        // organization_members には組織を作った管理者が入らないので使わない。
         supabase
-          .from("organization_members")
+          .from("user_roles")
           .select("id, user_id, role, created_at")
-          .eq("organization_id", orgId),
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: true }),
         supabase
           .from("organization_invite_codes")
-          .select("id, code, is_active, created_at")
+          .select("id, code, is_active, created_at, expires_at, max_uses, use_count")
           .eq("organization_id", orgId)
           .eq("is_active", true)
           .order("created_at", { ascending: false }),
@@ -293,7 +297,17 @@ export default function OrganizationSettings() {
       }
 
       if (membersResult.data && membersResult.data.length > 0) {
-        const userIds = membersResult.data.map((m) => m.user_id).filter(Boolean) as string[];
+        // 1人が複数の役割を持つことがあるので、1人1行にまとめ、上位の役割を出す
+        const rank = (r: string | null) => (r === "admin" ? 0 : r === "receiver" ? 1 : r === "driver" ? 2 : 3);
+        const byUser = new Map<string, (typeof membersResult.data)[number]>();
+        for (const m of membersResult.data) {
+          const prev = byUser.get(m.user_id);
+          if (!prev || rank(m.role) < rank(prev.role)) {
+            byUser.set(m.user_id, { ...m, created_at: prev && prev.created_at < m.created_at ? prev.created_at : m.created_at });
+          }
+        }
+        const memberRows = [...byUser.values()];
+        const userIds = memberRows.map((m) => m.user_id);
         const { data: profiles } = await supabase
           .from("profiles")
           .select("user_id, display_name")
@@ -302,7 +316,7 @@ export default function OrganizationSettings() {
         const profileMap = new Map(profiles?.map((p) => [p.user_id, p.display_name]) ?? []);
 
         setMembers(
-          membersResult.data.map((m) => ({
+          memberRows.map((m) => ({
             ...m,
             display_name: m.user_id ? (profileMap.get(m.user_id) ?? "未設定") : "未設定",
           }))
@@ -378,7 +392,7 @@ export default function OrganizationSettings() {
       console.error("組織作成失敗:", e);
       toast({
         title: "作成に失敗しました",
-        description: e.message || "不明なエラーが発生しました",
+        description: toDisplayMessage(e, "不明なエラーが発生しました"),
         variant: "destructive",
       });
     } finally {
@@ -393,10 +407,14 @@ export default function OrganizationSettings() {
     }
     setJoiningByCode(true);
     try {
-      const { error } = await supabase.rpc("join_organization_by_invite_code", {
+      const { data, error } = await supabase.rpc("join_organization_by_invite_code", {
         _code: joinCode.trim(),
       });
       if (error) throw error;
+      // 無効・期限切れ・使用上限のコードは、失敗の記録を残すため例外ではなく NULL で返る
+      if (!data) {
+        throw new Error("招待コードが見つからないか、有効期限が切れています。管理者に確認してください。");
+      }
       toast({
         title: "組織に参加しました",
         description: "ドライバーとして登録されました。",
@@ -405,34 +423,11 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "参加に失敗しました",
-        description: e.message || "招待コードを確認してください",
+        description: toDisplayMessage(e, "招待コードを確認してください"),
         variant: "destructive",
       });
     } finally {
       setJoiningByCode(false);
-    }
-  }
-
-  async function handleForceJoin() {
-    setForceJoining(true);
-    try {
-      const { error } = await supabase.rpc("force_join_organization_by_invite_code", {
-        target_invite_code: forceJoinCode.trim(),
-      });
-      if (error) throw error;
-      toast({
-        title: "新しい組織に移動しました",
-        description: "ページを再読み込みします。",
-      });
-      window.location.reload();
-    } catch (e: any) {
-      toast({
-        title: "移動に失敗しました",
-        description: e.message || "招待コードを確認してください",
-        variant: "destructive",
-      });
-    } finally {
-      setForceJoining(false);
     }
   }
 
@@ -447,7 +442,7 @@ export default function OrganizationSettings() {
       // Refetch codes to get the full record with id
       const { data: codes } = await supabase
         .from("organization_invite_codes")
-        .select("id, code, is_active, created_at")
+        .select("id, code, is_active, created_at, expires_at, max_uses, use_count")
         .eq("organization_id", org.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
@@ -456,7 +451,7 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "発行に失敗しました",
-        description: e.message,
+        description: toDisplayMessage(e),
         variant: "destructive",
       });
     } finally {
@@ -476,7 +471,7 @@ export default function OrganizationSettings() {
     } catch (e: any) {
       toast({
         title: "無効化に失敗しました",
-        description: e.message,
+        description: toDisplayMessage(e),
         variant: "destructive",
       });
     } finally {
@@ -545,7 +540,7 @@ export default function OrganizationSettings() {
 
       toast({ title: "保存しました", description: "組織情報を更新しました。" });
     } catch (e: any) {
-      toast({ title: "保存失敗", description: e.message, variant: "destructive" });
+      toast({ title: "保存失敗", description: toDisplayMessage(e), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -586,10 +581,10 @@ export default function OrganizationSettings() {
           <Tabs defaultValue="join" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-14 text-base">
               <TabsTrigger value="join" className="text-base py-3">
-                🔑 招待コードで参加
+                招待コードで参加
               </TabsTrigger>
               <TabsTrigger value="create" className="text-base py-3">
-                🏢 新規に組織を作成
+                新規に組織を作成
               </TabsTrigger>
             </TabsList>
 
@@ -617,8 +612,8 @@ export default function OrganizationSettings() {
                       onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === "Enter" && handleJoinByInviteCode()}
                       className="h-14 text-center text-2xl font-mono tracking-[0.3em] uppercase"
-                      placeholder="ABC123"
-                      maxLength={6}
+                      placeholder="ABCD1234"
+                      maxLength={8}
                       autoFocus
                     />
                   </div>
@@ -704,37 +699,23 @@ export default function OrganizationSettings() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-primary px-4 py-4 shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/70 hover:bg-primary-foreground/10"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-              <Building2 className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-primary-foreground">組織管理</h1>
-              <p className="text-xs text-primary-foreground/60">{org.name}</p>
-            </div>
-          </div>
-          {/* 特定荷主バッジ (ヘッダー) */}
-          {isRegulated ? (
-            <Badge variant="destructive" className="ml-auto flex items-center gap-1">
+      <PageHeader
+        title="組織管理"
+        subtitle={org.name}
+        right={
+          isRegulated ? (
+            <Badge variant="destructive" className="flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />
               特定荷主
             </Badge>
           ) : (
-            <Badge variant="outline" className="ml-auto flex items-center gap-1 border-primary/40 text-primary">
+            <Badge variant="outline" className="flex items-center gap-1 border-primary-foreground/40 text-primary-foreground">
               <CheckCircle2 className="h-3 w-3" />
               規制対象外
             </Badge>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       <main className="mx-auto max-w-4xl space-y-6 p-4 pb-24">
 
@@ -984,11 +965,7 @@ export default function OrganizationSettings() {
           <CardContent>
             {members.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
-                メンバーが見つかりません。
-                <br />
-                <span className="text-sm">
-                  ※ RLSポリシーが未適用の場合、ここは常に空になります。
-                </span>
+                メンバーはまだいません。下の「チームメンバー招待」から招待コードを発行できます。
               </p>
             ) : (
               <div className="divide-y divide-border">
@@ -1052,9 +1029,17 @@ export default function OrganizationSettings() {
                 <div className="divide-y divide-border rounded-lg border">
                   {inviteCodes.map((ic) => (
                     <div key={ic.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="flex-1 font-mono text-xl font-bold tracking-[0.3em] text-foreground">
-                        {ic.code}
-                      </span>
+                      <div className="flex-1">
+                        <span className="font-mono text-xl font-bold tracking-[0.3em] text-foreground">
+                          {ic.code}
+                        </span>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {ic.expires_at
+                            ? `有効期限 ${new Date(ic.expires_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}`
+                            : "有効期限なし"}
+                          {ic.max_uses !== null && `　使用 ${ic.use_count}/${ic.max_uses}回`}
+                        </p>
+                      </div>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(ic.code);
@@ -1106,63 +1091,6 @@ export default function OrganizationSettings() {
                 コードをドライバーに伝えてください。コードを入力するだけで組織に参加できます。
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* === 救済セクション: 別の組織に移動する === */}
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              別の組織に参加する
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              間違って組織を作成してしまった場合、正しい招待コードを入力して別の組織に移動できます。
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={forceJoinCode}
-                onChange={(e) => setForceJoinCode(e.target.value.toUpperCase())}
-                placeholder="招待コードを入力"
-                className="h-14 font-mono text-lg tracking-widest uppercase"
-                maxLength={10}
-              />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <FieldButton
-                    variant="destructive"
-                    size="default"
-                    fullWidth={false}
-                    disabled={forceJoinCode.trim().length < 4 || forceJoining}
-                    className="shrink-0"
-                  >
-                    {forceJoining ? <Loader2 className="animate-spin" /> : "参加する"}
-                  </FieldButton>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>⚠️ 組織を移動しますか？</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      現在の組織「{org?.name}」から離脱し、招待コード「{forceJoinCode}」の組織に移動します。この操作は取り消せません。
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleForceJoin}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      この組織を離れて参加する
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              ※ 現在の組織から離脱し、新しい組織に移動します。この操作は取り消せません。
-            </p>
           </CardContent>
         </Card>
       </main>

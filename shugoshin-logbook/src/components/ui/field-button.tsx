@@ -16,7 +16,7 @@ const fieldButtonVariants = cva(
         accent: "bg-accent text-accent-foreground hover:bg-accent/90",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border-2 border-primary bg-background text-primary hover:bg-primary hover:text-primary-foreground",
-        ghost: "hover:bg-accent/10 text-foreground",
+        ghost: "hover:bg-muted text-foreground",
       },
       size: {
         default: "h-[60px] px-8 py-4 text-lg",
