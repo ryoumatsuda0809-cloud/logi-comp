@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -448,6 +449,20 @@ export default function Demo() {
         <TimelinePanel />
         <KanbanPanel />
         <FeePanel />
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">荷主に渡す報告書</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              上の記録から作られる、荷主向けの乗務記録兼待機時間報告書です。サーバー検証済の記録（等級A）と、
+              承認済みの申告（等級C）を区別して示し、そのまま印刷・PDF 保存できます。
+            </p>
+            <Button asChild variant="outline">
+              <Link to="/demo/report">報告書を見る</Link>
+            </Button>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">記録が改ざんされにくい理由</CardTitle>

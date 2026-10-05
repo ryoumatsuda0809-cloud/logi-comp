@@ -21,6 +21,7 @@ import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
 import Simulator from "./pages/Simulator";
 import Demo from "./pages/Demo";
+import DemoReport from "./pages/DemoReport";
 import Report from "./pages/Report";
 import DeliveryStatus from "./pages/DeliveryStatus";
 import DailyReportConfirm from "./pages/DailyReportConfirm";
@@ -187,6 +188,7 @@ const App = () => {
             />
             <Route path="/simulator" element={<Simulator />} />
             <Route path="/demo" element={<Demo />} />
+            <Route path="/demo/report" element={<DemoReport />} />
             <Route path="/shared-report/:id" element={<SharedReportView />} />
             <Route path="/shared/:token" element={<SharedReportView />} />
             <Route
