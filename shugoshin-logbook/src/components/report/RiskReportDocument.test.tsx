@@ -27,11 +27,26 @@ const renderDoc = (rows: RiskReportRow[], extra: Partial<Parameters<typeof RiskR
   );
 
 describe("RiskReportDocument", () => {
-  it("行の金額と、年率14.6%の遅延損害金（月次×12×0.146）を出す", () => {
-    renderDoc([row()]);
-    expect(screen.getByText("¥10,000")).toBeTruthy();
-    expect(screen.getByText("¥17,520")).toBeTruthy();
+  it("行の金額と、遅延利息の1日あたりの目安（未払額×年率14.6%÷365）を出す", () => {
+    renderDoc([row({ estimated_loss_jpy: 50000 })]);
+    expect(screen.getByText("¥50,000")).toBeTruthy();
+    // 50,000 × 0.146 ÷ 365 = 20。月次を年換算した旧式（¥87,600）は出さない
+    expect(screen.getByText("¥20")).toBeTruthy();
+    expect(screen.queryByText("¥87,600")).toBeNull();
     expect(screen.getByText("架空運送株式会社")).toBeTruthy();
+  });
+
+  it("遅延利息の1日あたりの額は円未満を四捨五入する", () => {
+    renderDoc([row({ estimated_loss_jpy: 12345 })]);
+    // 12,345 × 0.146 ÷ 365 = 4.938... → 5
+    expect(screen.getByText("¥5")).toBeTruthy();
+  });
+
+  it("遅延利息の列は「1日あたりの目安」と分かる見出しにし、起算日を条文どおりに書く", () => {
+    renderDoc([row()]);
+    expect(screen.getByText(/遅延利息の目安（1日あたり）/)).toBeTruthy();
+    expect(screen.queryByText(/遅延損害金/)).toBeNull();
+    expect(screen.getByText(/役務の提供を受けた日から起算して60日を経過した日から/)).toBeTruthy();
   });
 
   it("算定不可・圏外承認が無ければ注記を出さず、通常のフッターにする", () => {
