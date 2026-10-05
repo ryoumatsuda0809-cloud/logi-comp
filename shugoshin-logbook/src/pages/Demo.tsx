@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
@@ -449,6 +450,7 @@ export default function Demo() {
         <TimelinePanel />
         <KanbanPanel />
         <FeePanel />
+        <DemoSubmitPanel />
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">荷主に渡す報告書</CardTitle>
