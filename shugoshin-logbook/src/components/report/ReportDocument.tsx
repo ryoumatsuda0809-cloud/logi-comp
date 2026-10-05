@@ -114,7 +114,7 @@ export function ReportDocument({
               乗務記録 兼 待機時間報告書
             </h1>
             <p className="text-sm text-gray-600 mt-1 tracking-wider">
-              特定受託事業者取引適正化法（取適法）準拠
+              中小受託取引適正化法（取適法）準拠
             </p>
           </div>
 

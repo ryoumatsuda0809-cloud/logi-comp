@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/PageHeader";
 function generateFormalReport(waitMinutes: number, hasExtraWork: boolean, shipperName: string): string {
   const now = new Date();
   const timeStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return `■ 業務報告\n・報告日時：${timeStr}\n・荷主様　：${shipperName}\n・待機時間：${waitMinutes}分\n・附帯作業：${hasExtraWork ? "あり" : "なし"}\n\n上記の通り、特定受託事業者取引適正化法に基づく業務記録をご報告いたします。よろしくお願い申し上げます。`;
+  return `■ 業務報告\n・報告日時：${timeStr}\n・荷主様　：${shipperName}\n・待機時間：${waitMinutes}分\n・附帯作業：${hasExtraWork ? "あり" : "なし"}\n\n上記の通り、中小受託取引適正化法（取適法）に基づく業務記録をご報告いたします。よろしくお願い申し上げます。`;
 }
 
 const FALLBACK_ORG_ID = "00000000-0000-0000-0000-000000000000";
