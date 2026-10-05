@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Check, CheckCircle2, Loader2, Lock, Sparkles } from "lucide-react";
-import { addDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
 import {
   DEMO_ORDER_APPROVED_AT_LABEL,
@@ -139,9 +139,8 @@ export default function DemoOrders() {
     setEditAttempted(false);
   };
 
-  const paymentDeadline = deliveryDate
-    ? format(addDays(new Date(`${deliveryDate}T00:00:00`), 60), "yyyy-MM-dd")
-    : null;
+  // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
+  const paymentDeadline = deliveryDate ? latestPaymentDate(deliveryDate) : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -270,7 +269,7 @@ export default function DemoOrders() {
 
               {paymentDeadline && (
                 <div className="rounded-lg bg-accent/10 p-3 text-sm">
-                  <span className="font-bold text-foreground">支払期限（納品日+60日）: {paymentDeadline}</span>
+                  <span className="font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
                 </div>
               )}
 

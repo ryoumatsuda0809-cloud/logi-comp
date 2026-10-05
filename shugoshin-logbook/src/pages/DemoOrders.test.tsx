@@ -63,7 +63,8 @@ describe("DemoOrders", () => {
     // 「明日」はデモの基準日（2026-10-03）の翌日
     expect(field("納品日").value).toBe("2026-10-04");
     expect(screen.getByRole("radio", { name: "冷凍" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByText("支払期限（納品日+60日）: 2026-12-03")).toBeTruthy();
+    // 納品日を1日目と数えて60日以内なので、上限は59日後の12月2日（60日後の12月3日は超過）
+    expect(screen.getByText("支払期限（納品日を含めて60日以内）: 2026-12-02")).toBeTruthy();
   });
 
   it("AI が埋めた「不明」は空欄に戻し、必須項目が空のまま承認しようとすると拒否される", () => {
@@ -129,7 +130,13 @@ describe("DemoOrders", () => {
     expect(doc.textContent).toContain("架空冷蔵 本社倉庫");
     expect(doc.textContent).toContain("¥60,000");
     expect(doc.textContent).toContain("2026年10月4日");
-    expect(doc.textContent).toContain("2026年12月3日（物品受領日から60日以内）");
+    expect(doc.textContent).toContain("2026年12月2日（役務の提供を受けた日から起算して60日以内）");
+    // 法令名は取適法の正式名。フリーランス法の名称や旧法の言い方を出さない
+    expect(doc.textContent).toContain("製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律");
+    expect(doc.textContent).not.toContain("特定受託事業者に係る取引の適正化等に関する法律");
+    expect(doc.textContent).not.toContain("下請");
+    expect(doc.textContent).not.toContain("物品受領");
+    expect(doc.textContent).toContain("年率14.6%の遅延利息");
   });
 
   it("「最初の状態に戻す」で最初に戻り、もう一度やり直せる", () => {

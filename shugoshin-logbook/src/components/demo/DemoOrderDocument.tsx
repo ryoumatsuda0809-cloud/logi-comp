@@ -1,21 +1,22 @@
-import { addDays } from "date-fns";
 import { cleanText, displayText, displayYen } from "@/lib/orderContent";
+import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DEMO_ORDER_ISSUER, DEMO_ORDER_NUMBER, DEMO_ORDER_TODAY_ISO } from "@/demo/demoOrders";
 
 /**
  * 以下の文言は、実際の発注書PDF（supabase/functions/generate-order-pdf）と同じにしてある。
- * 法令名・注釈の正しさはこのデモでは判断せず、実際の書面に合わせている。
+ * 法令名・支払期日の数え方は公取委・中小企業庁のテキストで確認したもの（docs/CONTEXT_LEGAL_SPEC.md）。
  */
 const DOC_TITLE = "発注書 兼 取引条件通知書";
-const DOC_LEGAL_TITLE = "特定受託事業者に係る取引の適正化等に関する法律 第4条書面";
+const LEGAL_ACT_NAME = "製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律";
+const DOC_LEGAL_TITLE = `${LEGAL_ACT_NAME} 第4条の明示`;
 const LEGAL_NOTES = [
-  "本書面は2026年施行の取適法第4条に基づき交付する書面です。",
-  "本取引は下請法および取適法に基づき、物品受領後60日以内の支払いを厳守します。",
-  "支払期日を超過した場合、遅延損害金が発生します。",
+  "本書面は、中小受託取引適正化法（取適法。2026年1月1日施行）第4条に基づく明示事項を記載した書面です。",
+  "代金の支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）に定めます。",
+  "支払期日までに支払わない場合、役務の提供を受けた日から60日を経過した日から支払日まで、年率14.6%の遅延利息を支払います。",
   "本書面の記載事項に変更が生じた場合は、速やかに書面にて通知します。",
-  "下請代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
+  "代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
 ];
-const LEGAL_REMARK = "備考: 特段の検収期間を定めない限り、物品受領日をもって検査完了とする。";
+const LEGAL_REMARK = "備考: 特段の検収期間を定めない限り、役務の提供を受けた日をもって検査完了とする。";
 
 export type DemoOrderDocumentData = {
   item_name: string;
@@ -35,20 +36,13 @@ function formatJaDate(iso: string): string {
   return `${m[1]}年${Number(m[2])}月${Number(m[3])}日`;
 }
 
-/** 納品日の60日後（支払期日）を yyyy-MM-dd で返す */
-function paymentDeadlineIso(deliveryIso: string): string | null {
-  const m = deliveryIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const d = addDays(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), 60);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 /**
  * 承認した発注の「4条書面」（架空データ）。
  * 実際の画面ではPDFでダウンロードする書面と同じ項目・同じ並びを、画面上に出す。
  */
 export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
-  const deadline = paymentDeadlineIso(data.deliveryDate);
+  // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
+  const deadline = latestPaymentDate(data.deliveryDate);
   const rows: { label: string; value: string; emphasize?: boolean; highlight?: boolean }[] = [
     { label: "品目名", value: displayText(data.item_name), emphasize: true },
     { label: "数量", value: displayText(data.quantity) },
@@ -56,10 +50,11 @@ export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
     { label: "出発地", value: displayText(data.origin), emphasize: true },
     { label: "到着地", value: displayText(data.destination), emphasize: true },
     { label: "運賃（税抜）", value: displayYen(data.price), emphasize: true },
-    { label: "納品日", value: formatJaDate(data.deliveryDate), emphasize: true },
+    { label: "委託日（発注日）", value: formatJaDate(DEMO_ORDER_TODAY_ISO) },
+    { label: "納品日（役務の提供を受ける日）", value: formatJaDate(data.deliveryDate), emphasize: true },
     {
-      label: "支払期日（60日ルール）",
-      value: `${deadline ? formatJaDate(deadline) : "—"}（物品受領日から60日以内）`,
+      label: "支払期日（60日以内）",
+      value: `${deadline ? formatJaDate(deadline) : "—"}（役務の提供を受けた日から起算して60日以内）`,
       highlight: true,
     },
   ];
@@ -131,7 +126,7 @@ export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
 
         <section className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
           <h4 className="font-bold text-foreground">
-            法的注釈（特定受託事業者に係る取引の適正化等に関する法律 第4条書面）
+            法的注釈（{DOC_LEGAL_TITLE}）
           </h4>
           <ul className="mt-1 space-y-0.5">
             {LEGAL_NOTES.map((n, i) => (
