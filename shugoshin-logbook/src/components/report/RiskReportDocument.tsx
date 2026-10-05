@@ -107,8 +107,8 @@ export function RiskReportDocument({
           </p>
         </div>
         {/* レポートタイトル */}
-        <h1 className="text-2xl font-extrabold text-foreground print:text-black print:text-3xl">
-          荷主別 取適法リスク診断レポート
+        <h1 className="text-balance text-xl font-extrabold text-foreground sm:text-2xl print:text-black print:text-3xl">
+          <span className="inline-block">荷主別</span> <span className="inline-block">取適法リスク診断レポート</span>
         </h1>
         <p className="mt-0.5 text-xs text-muted-foreground print:text-gray-500">
           守護神 — 物流コンプライアンス管理システム
