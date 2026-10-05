@@ -23,6 +23,7 @@ import Simulator from "./pages/Simulator";
 import Demo from "./pages/Demo";
 import DemoReport from "./pages/DemoReport";
 import DemoOrders from "./pages/DemoOrders";
+import DemoWarningReport from "./pages/DemoWarningReport";
 import Report from "./pages/Report";
 import DeliveryStatus from "./pages/DeliveryStatus";
 import DailyReportConfirm from "./pages/DailyReportConfirm";
@@ -191,6 +192,7 @@ const App = () => {
             <Route path="/demo" element={<Demo />} />
             <Route path="/demo/report" element={<DemoReport />} />
             <Route path="/demo/orders" element={<DemoOrders />} />
+            <Route path="/demo/warning" element={<DemoWarningReport />} />
             <Route path="/shared-report/:id" element={<SharedReportView />} />
             <Route path="/shared/:token" element={<SharedReportView />} />
             <Route

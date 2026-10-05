@@ -131,7 +131,7 @@ export default function ROISimulator() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between text-base">
-            <span className="text-muted-foreground">遅延損害金リスク（年率14.6%）</span>
+            <span className="text-muted-foreground">遅延利息（年率14.6%・支払が1か月遅れた場合）</span>
             <span className="font-mono font-semibold text-destructive">{fmt(animLatePayment)}</span>
           </div>
           {isGmenWarning && (
