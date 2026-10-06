@@ -14,6 +14,11 @@ const corsHeaders = {
 
 const MAX_TEXT_LENGTH = 200;
 const MAX_FIELD_LENGTH = 80;
+// 本文の上限。200文字を全部 \uXXXX に直しても約1.2KB なので、4KB あれば足りる。
+// 長さの検査より前に全文を読み込まないために、読む量そのものを止める。
+const MAX_BODY_BYTES = 4096;
+// Gemini の応答待ちの上限。画面側の待ち（15秒）より短くして、画面が諦めたあとも関数が居座らないようにする。
+const GEMINI_TIMEOUT_MS = 10_000;
 
 // 上限はこの関数のインスタンスのメモリ上で数える。インスタンスが入れ替わると数え直しになる、ゆるい制限。
 // 厳密に絞るなら、件数を持つテーブルが要る（デモは「DBに書かない」ので持たない）。
@@ -78,17 +83,25 @@ const SHIMONOSEKI_PLACES: Record<string, string> = {
 };
 
 // モデル名は環境変数で差し替えられる（プレビュー版の提供終了に、再デプロイなしで備える）
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3-flash-preview";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// 空文字で設定されても（`??` では空文字が残って壊れた URL になるので）既定値に戻す
+const GEMINI_MODEL = (Deno.env.get("GEMINI_MODEL") ?? "").trim() || "gemini-3-flash-preview";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
 
 const FIELDS = ["item_name", "quantity", "price", "origin", "destination"] as const;
 
+/** YYYY-MM-DD の形で、かつ実在する日付か（2026-13-45 や 2026-02-30 は不可） */
+const isRealDate = (v: unknown): v is string => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+};
+
 /** AI の返事から、決めた項目だけを、決めた長さまで取り出す（返事の中身は信用しない） */
 const sanitize = (args: Record<string, unknown>) => {
-  const text = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, MAX_FIELD_LENGTH) : "");
-  const date = typeof args.payment_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.payment_date)
-    ? args.payment_date
-    : null;
+  // 数値で返ってきても（特に運賃）捨てずに文字列にする。それ以外の型は空にする
+  const text = (v: unknown) =>
+    typeof v === "string" ? v.trim().slice(0, MAX_FIELD_LENGTH) : typeof v === "number" && Number.isFinite(v) ? String(v) : "";
+  const date = isRealDate(args.payment_date) ? args.payment_date : null;
   return {
     item_name: text(args.item_name),
     quantity: text(args.quantity),
@@ -99,18 +112,52 @@ const sanitize = (args: Record<string, unknown>) => {
   };
 };
 
+/** 本文を上限つきで読む。上限を超えたら null（残りは読まない） */
+const readBodyLimited = async (req: Request): Promise<string | null> => {
+  const declared = Number(req.headers.get("content-length"));
+  if (declared > MAX_BODY_BYTES) return null;
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    all.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "POST のみ受け付けます" }, 405);
 
   try {
-    let body: { text?: unknown };
+    const raw = await readBodyLimited(req);
+    if (raw === null) return json({ error: "リクエストが大きすぎます" }, 413);
+    let body: unknown;
     try {
-      body = await req.json();
+      body = JSON.parse(raw);
     } catch {
       return json({ error: "リクエストの形式が正しくありません" }, 400);
     }
-    const text = typeof body.text === "string" ? body.text.trim() : "";
+    // `null` や配列・数値など、{ "text": ... } の形でない JSON もここで弾く
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return json({ error: "リクエストの形式が正しくありません" }, 400);
+    }
+    const input = (body as { text?: unknown }).text;
+    const text = typeof input === "string" ? input.trim() : "";
     if (!text) return json({ error: "テキストが必要です" }, 400);
     if (text.length > MAX_TEXT_LENGTH) {
       return json({ error: `テキストが長すぎます（最大${MAX_TEXT_LENGTH}文字）` }, 400);
@@ -160,6 +207,8 @@ ${placeDictionary}
       method: "POST",
       // 鍵は URL に載せずヘッダーで渡す（失敗時のログに鍵が残らないように）
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      // Gemini が応答しないまま居座らないように打ち切る（応答本文の読み込みも含む）
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: "user", parts: [{ text }] }],
@@ -202,14 +251,20 @@ ${placeDictionary}
     }
 
     const data = await response.json();
-    const args = data.candidates?.[0]?.content?.parts?.[0]?.functionCall?.args;
-    if (!args || typeof args !== "object") {
+    // 思考パートなどが先頭に付いても拾えるよう、functionCall を持つ最初のパートを探す
+    const parts: Array<{ functionCall?: { args?: unknown } }> = data.candidates?.[0]?.content?.parts ?? [];
+    const args = Array.isArray(parts) ? parts.find((p) => p?.functionCall)?.functionCall?.args : undefined;
+    if (!args || typeof args !== "object" || Array.isArray(args)) {
       console.error("No function call in response");
       return json({ error: "AI解析結果を取得できませんでした" }, 502);
     }
 
     return json(sanitize(args as Record<string, unknown>));
   } catch (e) {
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      console.error("Gemini API timeout");
+      return json({ error: "AI解析がタイムアウトしました" }, 504);
+    }
     console.error("demo-parse-order error:", e);
     return json({ error: "処理中にエラーが発生しました" }, 500);
   }
