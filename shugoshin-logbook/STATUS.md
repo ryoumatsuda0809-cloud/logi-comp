@@ -4,9 +4,35 @@
 
 ## 1. 今のゴール
 
-企業にデモとして見せられる品質まで徹底的に作り込む（2026-10-04 設定）。
+ポートフォリオとして、採用・仕事の依頼をする企業（技術力を見る人）に、`/demo` とリポジトリを見て「設計から運用まで1人で筋よく作れる人」と判断される状態にする（2026-10-06 に本人が設定。旧: 企業にデモとして見せられる品質まで作り込む、2026-10-04）。
 
 ## 2. 次の一手（優先順）
+
+**2-0. 新しいゴールの優先順（2026-10-06 本人決定）**
+1. `/demo` の見た目の仕上げ。**PR #13 はマージ済み（2026-10-06 に `gh pr list` で確認）**: ブランチ `feat/demo-polish`（ce27f89）に、`/demo/report` の375px崩れ、`/demo/warning` の見出しの折り返し、`/demo` の冒頭の紹介カードを直した。実ブラウザで確認済み（375px・320px・PC幅）。**未確認**: A4の印刷プレビュー、`/demo` の GPS パネルより下。法令名の2件（`ReportDocument.tsx`、`DailyReportConfirm.tsx`）は #11 で直っていて、現コードに旧名は残っていない。
+   **別の agent による実ブラウザ確認（2026-10-06、375px は iframe で近似・PC幅 1054px）**: `/demo` の GPS パネルより下、最下部まで崩れ・横はみ出し・コンソールエラーなし。長押しの確定と「提出済み」まで動作確認。**取れなかった**: A4 の印刷プレビュー（印刷用ルールを当てた近似では `/demo/warning` は1ページ、`/demo/report` は2ページの見込みで、表の行が途中で割れるかは実機で要確認）、長押しの進捗バーのアニメーション（タブが非表示）。**見つかった問題**: ①環境変数が無いと `/demo` が真っ白（`supabaseUrl is required.`。`client.ts:7`）。②`/demo/warning` の表が 375px で横スクロール（表幅 640px に対し表示 341px。「総待機時間」列が切れ、手がかりも無い）。直すかは未決定。
+2. `/demo/orders` の自由入力だけを本物の AI で解析する（公開デモ専用の Edge Function `demo-parse-order`。ログイン不要、200文字まで、IP ごとに10分で5回・全体で1日300回の上限、DB に書かない。失敗したら固定の例の結果に切り替え、「入力は外部AIに送信されます」を表示。例文ボタンは固定結果のまま）。
+   **コードは書き終え・テスト済み・PR #15（未マージ）・未デプロイ**: ブランチ `feat/demo-ai-parse`（8d24967。作業用コピーは `.claude/worktrees/demo-ai-parse`）。型エラー 0、全体のテスト 157 件成功。**独立した検証は済み（2026-10-06）**: 別の agent が npm の `deno`（`npx --yes deno`、2.9.6）で実際に `Deno.serve` を起動し、Gemini 抜き（fetch はスタブ）で確かめた。型・スタブ付き Deno テスト16本（`supabase/functions/demo-parse-order/index.test.ts`。修正前のコードでは8本失敗、修正後は全部成功）・コードレビュー。見つかった中程度の問題3つ（Gemini 呼び出しに打ち切りが無い／本文を全部読んでから長さを検査／本文 `null` で500）と軽い4つは、`a9668be` で直して PR #15 に取り込み済み。詳細は PR #15 のコメント。
+   **デプロイ前に本人が決めること**: ①回数制限はインスタンスごとのメモリで、実効の上限は1日300回より大きくなりうる。費用の本当の上限にならないので、**Google 側（Gemini の鍵のクォータ・予算アラート）にも上限を置く**。②IP の取り方: `cf-connecting-ip` を優先し、無ければ `x-forwarded-for` の先頭（偽装できる）。本番の Edge でこのヘッダーが届くかは、デプロイして実際に呼ばないと分からない。フォールバックを末尾にするか、やめるか。**未確認**: 実 Gemini が `gemini-3-flash-preview` で functionCall を返すか、Edge のタイムアウトの実測値、10秒の打ち切りが実際に働く様子。
+   Deno のテストの実行: `deno test --allow-env --allow-read supabase/functions/demo-parse-order/index.test.ts`（vitest は拾わない）。
+   **前提**: Gemini の API キー。**本物の `parse-order` は、Supabase 側のシークレット `GEMINI_API_KEY` を読む（`.env` の同名の変数は Web アプリ側では使われない）。** 本人が `.env` にだけ貼って再設定したため、v25 は 2026-10-06 18:15 JST ごろ 2回とも `400 API_KEY_INVALID` で 500 になった。本人が Supabase のシークレットを更新すると、**18:23 JST に POST 200（2.4秒、v27）**。`parse-order` の200は Gemini が `functionCall.args` を返したときだけ（`index.ts:192-204`）なので、`gemini-3.5-flash-lite` の function calling が動いたと言える（画面の見た目は未確認）。v26・v27 は私が出したものではない（シークレット保存で Supabase が版を上げたと推測、未確認）。デプロイは、本人の了承を取って行う。
+   **モデルを `gemini-3.5-flash-lite` に変更（2026-10-06）**: 公式ドキュメント（ai.google.dev）でモデル ID と function calling 対応を確認。`demo-parse-order` の既定値も同じにした（`fe75c5a`、PR #15 に push 済み、Deno テスト16本成功。`GEMINI_MODEL` での上書きは従来どおり）。**無料枠の有無・上限は、取得できたドキュメントに記載が無く未確認。** 実データを無料枠に流す場合の学習利用の問題は `parse-order/index.ts:29` の TODO のとおり残る。
+   `parse-order`（本物の発注画面）の 500 の原因（2026-10-06、Supabase のログから）: **Gemini 側の 503「high demand」**（`gemini-3-flash-preview`、01:22 JST、1.3秒で返却）。見えた失敗は1件だけで、一時的か継続かは判断できない。401/403/404 の行は無く、私の v24 デプロイが原因の可能性は低い（v23 のコードは取得できず、「同じコード」は未確認）。**v25 を本番にデプロイ済み（モデル変更。PR #19 はマージ済みで、main と本番が揃った。`gh pr list` で確認）**。`verify_jwt: false` のまま、認証なしの POST は 401。**未確認**: デプロイ後の本番コードと手元ファイルの照合（`get_edge_function` が自動モードに拒否された。許可ルールを足せば私が読める）。
+   **次にやること（2026-10-06 夜、本人が了承した方針）**: ①PR #19・#13・#18 のマージ（**済み**）。②README（#14 のブランチ）の事実の訂正（**①〜⑦は訂正済み、`095b011`**。下の 3 を参照。#14 もマージ済み）。「環境変数なしで動く」は README を直し、`.env.example` に動作確認用のダミー値を入れて「`cp .env.example .env` で `/demo` が開く」と書く（`client.ts` は触らない）。構成図は直接書き込みを正直に描く。③`demo-parse-order`（#15）は、**デモ専用のキー（`DEMO_GEMINI_API_KEY`、別の Google プロジェクト）を読むようにしてから**デプロイする。**コードは対応済み（`0bd13b8`、#15 に push 済み）: `DEMO_GEMINI_API_KEY` だけを読み、`GEMINI_API_KEY` へのフォールバックは無い。未設定なら 503 を返し、画面は固定の例の結果に切り替わる。Deno テスト20件・vitest 158件・型エラー0。実 Gemini は呼んでいない（fetch はスタブ）。残り（本人）: Google で別プロジェクトのキーを発行 → Supabase のシークレットに `DEMO_GEMINI_API_KEY` を設定 → デプロイの了承。**理由: 今は本番と `GEMINI_API_KEY` を共有しているので、公開デモが無料枠を使い切ると本物の発注画面の AI 解析も止まる。IP の取り方は、デプロイ後に実際に呼んで届くヘッダーを見て決める。④やらない: `submitted_reports` のサーバー再計算、拠点登録、`client.ts` の変更、色トークン（デモ後）。
+3. 設計の見える化。**作業済み・PR #14（マージ済み、2026-10-06 夜）**: ブランチ `docs/portfolio-readme`（25d0db8、c566ebf）に README を書き直した（課題／構成図／設計判断5つ／テストと CI／既知の課題／開発の始め方）。CI は `logi-comp/.github/workflows/shugoshin-ci.yml` に既にある。本人に確認したいこと: 既知の課題に正直な内容を載せてよいか、`parse-daily-report`（現行のフロントから呼ばれていない）の扱い。`docs/IMPLEMENTATION_SUMMARY.md` に古い記述がある（取適法を「2024年改正物流法」とする、PostGIS とする、useEvidence のテスト件数が3件とする。実際は8件）。本人が PR にしてよいと了承（2026-10-06）。**PR #18（マージ済み）**（ブランチ `chore/repo-hygiene`）で、`supabase/.temp/` の追跡外し・`.env*` の ignore と一緒に直した。実コードで確かめたものだけ直した（取適法の正式名・施行日、PostGIS ではなく Haversine 式、ジオフェンスの判定は `issue_ticket` ではなく `wait_logs` の BEFORE INSERT トリガー `trg_enforce_wait_log_geofence`、`useEvidence.test.ts` は8件・`EvidenceCollector.test.tsx` は7件、ほか）。**直さなかったもの（本人確認が要る）**: 末尾の「次のステップ: 待機料自動計算ロジック・荷主向けダッシュボード」が実装済みかどうか、ヘッダーの「本番デプロイ済み」、`startLoading`・`completeTicket`・`cancelTicket`・オフライン打刻キューの節が無いこと。テストは走らせていない（ドキュメントと ignore だけの変更）。
+   **README（#14）の事実照合（2026-10-06、別の agent が読み取りのみ）**: テスト件数（17ファイル143件）・CI・migration 名とトリガー名・環境変数名は一致。#18 の訂正は全部実コードと合っていた。**【2026-10-06 夜に①〜⑦とも訂正済み。`095b011`、#14 に push 済み。別の agent が各項目を実コードで再確認してから直した。①は README を直し `.env.example` にダミー値（`https://dummy-project-ref.invalid`）を入れた（`client.ts` は未変更。ダミー値の dev サーバーで `/demo` が最後まで描画され `/demo/orders` も開き、コンソールエラーが無いことを確認）。③は構成図を「証拠系は RPC のみ」と「`submitted_reports`・`transport_orders` は直接書き込み」の2本に分けた。④の「施設の登録は運営の SQL」は `docs/CONTEXT_SUPABASE.md` に基づき、本番では確かめていない。⑦は「電波圏外」と「500m超」に言葉を分けた（`/demo` の画面の文言には、両方の意味の「圏外」が残っている）。Mermaid の図は描画しておらず、構文を目で見ただけ。tsc・テストは走らせていない（README・`.env.example`・docs だけの変更）。以下は訂正前の食い違いの記録】**: ①「`/demo` 系は環境変数なしで動く」は誤り（上の実ブラウザ確認で白紙を再現）。②設計判断②の「権限を絞って RPC を壊した事故」は原因が違う（実際は GPS NOT NULL トリガーと `issue_ticket` の不整合、`20260728130000`）。③構成図が「UI→証拠テーブルは SELECT のみ」と描くが、`submitted_reports`（`DailyReportConfirm.tsx:177`）と `transport_orders`（`Orders.tsx:293`）は直接書き込み。④「施設・組織の登録 UI が無い」は不正確（組織の作成 UI はあり、無いのは施設の登録 UI）。⑤「署名済みの `waiting_evidence` は更新・削除・TRUNCATE を禁止」は弱く書きすぎ（DELETE・TRUNCATE は署名の有無に関係なく常に禁止）。⑥#18 マージ後は「IMPLEMENTATION_SUMMARY は 2026-04 時点」が古くなる（マージ順）。⑦「圏外」が電波圏外と500m圏外の両方に使われ紛らわしい。**README の外**: PWA manifest（`vite.config.ts:27`）と `OrganizationSettings.tsx:940` に旧「2026年物流法・60日支払いルール」が残る。**本人の判断待ち**: 旧法令名（PWA manifest と `OrganizationSettings.tsx:940`）を直すか。①〜⑦は、本人の方針（§2-0 の「次にやること」）に沿って訂正済み。#14 は本人がマージ済み。
+4. リポジトリ公開前の秘密情報の点検。**済み（2026-10-06、読み取り専用）**: 全109コミット・全ブランチの履歴に、鍵・`.env`・パスワードは見つからなかった（ローテーション不要）。**公開する単位は、本人に任された私が決めた（2026-10-06）: `logi-comp/` のモノレポのまま。** 理由: 本番（Vercel）のデプロイ元が `logi-comp/shugoshin-logbook` で、単体に切り出すと別リポジトリ＋履歴の書き換え＋デプロイ元の付け替えが要り、デモ前に本番を壊すリスクのほうが大きい。リポジトリ直下の README（#14）が `shugoshin-logbook/README.md` に案内する。**公開（可視性の切り替え）自体はまだしていない。本人の操作。【2026-10-07 訂正: `gh repo view` は `visibility: PUBLIC` を返した。この文は古い。いつ公開したかは未確認。】** 切り替える前に本人が確認すること: ①同じリポジトリの `bloomers-app/` も一緒に公開してよいか（秘密は見つからなかったが、公開してよいかは別の判断）、②`chore/repo-hygiene` の PR（#18）をマージ済みか（**マージ済み**、`gh pr list` で確認）、③GitHub 側（PR の本文・Actions のログ・Secrets）を目で確認したか。初回コミット（7fa8f2d）の `supabase/.temp/*` に残る Supabase プロジェクト参照は、公開値なので履歴の書き換えは不要という見立て（本人の判断で変えてよい）。軽い対処（`shugoshin-logbook/supabase/.temp/cli-latest` の追跡外し、`shugoshin-logbook/.gitignore` への `.env*` と `supabase/.temp/`）は、PR #18 にした（ルートの `.gitignore` には `**/supabase/.temp/` が既にあり、漏れていたのは追跡済みの `cli-latest` だけだった）。調べていない範囲: GitHub 側（PR・Actions のログ・Secrets）、Supabase 側のシークレット、バイナリの中身。
+   別件: `.git` が iCloud 同期の Desktop にあり、377ファイルが dataless 状態で git が極端に遅かった（点検の agent が読み込んで実体化した）。Desktop の外に移すことを検討。**2026-10-06 夜に再発**: Agent の `isolation: "worktree"` が「git config を読めない」で2回失敗し、`git worktree add` が数分止まった（`.git/worktrees` 配下の dataless ファイルが原因と、agent が報告。Read で実体化すると解消）。ブランチが別の worktree で使用中だと `worktree add` が失敗する点にも注意（`.claude/worktrees/` に古い worktree が複数残っている）。
+
+**Lovable の削除（2026-10-06 夜）**: `.lovable/` は本人が main で削除済み（`da53b03`）。残りは **PR #20（マージ済み、`chore/remove-lovable`、`a866b87`）** で、`lovable-tagger`（package.json・package-lock.json・`vite.config.ts`）、`bun.lock`・`bun.lockb`、`src/main.tsx` の Lovable プレビュー用ホスト名チェックを消した。型エラー0・`npm run build` 成功・vitest 143件成功（別の作業場所で実行）。**マージ前に本人が確認**: Vercel のプレビュービルドが緑か。`bun.lockb` があると Vercel が bun で install している可能性があり、この PR で npm（CI と同じ経路）に変わる。いまどちらで動いているかは未確認。残したもの: `supabase/migrations/README.md` の「Lovable生成（旧）」（旧ファイル名の説明）と `docs/PROGRESS_LOG.md:178`（履歴）。
+
+**デモ後に回すこと（本人決定 2026-10-06）**: 拠点登録、支払管理、第4条の承認チェック（DB）、PDF の¥0・記号の修正。
+第4条の3件は本人が決定済み（実装はデモ後）: ①委託日は承認日時（`approved_at`）。下書きの PDF は作成日時のまま。②発注先（運送会社）の名称を承認の必須項目に足し、発注画面に入力欄（まずは自由入力）。空欄では承認させない。③`content.payment_date` があればそれを印字し、無ければ上限日（納品日の59日後）。上限を超える日が入っていたら承認で止めて理由を表示。必須にはしない。②③は承認ガード（`guard_transport_orders`）の DB 変更で、この Mac では動作を確かめられない。
+PDF の確認（2026-10-06 01:30、本人が貼った別セッションの報告。私は再確認していない）: 承認済みの発注 c0d11aea（納品日 4/24）で、支払期日 6/22（59日後）・見出しが取適法の正式名・表とフッターが重ならないことを確認済み。要対応: 長文で表が伸びたときの重なり、「★」「■」がテキスト抽出で空になる、運賃が数値でない古い発注が「¥0」と出る。
+
+**そのほか（2026-10-06）**: `src/pages/Orders.tsx` の AI 解析に30秒のタイムアウトを足した（PR #16、未マージ。`isAbortError` とテスト付き）。画面で打ち切りを実際に見てはいない。サーバーが500を1.6秒で返しても「解析中...」のまま止まった、という別の報告は、このタイムアウトでは説明がつかないので、ログインして失敗時の画面をもう一度見る必要がある。
+
+**以下は、旧ゴール（企業にデモとして見せられる品質）のときの項目。**
 
 0. 2026-10-04 夜の実操作点検（課題 E1〜E21、リポジトリ外の UI 修正メモ）の P0 を処理中。
    コードで直したもの: E1 表示（null・¥NaN を「—」に、AI の埋め草を空欄に）、E2 空の発注の承認拒否（画面＋
@@ -61,11 +87,11 @@
 ## 2c. 再開するときの引き継ぎ（2026-10-05 夜。法務の修正を反映）
 
 **マージ済み（2026-10-05）**: #5 DM3 日報の提出パネル／#7 DM5 `/demo/warning`／#9 発注書の法令名と支払期日の数え方（以上19:28）／#6 DM2 `/demo/orders`／#4 STATUS の本番反映の記録。
-#8（この引き継ぎ）もマージ済み。**未マージ**: #10（`/demo` から発注へのリンク。このファイルの更新も含む）と #11（帳票・日報に残っていた旧法名を取適法の正式名に直す。2026-10-06）と #12（`/shared/*`・`/shared-report/*` に `Referrer-Policy: no-referrer`・noindex・frame 拒否のヘッダーを足す。`vercel.json`）。
-#12 のヘッダーは**未確認**: Vercel のプレビューがログインで保護されていて curl が通らなかった。マージ後に本番で `curl -I https://shugoshin-logbook.vercel.app/shared/<32文字以上の適当な文字列>` を打ち、`referrer-policy: no-referrer` が付くこと、`/demo` には付かないこと、直接開いて 404 にならないことを確かめる。
+#8（この引き継ぎ）もマージ済み。#10（`/demo` から発注へのリンク。このファイルの更新も含む）・#11（帳票・日報に残っていた旧法名を取適法の正式名に直す）・#12（`/shared/*`・`/shared-report/*` に `Referrer-Policy: no-referrer`・noindex・frame 拒否のヘッダーを足す。`vercel.json`）も、本人が 2026-10-06 にマージ済み。**この時点（#12 まで）では未マージの PR は無かった。その後に作った #13〜#18 は、17:23 時点では全て OPEN だった。**2026-10-06 夜の `gh pr list` では、#13・#18・#19 がマージ済み。未マージは #14（README）・#15（デモ AI）・#16（30秒タイムアウト）・#17（この STATUS）・#20（Lovable の削除）。**
+#12 のヘッダーは**本番で確認済み（2026-10-06、curl）**: `/shared/<適当な文字列>` と `/shared-report/<適当な文字列>` が 200 で、`referrer-policy: no-referrer`・`x-robots-tag: noindex, nofollow`・`x-frame-options: DENY` が付く。`/demo` と `/` には付かず、200。HTML の枠（`<div id="root">`）が返ることまで確認し、画面の見た目は未確認。
 
 PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub の画面でマージするか、Bash の権限ルールを足す（2026-10-05 に確認）。
-本番の Edge Function デプロイ（`mcp__supabase__deploy_edge_function`）も、自動モードに「本番デプロイ」として拒否される（2026-10-06 に確認）。
+本番の Edge Function デプロイ（`mcp__supabase__deploy_edge_function`）は、権限ルールが無いと自動モードに「本番デプロイ」として拒否される（2026-10-06 に確認）。本人が `.claude/settings.local.json` の `permissions.allow` にそのルールを足したので、2026-10-06 にデプロイ済み（下の 3）。
 開発機の事実（2026-10-06）: この Mac には Docker・`supabase` CLI・`psql` が無く、DB の変更（migration・トリガー）はローカルで動作を確かめられない。Vercel のプレビュー URL はログイン保護で curl が通らない（本番は公開）。
 
 再開したらやること:
@@ -74,7 +100,8 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
 3. **Edge Function をデプロイする**（`generate-order-pdf`、`parse-order`）。コードは main に入ったが、デプロイするまで本番の PDF は旧版（支払期日の上限を60日後と出す）のまま。**先にローカルで PDF を1枚出して目視する**（文字幅は計算で見積もっただけ。Deno が無く、実描画は未確認）。
    **2026-10-06 に確認したこと**: 本番の `generate-order-pdf` は v24（最終更新は 2026-04）で、旧版のまま（旧法名の見出し、支払期日は納品日の60日後、「物品受領」「下請法」「遅延損害金」）。`verify_jwt` は `false` で `config.toml` と一致。
    ローカルの新版（main と同一）は、表が1行増えてもフッター枠と重ならないことを行数と文字幅から手計算で確認した（実描画は未確認）。
-   **デプロイは未実施**: 自動モードの権限に「本番デプロイ」として拒否された。本人がデプロイするか、`mcp__supabase__deploy_edge_function` の権限ルールを足してから依頼する。`parse-order` も同じ手順で。デプロイ後は、承認済みの発注で PDF を1枚出して目視する（ログインが要るので本人）。旧版は git 履歴にある。
+   **デプロイ済み（2026-10-06）**: `generate-order-pdf` は v24 → v25、`parse-order` は v23 → v24（`verify_jwt` は両方 `false` のまま）。`get_edge_function` で、本番のコードがローカル（main）と同じ内容であることを確認した（59日後の計算、取適法の正式名、「遅延利息」）。認証なしで POST すると両方とも 401「認証が必要です」を返し、起動と外部 import の解決までは確認できた。
+   **未確認**: 承認済みの発注で PDF を1枚出した実描画（ログインが要るので本人）。支払期日が59日後か、見出しが取適法の正式名か、表がフッター枠と重ならないかを見る。崩れていたら旧版（v24）は git 履歴にあるので戻せる。`parse-order` の AI 解析の実行も未確認（ログインと Gemini の呼び出しが要る）。
 4. 共有リンク周りのセキュリティ検査は**読み取りまで済み（2026-10-06）**。結果は §2d。本番 DB での実行テストは未実施。コードベース全体を脆弱性の目的で通して読んだことは、まだない。
 
 **法務の修正（2026-10-05、PR #9・#7・#6 は main にマージ済み。一次情報で確認済み）**。出典は公取委・中小企業庁「中小受託取引適正化法テキスト」（令和7年11月）。詳細は `docs/CONTEXT_LEGAL_SPEC.md` の末尾。
@@ -93,7 +120,7 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
 未確認（見た目・操作の確認が終わっていないもの）:
 - 長押し中の進捗バーの見た目（`/demo` の日報パネル。検証時のタブが非表示でアニメーションが動かなかった）。
 - 本物の `/report` の見た目（要ログイン）。紙面を `RiskReportDocument` に切り出し、表に `min-w-[40rem]` を付けたので、念のため見る。
-- 警告レポート・発注の A4 印刷プレビュー。発注書 PDF の実描画（上のデプロイ前の目視）。
+- 警告レポート・発注の A4 印刷プレビュー。発注書 PDF の実描画（デプロイ済みの本番で、上の 3 の目視を本人が行う）。
 
 ## 2d. 共有リンクの検査結果（2026-10-06。コードの読み取りのみ。本番 DB では実行していない）
 
@@ -113,9 +140,19 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
 - 🟡 **重複行の疑い（未確認）**: 提出時、同じ `wait_logs` の訪問が `timeline` に1回（`useDailyTimeline.ts` が `source: "gps"` で入れる）、`DailyReportConfirm.tsx:174` でもう1回（`source: "wait_log"`）入る。
   表示側（`ReportDocument.tsx`）に重複を除く処理が無いので、実際の共有帳票で同じ行が2回出る可能性がある。本番の5件は、この経路ができる前のデータで、確認も反証もできていない。ログインして1日分を提出し、共有帳票を開けば分かる。
 - 🟡 1本のリンクで、その日の全荷主の訪問（施設名・時刻・待機料）が見える。帳票は複数荷主宛の1通のため、荷主Aに渡したリンクで荷主B・Cの訪問も見える。荷主ごとに絞るかは本人の判断。
-- 🟡 `vercel.json` にヘッダーが無い。トークンが URL のパスに入るので、`/shared/*` に `Referrer-Policy: no-referrer`・`X-Robots-Tag: noindex`・`X-Frame-Options: DENY` を足したい（効いたかは Vercel のプレビューで確認が要る）。
+- ✅ 対応済み（#12、本番で確認済み 2026-10-06）: `vercel.json` に、`/shared/*` と `/shared-report/*` 向けの `Referrer-Policy: no-referrer`・`X-Robots-Tag: noindex, nofollow`・`X-Frame-Options: DENY` を足した。トークンが URL のパスに入るための対策。
 - ⚪ 宛名の荷主名（`shipper_names`）は、その日の `wait_logs` を状態で絞らずに引くので、キャンセルした訪問の荷主名も載りうる。
 - ⚪ `security_checks.sql` は、期限切れのリンクが開けないこと、`timeline_snapshot` の中に内部IDが無いことを検査していない（今は最上位のキーだけ）。
+
+## 2e. 2026-10-07 の記録（マージ後の検証と、開いている PR）
+
+**マージ済み（本人、2026-10-06 夜）**: #14（README）・#20（Lovable の削除）。main は 6c40e4a。#15（デモ AI）・#16（30秒タイムアウト）・#17（この STATUS）は OPEN のまま。
+**検証（別の agent、読み取りのみ）**: main を `git archive` で書き出して `npm ci` した場所で、型エラー 0・vitest 17 ファイル 143 件成功・`npm run build` 成功。`bun.lock*` は無く、README の「17 ファイル 143 件」は実測と一致。コード・設定に Lovable は残っていない（README・migration の説明に履歴の言及だけ）。本番（shugoshin-logbook.vercel.app）は、全ルートが 200 で `<div id="root">` を返し、`/shared/*`・`/shared-report/*` にだけ `no-referrer`・noindex・`DENY` が付く。配信中の JS に `lovable`・`dummy-project-ref` は 0 件。6c40e4a は GitHub の deployment status と時刻から反映済み（Vercel のビルドハッシュは未照合）。**未確認**: #20 で Vercel の install が bun から npm に変わったか（本番は壊れていない）、画面の見た目。
+**開いている PR**:
+- **#21**（`fix/old-law-name-in-meta`）: `index.html`（description・og:description）・PWA manifest・`OrganizationSettings.tsx` の「2026年物流法改正・60日支払いルール」を取適法の表記に直した。型 0・テスト 143 件成功・ビルド成功（clean な場所で）。**本人の判断待ち**: 画面の見出し「特定荷主」（`OrganizationSettings.tsx:709, 870`）を直すか。説明文から外した「特定荷主規制」（物流の別の法改正に由来する語で、`CONTEXT_LEGAL_SPEC.md` に根拠が無い）を戻すか。
+- **#22**（`fix/report-loading-start-label`）: 帳票・日報の明細で、荷役開始（荷待ち終了）の行が「荷待ち開始」と出ていた誤りを、**表示ラベルだけ**「荷役開始（荷待ち終了）」に直し、出発の行を「作業完了（出発）」にした。`eventType: "waiting_start"` は変えていない（待機料の計算 `useDailyTimeline.ts:169`・荷待ち合計 `:283` と、提出済みの日報が参照するため）。型 0・テスト 143 件成功。**未確認（マージ後）**: `/demo/report` と本番の共有帳票での表示。`/demo` の時系列（`Demo.tsx`）は「作業完了」のまま。
+**リポジトリの見え方（採点 69/100 を受けた掲載前の3件。本人が貼った）**: ①帳票ラベル → #22（上）。②リポジトリの description と topics（react, typescript, supabase, postgresql, rls, pwa, vite）は、**私の権限が WRITE で `gh repo edit` が 404 になり、設定できていない。本人が About の歯車から設定する**。案: 「トラック待機時間を法的証拠にする運行記録アプリ。サーバー時刻のGPS打刻、署名後は改ざん不可、取適法の書面を自動生成。React / TypeScript / Supabase(RLS) / PWA」。`bloomers-app/`（同じリポジトリの32ファイル）を別リポジトリへ移すか、README の書き換えで済ませるかは**未決定**。③#15 は `DEMO_GEMINI_API_KEY`（別の Google プロジェクトのキー）を本人が Supabase に設定してからデプロイ。`parse-order`（v25）がログイン状態で 200 を返すかの確認も、本人のログインが要る。**掲載直後**: `submitted_reports` のサーバー側再計算（BEFORE INSERT トリガーの小案。Supabase のブランチ等で `security_checks.sql` を通してから本番へ。§2d・§3）。
+**環境の注意**: この Mac の既存の `node_modules` では vitest が PostCSS の読み込み（`postcss.config.js`）で落ちる（原因は未調査。型チェックは通る）。`/tmp` 側の `npm ci` した場所では通る。
 
 ## 3. ゴール外の未了
 
