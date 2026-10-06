@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { toDisplayMessage } from "./dbErrors";
+import { isAbortError, toDisplayMessage } from "./dbErrors";
+
+describe("isAbortError", () => {
+  it("打ち切りで止まった通信を見分ける", () => {
+    expect(isAbortError(new DOMException("aborted", "AbortError"))).toBe(true);
+    // supabase.functions.invoke は元の AbortError を context に入れて返す
+    expect(isAbortError({ name: "FunctionsFetchError", context: { name: "AbortError" } })).toBe(true);
+  });
+
+  it("ほかのエラーや空の値は打ち切りとみなさない", () => {
+    expect(isAbortError(new Error("Failed to fetch"))).toBe(false);
+    expect(isAbortError({ name: "FunctionsHttpError", context: {} })).toBe(false);
+    expect(isAbortError(null)).toBe(false);
+    expect(isAbortError("AbortError")).toBe(false);
+  });
+});
 
 describe("toDisplayMessage", () => {
   it("RPC が日本語で返した理由はそのまま出す", () => {

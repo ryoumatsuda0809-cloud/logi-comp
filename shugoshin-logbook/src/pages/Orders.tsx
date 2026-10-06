@@ -1,4 +1,4 @@
-import { toDisplayMessage } from "@/lib/dbErrors";
+import { isAbortError, toDisplayMessage } from "@/lib/dbErrors";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,9 @@ type ParsedOrder = {
   destination: string;
   payment_date: string | null;
 };
+
+/** AI 解析（parse-order）を待つ上限。これを超えたら打ち切ってエラーを出す */
+const PARSE_TIMEOUT_MS = 30_000;
 
 const STATUS_LABELS: Record<string, {label: string;color: string;}> = {
   draft: { label: "下書き", color: "bg-muted text-muted-foreground" },
@@ -181,8 +184,10 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
     setIsParsing(true);
     setParsed(null);
     try {
+      // 応答が返らないときに「解析中...」のまま止まらないよう、30秒で打ち切る
       const { data, error } = await supabase.functions.invoke("parse-order", {
-        body: { text: inputText }
+        body: { text: inputText },
+        timeout: PARSE_TIMEOUT_MS,
       });
       if (error) throw error;
       if (!data || data.error) {
@@ -204,7 +209,10 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
         else if (cleanText(data?.payment_date)) setDeliveryDate(data.payment_date);
       }
     } catch (e: any) {
-      toast({ title: "エラー", description: toDisplayMessage(e, "AI解析に失敗しました"), variant: "destructive" });
+      const description = isAbortError(e)
+        ? `${PARSE_TIMEOUT_MS / 1000}秒以内に解析が終わりませんでした。もう一度お試しください。`
+        : toDisplayMessage(e, "AI解析に失敗しました");
+      toast({ title: "エラー", description, variant: "destructive" });
     } finally {
       setIsParsing(false);
     }
