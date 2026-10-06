@@ -28,7 +28,7 @@ const MAX_TEXT_LENGTH = 1000;
 
 // TODO: [PROTOTYPE ONLY] 本番稼働時（リアルデータ取扱時）は、複雑な商流データの正確な読み取りと学習利用防止のため、必ず有料枠の高知能正式版モデルへ切り替えること
 const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
