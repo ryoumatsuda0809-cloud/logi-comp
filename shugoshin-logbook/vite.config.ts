@@ -25,7 +25,7 @@ export default defineConfig(() => ({
       manifest: {
         name: "守護神 — 物流コンプライアンス管理",
         short_name: "守護神",
-        description: "2026年物流法改正対応。特定荷主規制・60日支払いルールを自動管理。",
+        description: "取適法（中小受託取引適正化法）対応。書面の明示と支払期日のルールを自動管理。",
         start_url: "/",
         display: "standalone",
         orientation: "portrait",

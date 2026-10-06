@@ -936,8 +936,8 @@ export default function OrganizationSettings() {
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 <p className="text-sm text-destructive/80">
-                  <strong>特定荷主に該当します。</strong>
-                  2026年物流法改正により、書面交付義務・60日支払いルールなどの厳格な規制が適用されます。
+                  <strong>取適法の規制対象に該当します。</strong>
+                  取適法（中小受託取引適正化法）により、書面の明示義務（第4条）・受領日から60日以内の支払期日（第3条）などの規制が適用されます。
                 </p>
               </div>
             )}
