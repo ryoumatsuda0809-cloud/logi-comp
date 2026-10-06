@@ -46,6 +46,13 @@ describe("parseDemoOrderWithAi", () => {
     expect(err.rateLimited).toBe(false);
   });
 
+  it("デモ用のキーが未設定のとき（503）も DemoAiError にする（画面は固定の例の結果に切り替える）", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond(503, { error: "AI解析を利用できません" })));
+    const err = await parseDemoOrderWithAi("文").catch((e) => e);
+    expect(err).toBeInstanceOf(DemoAiError);
+    expect(err.rateLimited).toBe(false);
+  });
+
   it("返事の形が違えば、画面に使わず DemoAiError にする", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond(200, { ...okBody, price: 60000 })));
     await expect(parseDemoOrderWithAi("文")).rejects.toBeInstanceOf(DemoAiError);

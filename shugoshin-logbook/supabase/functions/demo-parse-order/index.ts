@@ -4,6 +4,7 @@
 //   - ログイン不要（verify_jwt = false。誰でも呼べるので、下の上限で守る）
 //   - DB には一切書かない。Supabase のクライアントも使わない
 //   - 入力は200文字まで。IP ごとの回数と、全体の1日の回数に上限がある
+//   - API キーはデモ専用の DEMO_GEMINI_API_KEY だけを読む（本番の GEMINI_API_KEY は読まない）
 // 抽出する項目とプロンプトは parse-order と同じ形（画面側は同じ判定関数で受ける）。
 
 const corsHeaders = {
@@ -11,6 +12,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// 読む API キーのシークレット名。本番の parse-order とは別のキー・別の Google プロジェクトにする。
+const DEMO_API_KEY_NAME = "DEMO_GEMINI_API_KEY";
 
 const MAX_TEXT_LENGTH = 200;
 const MAX_FIELD_LENGTH = 80;
@@ -163,9 +167,12 @@ Deno.serve(async (req) => {
       return json({ error: `テキストが長すぎます（最大${MAX_TEXT_LENGTH}文字）` }, 400);
     }
 
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    // デモ専用のキー（別の Google プロジェクト）だけを読む。本番 parse-order の GEMINI_API_KEY には
+    // 絶対にフォールバックしない（デモの無料枠を使い切っても、本物の発注画面の AI 解析を止めないため）。
+    // 未設定のときは 503 を返す。画面側（demoParseApi.ts → DemoOrders.tsx）は、失敗をすべて固定の例の結果に切り替える。
+    const apiKey = Deno.env.get(DEMO_API_KEY_NAME);
     if (!apiKey) {
-      console.error("GEMINI_API_KEY is not configured");
+      console.error(`${DEMO_API_KEY_NAME} is not configured`);
       return json({ error: "AI解析を利用できません" }, 503);
     }
 

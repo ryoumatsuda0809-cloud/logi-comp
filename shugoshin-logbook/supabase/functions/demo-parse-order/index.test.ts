@@ -30,13 +30,18 @@ type Handler = (req: Request) => Promise<Response> | Response;
 type FetchCall = { url: string; init: RequestInit };
 
 const SECRET_KEY = "test-secret-key-DO-NOT-LEAK";
+// 本番 parse-order 用のキー。デモ関数は、これが設定されていても絶対に使ってはいけない。
+const PROD_KEY = "prod-gemini-key-MUST-NOT-BE-USED";
 let loadCount = 0;
 
 /** index.ts を新しいモジュールとして読み込み、Deno.serve に渡されたハンドラを取り出す（回数の記録も新しくなる） */
-async function load(env: { apiKey?: string | null; model?: string } = {}): Promise<Handler> {
-  // 鍵はリクエストごとに読まれる（読み込み後も残す）。モデル名は読み込み時に1度だけ読まれる。次の load が上書きする。
-  if (env.apiKey === null) Deno.env.delete("GEMINI_API_KEY");
-  else Deno.env.set("GEMINI_API_KEY", env.apiKey ?? SECRET_KEY);
+async function load(env: { apiKey?: string | null; prodKey?: string; model?: string } = {}): Promise<Handler> {
+  // デモ用の鍵（DEMO_GEMINI_API_KEY）はリクエストごとに読まれる（読み込み後も残す）。モデル名は読み込み時に1度だけ読まれる。次の load が上書きする。
+  if (env.apiKey === null) Deno.env.delete("DEMO_GEMINI_API_KEY");
+  else Deno.env.set("DEMO_GEMINI_API_KEY", env.apiKey ?? SECRET_KEY);
+  // 本番の GEMINI_API_KEY は、指定したときだけ設定する（既定では未設定）
+  if (env.prodKey === undefined) Deno.env.delete("GEMINI_API_KEY");
+  else Deno.env.set("GEMINI_API_KEY", env.prodKey);
   if (env.model === undefined) Deno.env.delete("GEMINI_MODEL");
   else Deno.env.set("GEMINI_MODEL", env.model);
 
@@ -349,7 +354,61 @@ Deno.test("入力に仕込まれた指示は、出力の形を変えられない
   );
 });
 
-Deno.test("GEMINI_API_KEY 未設定は 503（Gemini を呼ばず、枠も使わない）", async () => {
+Deno.test("DEMO_GEMINI_API_KEY を読み、Gemini へのヘッダーに使う", async () => {
+  await withStub(() => geminiOk(GOOD_ARGS), async (handler, calls) => {
+    const res = await handler(post({ text: "フグ" }));
+    assert.equal(res.status, 200);
+    await res.body?.cancel();
+    assert.equal(calls.length, 1);
+    assert.equal((calls[0].init.headers as Record<string, string>)["x-goog-api-key"], SECRET_KEY);
+  });
+});
+
+Deno.test("GEMINI_API_KEY（本番用）だけが設定されていても使わない: 503 で、Gemini を呼ばず、枠も使わない", async () => {
+  await withStub(
+    () => geminiOk(GOOD_ARGS),
+    async (handler, calls) => {
+      for (let i = 0; i < 7; i++) {
+        const res = await handler(post({ text: "フグ" }, { "cf-connecting-ip": "203.0.113.6" }));
+        assert.equal(res.status, 503, `${i + 1}回目`);
+        assert.ok(!(await res.text()).includes(PROD_KEY));
+      }
+      assert.equal(calls.length, 0, "本番キーで Gemini を呼んでいる");
+    },
+    { apiKey: null, prodKey: PROD_KEY },
+  );
+});
+
+Deno.test("両方が設定されていても、使うのは DEMO_GEMINI_API_KEY だけ（本番キーは Gemini に送らない）", async () => {
+  await withStub(
+    () => geminiOk(GOOD_ARGS),
+    async (handler, calls) => {
+      const res = await handler(post({ text: "フグ" }));
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+      assert.equal(calls.length, 1);
+      const sent = JSON.stringify(calls[0]);
+      assert.ok(!sent.includes(PROD_KEY), "本番キーが Gemini への要求に含まれている");
+      assert.equal((calls[0].init.headers as Record<string, string>)["x-goog-api-key"], SECRET_KEY);
+    },
+    { prodKey: PROD_KEY },
+  );
+});
+
+Deno.test("DEMO_GEMINI_API_KEY が空文字でも未設定と同じ 503（本番キーには落ちない）", async () => {
+  await withStub(
+    () => geminiOk(GOOD_ARGS),
+    async (handler, calls) => {
+      const res = await handler(post({ text: "フグ" }));
+      assert.equal(res.status, 503);
+      await res.body?.cancel();
+      assert.equal(calls.length, 0);
+    },
+    { apiKey: "", prodKey: PROD_KEY },
+  );
+});
+
+Deno.test("DEMO_GEMINI_API_KEY 未設定は 503（500 ではない。Gemini を呼ばず、枠も使わない）", async () => {
   await withStub(
     () => geminiOk(GOOD_ARGS),
     async (handler, calls) => {
