@@ -42,9 +42,11 @@ export interface ReportData {
 /* ------------------------------------------------------------------ */
 const EVENT_LABELS: Record<string, string> = {
   arrival: "到着",
-  waiting_start: "荷待ち開始",
+  // waiting_start は荷役開始（＝荷待ち終了）の時刻に付く（waitLogToTimeline.ts）。
+  // 名前は集計が参照しているので変えず、表示だけ実態に合わせる。
+  waiting_start: "荷役開始（荷待ち終了）",
   loading_start: "荷役開始",
-  departure: "出発",
+  departure: "作業完了（出発）",
 };
 
 function formatTime(iso: string): string {
