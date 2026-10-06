@@ -371,6 +371,6 @@ Deno.test("GEMINI_MODEL: 指定があれば URL に使い、空文字ならす�
   }, { model: "my-model" });
   await withStub(() => geminiOk(GOOD_ARGS), async (handler, calls) => {
     await (await handler(post({ text: "フグ" }))).body?.cancel();
-    assert.ok(calls[0].url.includes("/models/gemini-3-flash-preview:generateContent"), calls[0].url);
+    assert.ok(calls[0].url.includes("/models/gemini-3.5-flash-lite:generateContent"), calls[0].url);
   }, { model: "" });
 });

@@ -84,7 +84,7 @@ const SHIMONOSEKI_PLACES: Record<string, string> = {
 
 // モデル名は環境変数で差し替えられる（プレビュー版の提供終了に、再デプロイなしで備える）
 // 空文字で設定されても（`??` では空文字が残って壊れた URL になるので）既定値に戻す
-const GEMINI_MODEL = (Deno.env.get("GEMINI_MODEL") ?? "").trim() || "gemini-3-flash-preview";
+const GEMINI_MODEL = (Deno.env.get("GEMINI_MODEL") ?? "").trim() || "gemini-3.5-flash-lite";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
 
 const FIELDS = ["item_name", "quantity", "price", "origin", "destination"] as const;
