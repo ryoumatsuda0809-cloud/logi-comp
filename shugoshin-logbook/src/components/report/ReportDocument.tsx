@@ -95,12 +95,12 @@ export function ReportDocument({
     (t) => t.evidenceGrade === "C" && t.eventType === "arrival" && t.selfApproved
   ).length;
 
-  const cellClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm";
-  const thClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm font-bold bg-gray-200 print:bg-gray-200 text-left whitespace-nowrap";
+  const cellClass = "border border-gray-800 px-1.5 py-1.5 sm:px-3 sm:py-2 print:px-2 print:py-1 text-xs sm:text-sm";
+  const thClass = "border border-gray-800 px-1.5 py-1.5 sm:px-3 sm:py-2 print:px-2 print:py-1 text-xs sm:text-sm font-bold bg-gray-200 print:bg-gray-200 text-left whitespace-nowrap";
 
   return (
       <article
-        className="mx-auto max-w-4xl bg-white border border-gray-300 shadow-[0_0_20px_rgba(0,0,0,0.08)] my-6 px-8 py-10 md:px-12 md:py-12 print:border-none print:shadow-none print:max-w-none print:m-0 print:px-4 print:py-2 font-serif-jp"
+        className="mx-auto max-w-4xl bg-white border border-gray-300 shadow-[0_0_20px_rgba(0,0,0,0.08)] my-6 px-4 py-8 sm:px-8 sm:py-10 md:px-12 md:py-12 print:border-none print:shadow-none print:max-w-none print:m-0 print:px-4 print:py-2 font-serif-jp"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
       >
 
@@ -110,7 +110,7 @@ export function ReportDocument({
         <header className="mb-8 print:mb-3 break-inside-avoid">
           {/* Title */}
           <div className="text-center mb-6 print:mb-2">
-            <h1 className="text-2xl font-bold tracking-widest text-black">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-widest text-black">
               乗務記録 兼 待機時間報告書
             </h1>
             <p className="text-sm text-gray-600 mt-1 tracking-wider">
@@ -119,7 +119,7 @@ export function ReportDocument({
           </div>
 
           {/* Two-column: To/From + Meta */}
-          <div className="flex justify-between items-start gap-8 mb-4 print:gap-2 print:mb-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start sm:gap-8 mb-4 print:gap-2 print:mb-2">
             {/* Left: To / From */}
             <div className="space-y-3">
               <div>
@@ -143,7 +143,7 @@ export function ReportDocument({
             </div>
 
             {/* Right: Date / Doc No */}
-            <div className="text-right space-y-1 font-mono text-sm shrink-0">
+            <div className="sm:text-right space-y-1 font-mono text-sm shrink-0">
               <div>
                 <span className="text-gray-500">{report.id.startsWith("live-") ? "作成日時: " : "提出日時: "}</span>
                 <span className="font-bold text-black">{new Date(report.submitted_at).toLocaleString("ja-JP")}</span>
@@ -177,13 +177,13 @@ export function ReportDocument({
               </tr>
               <tr>
                 <th className={thClass}>総待機時間</th>
-                <td className={`${cellClass} font-bold text-lg`}>
+                <td className={`${cellClass} font-bold text-lg sm:text-lg`}>
                   {report.total_wait_minutes}分
                 </td>
               </tr>
               <tr>
                 <th className={thClass}>推定待機料</th>
-                <td className={`${cellClass} font-bold text-lg`}>
+                <td className={`${cellClass} font-bold text-lg sm:text-lg`}>
                   ¥{report.estimated_wait_cost.toLocaleString()}
                 </td>
               </tr>
@@ -288,7 +288,7 @@ export function ReportDocument({
                           </span>
                         )}
                       </td>
-                      <td className={cellClass}>{item.locationName || "—"}</td>
+                      <td className={`${cellClass} min-w-[4.5rem] sm:min-w-0`}>{item.locationName || "—"}</td>
                       <td className={`${cellClass} text-right ${isWait ? "font-bold" : ""}`}>
                         {item.waitMinutes ? `${item.waitMinutes}分` : "—"}
                       </td>

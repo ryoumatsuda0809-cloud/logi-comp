@@ -171,7 +171,7 @@ function GpsPanel() {
         <div className="flex items-center gap-3">
           <Button
             size="sm"
-            variant="outline"
+            variant={!playing && index === 0 ? "default" : "outline"}
             className="shrink-0 gap-2"
             aria-label={playing ? "一時停止" : "1日の流れを再生"}
             onClick={() => {
@@ -446,6 +446,20 @@ export default function Demo() {
       </div>
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-4 pb-16">
+        <section className="rounded-xl border bg-card p-4">
+          <h2 className="text-base font-semibold text-balance">待機時間を、荷主に示せる記録にする</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            トラックの荷待ち時間を GPS とサーバー時刻で記録し、待機料の報告書にするアプリです。
+            ドライバーの打刻、荷主の呼出画面、荷主に渡す報告書を、架空のデータで試せます。
+          </p>
+          <p className="mt-2 text-sm font-medium">まず下の地図で「1日の流れを再生」を押してみてください。</p>
+          <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-sm">
+            <span className="text-xs text-muted-foreground">ほかの画面</span>
+            <Link to="/demo/report" className="font-medium underline underline-offset-4">報告書</Link>
+            <Link to="/demo/warning" className="font-medium underline underline-offset-4">警告レポート</Link>
+            <Link to="/demo/orders" className="font-medium underline underline-offset-4">発注の流れ</Link>
+          </p>
+        </section>
         <GpsPanel />
         <TimelinePanel />
         <KanbanPanel />
