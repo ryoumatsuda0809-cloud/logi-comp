@@ -4,6 +4,7 @@ import { ArrowLeft, Check, CheckCircle2, Loader2, Lock, Sparkles } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -20,14 +21,19 @@ import { cleanText, displayRoute, displayText, displayYen, missingForApproval, o
 import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
 import {
+  DEMO_AI_FALLBACK_NOTE,
+  DEMO_AI_NOTE,
+  DEMO_FREE_TEXT_DISCLOSURE,
   DEMO_ORDER_APPROVED_AT_LABEL,
   DEMO_ORDER_EXAMPLES,
   DEMO_ORDER_TODAY,
   DEMO_ORDER_TODAY_ISO,
   DEMO_PARSE_DELAY_MS,
   DEMO_PARSE_NOTE,
+  type DemoAiOrderResult,
   type DemoOrderExample,
 } from "@/demo/demoOrders";
+import { DEMO_FREE_TEXT_MAX, parseDemoOrderWithAi } from "@/demo/demoParseApi";
 
 type OrderForm = {
   item_name: string;
@@ -39,14 +45,22 @@ type OrderForm = {
 
 const TEMPERATURE_ZONES = ["常温", "冷蔵", "冷凍"] as const;
 
+/** 解析結果がどこから来たか。画面の注記を切り替える */
+type ParseSource = "example" | "ai" | "fallback";
+
 /**
  * /demo/orders の「発注」。
- * 例文を選ぶ → 擬似AI解析（固定の結果）→ 内容を確認・入力 → 承認（取り消せない）→ 4条書面、の流れを見せる。
+ * 入力 → AI解析 → 内容を確認・入力 → 承認（取り消せない）→ 4条書面、の流れを見せる。
+ * 入力は2通り。例文を選ぶと固定の結果が返る（AI は呼ばない）。自由入力は、公開デモ専用の
+ * Edge Function（demoParseApi.ts）で本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
  * 実際の発注画面（/orders）と同じ判定関数（orderContent.ts）を使う。状態はこの画面の中だけ。
- * Supabase にも AI にもアクセスしない。
+ * DB には書かない。Supabase のクライアントも使わない。
  */
 export default function DemoOrders() {
   const [example, setExample] = useState<DemoOrderExample | null>(null);
+  const [freeText, setFreeText] = useState("");
+  const [source, setSource] = useState<ParseSource>("example");
+  const [fallbackExample, setFallbackExample] = useState<DemoOrderExample | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [form, setForm] = useState<OrderForm | null>(null);
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -56,47 +70,105 @@ export default function DemoOrders() {
   const [approved, setApproved] = useState<DemoOrderDocumentData | null>(null);
   const [editAttempted, setEditAttempted] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const clearTimer = () => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
   };
-  useEffect(() => clearTimer, []);
+  const abortAi = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+  useEffect(
+    () => () => {
+      clearTimer();
+      abortAi();
+    },
+    [],
+  );
 
   const locked = approved !== null;
 
   const selectExample = (ex: DemoOrderExample) => {
     if (locked || isParsing) return;
     setExample(ex);
+    setFreeText("");
+    setSource("example");
     setForm(null);
     setDeliveryDate("");
     setTemperatureZone("常温");
     setRefusal(null);
   };
 
-  /** 実際の handleParse と同じ流れ。違うのは、AI を呼ばず固定の結果を返すところだけ */
-  const handleParse = () => {
-    if (!example || isParsing || locked) return;
+  const changeFreeText = (value: string) => {
+    if (locked || isParsing) return;
+    setFreeText(value.slice(0, DEMO_FREE_TEXT_MAX));
+    // 自由入力を始めたら、例文の選択は外す
+    setExample(null);
+    setSource("example");
+  };
+
+  /** 解析結果（AI の返事でも固定の結果でも）を、確認用のフォームに入れる */
+  const applyResult = (data: DemoAiOrderResult, sentence: string) => {
+    // AI は入力に無い項目を "不明" などで埋めることがある。空欄に戻して人に入れてもらう（実際の画面と同じ）。
+    setForm({
+      item_name: cleanText(data.item_name) ?? "",
+      quantity: cleanText(data.quantity) ?? "",
+      price: cleanText(data.price) ?? "",
+      origin: cleanText(data.origin) ?? "",
+      destination: cleanText(data.destination) ?? "",
+    });
+    // 温度帯と納品日は AI が返さないので、入力文から読み取って補う（実際の画面と同じ関数）
+    const hints = orderHintsFromText(sentence, DEMO_ORDER_TODAY);
+    setTemperatureZone(hints.temperatureZone ?? "常温");
+    if (hints.deliveryDate) setDeliveryDate(hints.deliveryDate);
+    else if (cleanText(data.payment_date)) setDeliveryDate(data.payment_date as string);
+    else setDeliveryDate("");
+  };
+
+  /** 自由入力: 公開デモ専用の AI に解析させる。失敗したら、固定の例の結果に切り替える */
+  const parseFreeText = async (text: string) => {
     setIsParsing(true);
     setForm(null);
     setRefusal(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const data = await parseDemoOrderWithAi(text, controller.signal);
+      if (controller.signal.aborted) return;
+      setSource("ai");
+      applyResult(data, text);
+    } catch {
+      if (controller.signal.aborted) return;
+      const fallback = DEMO_ORDER_EXAMPLES[0];
+      setSource("fallback");
+      setFallbackExample(fallback);
+      applyResult(fallback.aiResult, fallback.sentence);
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setIsParsing(false);
+      }
+    }
+  };
+
+  /** 実際の handleParse と同じ流れ。例文のときは、AI を呼ばず固定の結果を返す */
+  const handleParse = () => {
+    if (isParsing || locked) return;
+    const text = freeText.trim();
+    if (text) {
+      void parseFreeText(text);
+      return;
+    }
+    if (!example) return;
+    setIsParsing(true);
+    setForm(null);
+    setRefusal(null);
+    setSource("example");
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      const data = example.aiResult;
-      // AI は入力に無い項目を "不明" などで埋めることがある。空欄に戻して人に入れてもらう（実際の画面と同じ）。
-      setForm({
-        item_name: cleanText(data.item_name) ?? "",
-        quantity: cleanText(data.quantity) ?? "",
-        price: cleanText(data.price) ?? "",
-        origin: cleanText(data.origin) ?? "",
-        destination: cleanText(data.destination) ?? "",
-      });
-      // 温度帯と納品日は AI が返さないので、入力文から読み取って補う（実際の画面と同じ関数）
-      const hints = orderHintsFromText(example.sentence, DEMO_ORDER_TODAY);
-      setTemperatureZone(hints.temperatureZone ?? "常温");
-      if (hints.deliveryDate) setDeliveryDate(hints.deliveryDate);
-      else if (cleanText(data.payment_date)) setDeliveryDate(data.payment_date as string);
-      else setDeliveryDate("");
+      applyResult(example.aiResult, example.sentence);
       setIsParsing(false);
     }, DEMO_PARSE_DELAY_MS);
   };
@@ -128,7 +200,11 @@ export default function DemoOrders() {
 
   const reset = () => {
     clearTimer();
+    abortAi();
     setExample(null);
+    setFreeText("");
+    setSource("example");
+    setFallbackExample(null);
     setIsParsing(false);
     setForm(null);
     setDeliveryDate("");
@@ -169,7 +245,7 @@ export default function DemoOrders() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">1. 発注内容の入力</CardTitle>
             <p className="text-xs text-muted-foreground">
-              実際の画面では、文章を打つか声で話します。ここでは例文から選びます。
+              実際の画面では、文章を打つか声で話します。ここでは、例文を選ぶか、自由に打って試せます。
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -196,11 +272,43 @@ export default function DemoOrders() {
               </p>
             )}
 
-            <Button className="w-full gap-2" onClick={handleParse} disabled={!example || isParsing || locked}>
+            <div className="space-y-1">
+              <Label htmlFor="demo-order-free" className="text-sm font-bold">自由入力（AIが解析します）</Label>
+              <Textarea
+                id="demo-order-free"
+                value={freeText}
+                maxLength={DEMO_FREE_TEXT_MAX}
+                rows={3}
+                placeholder="例：架空水産の第2荷捌き場から架空冷蔵の本社倉庫まで、冷凍のブリ20箱、運賃6万円、明日納品"
+                disabled={locked || isParsing}
+                onChange={(e) => changeFreeText(e.target.value)}
+              />
+              <p className="flex justify-between gap-2 text-xs text-muted-foreground">
+                <span>{DEMO_FREE_TEXT_DISCLOSURE}</span>
+                <span className="shrink-0 tabular-nums">{freeText.length}/{DEMO_FREE_TEXT_MAX}</span>
+              </p>
+            </div>
+
+            <Button
+              className="w-full gap-2"
+              onClick={handleParse}
+              disabled={(!example && !freeText.trim()) || isParsing || locked}
+            >
               {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {isParsing ? "解析中..." : "AI解析"}
             </Button>
-            <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>
+            {source === "example" && <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>}
+            {source === "ai" && (
+              <p role="status" className="text-xs font-medium text-muted-foreground">
+                {DEMO_AI_NOTE}
+              </p>
+            )}
+            {source === "fallback" && (
+              <p role="status" className="rounded-lg border bg-muted/40 p-2 text-xs font-medium text-muted-foreground">
+                {DEMO_AI_FALLBACK_NOTE}
+                {fallbackExample ? `（${fallbackExample.label.split("：")[0]}の結果）` : ""}
+              </p>
+            )}
           </CardContent>
         </Card>
 

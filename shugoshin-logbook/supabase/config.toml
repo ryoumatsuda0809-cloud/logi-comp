@@ -8,3 +8,7 @@ verify_jwt = false
 
 [functions.parse-daily-report]
 verify_jwt = false
+
+# 公開デモ専用。ログイン不要なので、入力長と回数の上限は関数の中で守る
+[functions.demo-parse-order]
+verify_jwt = false
