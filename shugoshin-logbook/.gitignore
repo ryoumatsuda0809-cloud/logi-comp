@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (keep ignored even if this directory is published on its own)
+.env
+.env.*
+!.env.example
+
+# Supabase CLI local cache (linked project ref, service versions)
+supabase/.temp/

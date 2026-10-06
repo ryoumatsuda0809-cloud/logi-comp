@@ -1,7 +1,7 @@
 # 守護神 — 実装要約ドキュメント
 
 > **対象読者**: 本プロジェクトに新たに参加する開発者、またはコア機能を変更する前に設計意図を確認したい担当者  
-> **最終更新**: 2026-04-19  
+> **最終更新**: 2026-10-06（取適法の名称、距離計算の方式、テスト件数、打刻RPCの現行定義に合わせて訂正）  
 > **ステータス**: 本番デプロイ済み（Vercel + Supabase）
 
 ---
@@ -43,7 +43,7 @@ useEffect(() => {
 **重要な設計不変条件**:
 
 - `onAuthStateChange` は登録直後に現在のセッション状態を即時発火する。これにより初回マウント時も `getSession()` なしで正しい状態が得られる。
-- この順序を変更すると競合状態が再発する。`CLAUDE.md` の Rule 3 で変更を禁止している。
+- この順序を変更すると競合状態が再発する。`useAuth.tsx` は `getSession()` を呼ばない現在の形を保つこと。
 
 ---
 
@@ -51,13 +51,13 @@ useEffect(() => {
 
 ### なぜ実装したか
 
-2024年改正物流法（通称「取適法」）では、荷主施設でのドライバー待機時間を客観的証拠として記録・保全することが義務付けられている。GPS位置情報を伴わない打刻は法的証拠として無効となるため、**GPSが取得できない状態での打刻操作を物理的に不可能にする**フェイルセーフが必要だった。
+取適法（正式名称: 製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律、通称 中小受託取引適正化法。旧 下請法。2026-01-01 施行。詳細は `docs/CONTEXT_LEGAL_SPEC.md`）を背景に、運送業者が荷主に待機料を確実に請求できるよう、荷主施設での待機時間を法的に有効なエビデンスとして自動生成する。本プロジェクトでは GPS 位置情報を伴わない打刻を証拠として扱わない設計とし、**GPSが取得できない状態での打刻操作を物理的に不可能にする**フェイルセーフを置いた。
 
 ### どう実装したか
 
 #### フック層: `src/hooks/useEvidence.ts`
 
-`navigator.geolocation.watchPosition()` で GPS を継続監視し、以下の2つの状態を管理する。
+`navigator.geolocation.watchPosition()` で GPS を継続監視し、GPS まわりでは以下の2つの状態を管理する。
 
 | 状態 | 説明 |
 |------|------|
@@ -70,7 +70,7 @@ GPS エラーはエラーコードで分岐し、ドライバーが対処でき�
 
 ```typescript
 const isGpsReady = position !== null && !gpsError;
-const isButtonLocked = !isGpsReady || isSubmitting;  // 物理ロック条件
+const isButtonLocked = !isGpsReady || isSubmitting || !isOnline;  // 物理ロック条件
 ```
 
 | 条件 | UIの状態 |
@@ -78,12 +78,13 @@ const isButtonLocked = !isGpsReady || isSubmitting;  // 物理ロック条件
 | GPS取得中（`position === null`） | ボタン `disabled`、レーダーアニメーション表示 |
 | GPS エラー（`gpsError !== null`） | ボタン `disabled`、`<Alert variant="destructive">` で日本語エラー表示 |
 | 送信中（`isSubmitting === true`） | ボタン `disabled`、ローダー表示 |
+| オフライン（`isOnline === false`） | ボタン `disabled`、オフラインである旨の Alert を表示 |
 | GPS取得済み・エラーなし | ボタン enabled「到着打刻」 |
 
 **フェイルセーフの二重構造**:
 
 1. **フロント層**: `disabled` による物理ロック（クリック不可）
-2. **バックエンド層**: `issue_ticket` RPC の PostGIS ジオフェンス判定（500m圏外は `RAISE EXCEPTION`）
+2. **バックエンド層**: `wait_logs` の BEFORE INSERT トリガー `trg_enforce_wait_log_geofence`（`enforce_wait_log_geofence()`）が、Haversine 式（SQL の自前計算。PostGIS は使っていない）で施設までの距離を求め、施設の `radius`（既定500m）を超えると `RAISE EXCEPTION`（ERRCODE `check_violation`）で INSERT を拒否する。`issue_ticket` 経由か直接 INSERT かを問わず効く
 
 フロント側の無効化を意図的に回避されても、バックエンドが必ず弾く設計になっている。
 
@@ -105,32 +106,35 @@ const isButtonLocked = !isGpsReady || isSubmitting;  // 物理ロック条件
         │
         ▼
 [RPC: get_nearest_facility]
-  PostGIS で 500m 圏内の施設を検索
+  Haversine 式（SQL）で施設の radius（既定500m）圏内の最寄り施設を検索
   圏外の場合は空配列を返す（フロントがエラー表示）
         │
         ▼
 [RPC: issue_ticket]
-  wait_logs を INSERT
-  arrival_time = CURRENT_TIMESTAMP（DB サーバー時刻）
-  整理券番号を自動採番
-  500m 圏外の場合は RAISE EXCEPTION（P0001）
+  wait_logs を INSERT（arrival_time は DB サーバー時刻）
+  同じトランザクションで waiting_evidence（arrival）も INSERT
+  整理券番号を自動採番（施設 × 日本時間の日付ごとの連番。
+    同時到着で衝突したら最大5回やり直す）
+  500m 圏外の場合は trg_enforce_wait_log_geofence が
+    RAISE EXCEPTION（check_violation）で拒否
         │
         ▼
 [フロントエンド]
   log_id / ticket_number / arrival_time を受け取り表示
 ```
 
-フロントエンドが送信するのは `user_lat`, `user_lng`, `p_facility_id` のみ。**時刻の付与・ジオフェンス判定・整理券採番はすべてDBが行う**。
+フロントエンドが送信するのは、`get_nearest_facility` へ `user_lat` / `user_lng`、`issue_ticket` へ `p_facility_id` / `p_latitude` / `p_longitude` のみ。**時刻の付与・ジオフェンス判定・整理券採番はすべてDBが行う**。
 
 #### DBレベルの改ざん防止（`supabase/migrations/`）
 
 | 仕組み | 対象テーブル | 効果 |
 |--------|-------------|------|
-| `trg_force_wait_log_arrival` | `wait_logs` | `arrival_time` / `created_at` をDBサーバー時刻で強制上書き |
-| `trg_force_recorded_at` | `compliance_logs` | `recorded_at` をDBサーバー時刻で強制上書き |
-| `trg_force_waiting_evidence_timestamps` | `waiting_evidence` | `recorded_at` / `created_at` をDBサーバー時刻で強制上書き |
-| `trg_guard_waiting_evidence_update` | `waiting_evidence` | `is_signed = true` の行への変更を全ロールで禁止 |
-| `trg_block_waiting_evidence_delete` | `waiting_evidence` | DELETE を全ロールで禁止（service_role 含む） |
+| `trg_force_wait_log_arrival` | `wait_logs` | INSERT 時に `arrival_time` / `created_at` をDBサーバー時刻で強制上書き |
+| `trg_enforce_wait_log_geofence` | `wait_logs` | INSERT 時に施設との距離（Haversine）が `radius`（既定500m）を超えると拒否 |
+| `trg_force_recorded_at` | `compliance_logs` | INSERT 時に `recorded_at` をDBサーバー時刻で強制上書き |
+| `trg_force_waiting_evidence_timestamps` | `waiting_evidence` | INSERT 時に `recorded_at` / `created_at` をDBサーバー時刻で強制上書き |
+| `trg_guard_waiting_evidence_update` | `waiting_evidence` | `is_signed = true` の行への UPDATE を全ロールで禁止（署名の瞬間に `signed_at` をサーバー時刻で記録） |
+| `trg_block_waiting_evidence_delete` | `waiting_evidence` | DELETE を全ロールで禁止（署名の有無を問わない。service_role 含む） |
 | `trg_block_waiting_evidence_truncate` | `waiting_evidence` | TRUNCATE を全ロールで禁止 |
 
 RLS ポリシーに加えて `SECURITY DEFINER` トリガーによる二重防御を採用しているため、service_role を使った管理操作でも署名済みエビデンスの改ざんは不可能。
@@ -143,37 +147,48 @@ RLS ポリシーに加えて `SECURITY DEFINER` トリガーによる二重防�
 
 | ファイル | テスト対象 | テスト数 |
 |--------|-----------|---------|
-| `src/hooks/useEvidence.test.ts` | バックエンド通信ロジック（RPC呼び出し） | 3 |
-| `src/components/evidence/EvidenceCollector.test.tsx` | GPS状態によるUI物理ロック | 3 |
+| `src/hooks/useEvidence.test.ts` | バックエンド通信ロジック（RPC呼び出し） | 8 |
+| `src/components/evidence/EvidenceCollector.test.tsx` | GPS状態・オフライン状態によるUI物理ロック | 7 |
 
-### `useEvidence.test.ts` — バックエンド通信結合テスト
+### `useEvidence.test.ts` — バックエンド通信結合テスト（8件）
 
 ```
-describe: useEvidence — バックエンド送信の結合テスト
+describe: useEvidence — バックエンド送信の結合テスト（4件）
+describe: useEvidence.completeTicket — 作業完了打刻の結合テスト（4件）
 ```
 
 | テストケース | 検証内容 |
 |------------|---------|
-| 正常系: GPS→RPC正常 | `get_nearest_facility` に正しい緯度経度が渡されること / `issue_ticket` に施設IDが渡されること / `lastResult` が正しくマッピングされること |
+| 正常系: GPS→RPC正常 | `get_nearest_facility` に正しい緯度経度が渡されること / `issue_ticket` に施設IDと緯度経度が渡されること / `lastResult` が正しくマッピングされること |
+| 届出番号の引き継ぎ | 施設に届出番号が登録されていれば `lastResult` に引き継がれること（漁獲番号の自動組み立てに使う） |
 | 異常系: ネットワークエラー | `get_nearest_facility` 失敗時に `submitError` に日本語メッセージが伝播し、後続の `issue_ticket` が呼ばれないこと |
-| 異常系: 500m圏外/ジオフェンス | `issue_ticket` が `RAISE EXCEPTION` を返した場合に圏外エラーメッセージが正しく表示されること |
+| 異常系: 500m圏外/ジオフェンス | `issue_ticket` がジオフェンスエラーを返した場合に圏外エラーメッセージが正しく表示されること |
+| 作業完了: GPS座標の送信 | 作業完了操作その場のGPS座標が `p_latitude` / `p_longitude` として `complete_ticket` に渡ること |
+| 取消: 成功 | `cancel_ticket` RPC が呼ばれ、成功時に `lastResult` がクリアされること |
+| 取消: 署名済みで拒否 | 署名済みで取消が拒否されたとき、`lastResult` を消さずエラーを表示すること |
+| 異常系: GPS座標必須エラー | DBが GPS座標必須の `[法的保護]` エラーを返した場合、日本語メッセージに変換されること |
 
-### `EvidenceCollector.test.tsx` — UIフェイルセーフ結合テスト
+### `EvidenceCollector.test.tsx` — UIフェイルセーフ結合テスト（7件）
 
 ```
-describe: EvidenceCollector — GPS状態によるUIフェイルセーフ検証
+describe: EvidenceCollector — GPS 状態によるUIフェイルセーフ検証（4件）
+describe: EvidenceCollector — オフライン時のフェイルセーフ（3件）
 ```
 
 | テストケース | 検証内容 |
 |------------|---------|
-| 正常系: GPS取得済み | 「到着打刻」ボタンが `enabled` になること |
+| 正常系: GPS取得済み | 打刻ボタンが `enabled` になること |
 | 異常系: 許可拒否 (PERMISSION_DENIED) | `<Alert variant="destructive">` が表示され、ボタンが `disabled` であること |
+| 再取得ボタン | ページを再読み込みせず（`window.location.reload` を呼ばず）、GPS監視だけをやり直すこと |
 | 異常系: 位置取得失敗 (POSITION_UNAVAILABLE) | `<Alert>` が表示され、ボタンが `disabled` であること |
+| オフライン: ボタンロック | オフライン時は GPS取得済みでも打刻ボタンがロックされること |
+| オフライン: 説明 | オフライン時は理由を説明する Alert が表示されること |
+| オンライン復帰 | オンラインに復帰すると打刻ボタンが再び押せるようになること |
 
 ### モック戦略
 
 - `supabase` クライアントを `vi.mock` で完全モック化し、実ネットワーク接続なしでRPCのレスポンスを制御。
-- `navigator.geolocation` は jsdom に存在しないため、テストごとに `Object.defineProperty` で差し込む。
+- `navigator.geolocation` は jsdom に存在しないため、テストごとに `Object.defineProperty` で差し込む（オフライン状態は `navigator.onLine` を同様に差し替える）。
 - `useAuth` をモックして認証状態を固定し、Auth フローとテスト対象ロジックを分離。
 
 ---
@@ -200,15 +215,16 @@ describe: EvidenceCollector — GPS状態によるUIフェイルセーフ検証
 └───────────────┬─────────────────────┘
                 │ HTTPS / Supabase SDK
 ┌───────────────▼─────────────────────┐
-│  Supabase（PostgreSQL + PostGIS）   │
+│  Supabase（PostgreSQL）             │
 │                                     │
 │  get_nearest_facility RPC           │
-│  └─ 500m 圏内施設を PostGIS で検索 │
+│  └─ 500m 圏内施設を Haversine で検索│
 │                                     │
 │  issue_ticket RPC                   │
 │  ├─ wait_logs INSERT                │
-│  ├─ arrival_time = CURRENT_TIMESTAMP│
-│  └─ 500m 圏外 → RAISE EXCEPTION    │
+│  ├─ arrival_time = DB サーバー時刻  │
+│  └─ 500m 圏外は wait_logs の        │
+│     ジオフェンストリガーが拒否      │
 │                                     │
 │  DBトリガー（改ざん防止）           │
 │  ├─ タイムスタンプ強制上書き        │
