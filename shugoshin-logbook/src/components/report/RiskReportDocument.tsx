@@ -140,6 +140,10 @@ export function RiskReportDocument({
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-sm print:border-black print:bg-white print:shadow-none">
           {/* 狭い画面では列を潰さず、カードの中で横にスクロールさせる。印刷では紙の幅に収める */}
+          {/* 表が 40rem に満たない幅（md 未満）でだけ、右の列が隠れていることを知らせる。印刷には出さない */}
+          <p className="border-b border-border px-3 py-1.5 text-right text-xs text-muted-foreground md:hidden print:hidden">
+            右へスクロールで総待機時間などが見えます →
+          </p>
           <Table className="min-w-[40rem] print:min-w-0">
             <TableHeader>
               <TableRow className="print:border-black">
