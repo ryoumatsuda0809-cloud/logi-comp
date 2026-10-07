@@ -471,7 +471,7 @@ export default function Demo() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              発注の文面を読み取り（デモでは擬似の AI 解析）、必須項目がそろっているかを確かめて承認し、取適法の4条書面にするまでの流れです。
+              発注の文面を読み取り（デモでは、例文は固定の結果、自由入力は実際の AI で解析）、必須項目がそろっているかを確かめて承認し、取適法の4条書面にするまでの流れです。
               項目が欠けたままの承認は拒否されます。
             </p>
             <Button asChild variant="outline">
