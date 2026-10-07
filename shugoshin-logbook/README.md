@@ -25,11 +25,11 @@
 | パス | 見られるもの |
 |---|---|
 | [`/demo`](https://shugoshin-logbook.vercel.app/demo) | ドライバーの1日。GPS と500mジオフェンス、打刻タイムライン、待機料の算定、荷主側の待機状況の画面、日報の提出（1秒の長押し→「提出済み・変更不可」。修正を試すと拒否される） |
-| [`/demo/orders`](https://shugoshin-logbook.vercel.app/demo/orders) | 発注の流れ。例文を選ぶ→（擬似の）AI 解析→必須項目の確認→承認（取り消し不可）→4条書面。項目が欠けたままの承認は拒否される |
+| [`/demo/orders`](https://shugoshin-logbook.vercel.app/demo/orders) | 発注の流れ。例文（固定の結果）または自由入力（実際の AI で解析）→必須項目の確認→承認（取り消し不可）→4条書面。項目が欠けたままの承認は拒否される |
 | [`/demo/report`](https://shugoshin-logbook.vercel.app/demo/report) | 荷主に渡す報告書。サーバー検証済（等級A）と管理者承認済みの申告（等級C）を区別して表示。A4 で印刷できる |
 | [`/demo/warning`](https://shugoshin-logbook.vercel.app/demo/warning) | 荷主別の警告レポート（1か月分の待機リスク診断） |
 
-デモの AI 解析は固定の結果を返す擬似実装です。本番画面（`/orders`）では Edge Function `parse-order` が Gemini API を呼びます。
+デモの例文ボタンは固定の結果を返します（関数は呼びません）。自由入力欄に入れた文だけが、公開デモ専用の Edge Function `demo-parse-order` 経由で実際の Gemini API を呼びます（入力は外部の AI に送信されます）。本番画面（`/orders`）は別の Edge Function `parse-order` が Gemini API を呼びます。
 
 ## 構成図
 
@@ -53,7 +53,7 @@ flowchart LR
       EV[("証拠系テーブル<br/>wait_logs / waiting_evidence /<br/>pending_punches")]
       DW[("端末が直接書き込むテーブル<br/>submitted_reports / transport_orders ほか")]
     end
-    EF["Edge Functions<br/>parse-order / generate-order-pdf"]
+    EF["Edge Functions<br/>parse-order / demo-parse-order / generate-order-pdf"]
   end
 
   Gemini["Gemini API"]
@@ -70,7 +70,7 @@ flowchart LR
   UI -- "電波圏外: 仮記録を保存" --> Q
   Q -- "復帰後に queue_offline_punch" --> RPC
   UI -- "発注の文面・PDF" --> EF
-  EF -- "parse-order のみ" --> Gemini
+  EF -- "parse-order / demo-parse-order のみ" --> Gemini
 ```
 
 証拠系テーブル（`wait_logs`・`waiting_evidence`・`pending_punches`）への書き込みは RPC だけです。一方、`submitted_reports`（日報の提出。`src/pages/DailyReportConfirm.tsx`）と `transport_orders`（発注。`src/pages/Orders.tsx`）は、端末から直接書き込みます（このほか組織設定や保存先住所も直接）。`submitted_reports` は提出後にトリガーで書き換えられなくなりますが、**何を提出するかは端末が決めています**。これは下の「既知の課題」の最初の項目です。`transport_orders` は、承認後にトリガーで内容が凍結されます（設計判断④）。
@@ -197,7 +197,7 @@ src/hooks/            useEvidence（打刻）, useOfflinePunch, useAuth ...
 src/lib/              算定・変換のロジック（単体テスト付き）
 src/demo/             /demo 用の架空データ
 supabase/migrations/  スキーマ・RLS・RPC・トリガーの変更履歴（58本）
-supabase/functions/   Edge Functions（parse-order, parse-daily-report, generate-order-pdf）
+supabase/functions/   Edge Functions（parse-order, demo-parse-order, parse-daily-report, generate-order-pdf）
 supabase/tests/       security_checks.sql（権限の回帰テスト）
 docs/                 設計メモ・実装要約・進捗ログ
 ```
