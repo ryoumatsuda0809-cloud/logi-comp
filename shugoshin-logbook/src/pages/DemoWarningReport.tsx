@@ -35,7 +35,7 @@ export default function DemoWarningReport() {
           </Link>
         </Button>
         <p className="mt-3 text-sm text-muted-foreground">
-          荷主ごとの待機の状況を、1か月分まとめたレポートです。算定できなかった訪問と、圏外で申告して承認された訪問は、
+          荷主ごとの待機の状況を、1か月分まとめたレポートです。算定できなかった訪問と、電波圏外で申告して承認された訪問は、
           「0円」が「待機がなかった」と読まれないよう、件数と注記で示します。
         </p>
       </div>

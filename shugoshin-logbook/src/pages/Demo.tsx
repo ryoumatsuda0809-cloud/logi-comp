@@ -50,7 +50,7 @@ function toLocalMeters(lat: number, lng: number) {
 const EVENT_LABEL: Record<string, string> = {
   arrival: "到着打刻",
   waiting_start: "荷役開始（荷待ち終了）",
-  departure: "作業完了",
+  departure: "作業完了（出発）",
   work_end: "作業完了",
 };
 
@@ -163,7 +163,7 @@ function GpsPanel() {
           ) : (
             <>
               <Lock className="mr-2 h-4 w-4" />
-              500m圏外のため打刻できません
+              500m超のため打刻できません
             </>
           )}
         </Button>
@@ -371,7 +371,7 @@ function FeePanel() {
               )}
               {log.evidence_grade === "C" && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  圏外のため打刻できず、後から申告。管理者が承認した時刻ではなく、ドライバーが申告した時刻で算定し、等級を明示します。
+                  電波圏外のため打刻できず、後から申告。管理者が承認した時刻ではなく、ドライバーが申告した時刻で算定し、等級を明示します。
                 </p>
               )}
             </li>
@@ -424,9 +424,9 @@ function TimelinePanel() {
 
 const INTEGRITY_POINTS = [
   { title: "時刻はサーバーが決める", body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
-  { title: "圏外では打刻できない", body: "500m 圏外はボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
+  { title: "500m超では打刻できない", body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
   { title: "確定した証拠は書き換え不可", body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
-  { title: "例外は等級で区別", body: "圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
+  { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
 
 export default function Demo() {
@@ -499,7 +499,7 @@ export default function Demo() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              1か月分の記録を荷主ごとにまとめた、待機のリスク診断です。算定できなかった訪問や、圏外で申告して承認された訪問も、件数と注記で区別して示します。
+              1か月分の記録を荷主ごとにまとめた、待機のリスク診断です。算定できなかった訪問や、電波圏外で申告して承認された訪問も、件数と注記で区別して示します。
             </p>
             <Button asChild variant="outline">
               <Link to="/demo/warning">警告レポートを見る</Link>
