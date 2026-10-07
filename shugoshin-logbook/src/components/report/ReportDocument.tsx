@@ -45,7 +45,7 @@ const EVENT_LABELS: Record<string, string> = {
   // waiting_start は荷役開始（＝荷待ち終了）の時刻に付く（waitLogToTimeline.ts）。
   // 名前は集計が参照しているので変えず、表示だけ実態に合わせる。
   waiting_start: "荷役開始（荷待ち終了）",
-  loading_start: "荷役開始",
+  loading_start: "積込開始",
   departure: "作業完了（出発）",
 };
 
