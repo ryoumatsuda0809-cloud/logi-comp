@@ -8,6 +8,17 @@
  */
 const HAS_JAPANESE = /[぀-ヿ㐀-鿿]/;
 
+/**
+ * 打ち切り（AbortController の abort）で止まった通信かどうか。
+ * supabase.functions.invoke は、timeout を超えると FunctionsFetchError を返し、
+ * 元の AbortError は context に入っている。
+ */
+export function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { name?: unknown; context?: { name?: unknown } };
+  return e.name === "AbortError" || e.context?.name === "AbortError";
+}
+
 export function toDisplayMessage(
   err: unknown,
   fallback = "処理に失敗しました。通信状況を確認して、もう一度お試しください。",
