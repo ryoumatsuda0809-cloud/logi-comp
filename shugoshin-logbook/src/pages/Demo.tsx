@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
-import { Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronDown, ClipboardList, FileText, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -265,7 +265,7 @@ function KanbanPanel() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">荷主側の画面（施設の待機状況）</CardTitle>
         <p className="text-xs text-muted-foreground">
-          {DEMO_FACILITIES[0].name}・{formatTimeOrNull(KANBAN_NOW)} 時点。ボタンを押すと、実際の画面と同じように動きます。
+          {DEMO_FACILITIES[0].name}・{formatTimeOrNull(KANBAN_NOW)} 時点。ボタンを押せます。
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -314,7 +314,7 @@ function KanbanPanel() {
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          荷主側のボタンは「呼出」と「荷役開始」までです。完了は、GPS と署名を伴うドライバー側の打刻だけが確定させます。荷主が完了にできないことで、記録の信頼性を保っています。
+          荷主が押せるのは「呼出」と「荷役開始」まで。完了はドライバーの打刻だけが確定します。
         </p>
         <Button variant="outline" size="sm" onClick={() => setTickets(KANBAN_INITIAL)}>
           最初の状態に戻す
@@ -371,7 +371,7 @@ function FeePanel() {
               )}
               {log.evidence_grade === "C" && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  電波圏外のため打刻できず、後から申告。管理者が承認した時刻ではなく、ドライバーが申告した時刻で算定し、等級を明示します。
+                  電波圏外のため後から申告。申告された時刻で算定し、等級Cと明示します。
                 </p>
               )}
             </li>
@@ -429,6 +429,12 @@ const INTEGRITY_POINTS = [
   { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
 
+const DEMO_LINKS = [
+  { to: "/demo/orders", label: "発注", sub: "文面から4条書面へ", Icon: ClipboardList },
+  { to: "/demo/report", label: "報告書", sub: "荷主に渡す記録", Icon: FileText },
+  { to: "/demo/warning", label: "警告", sub: "月ごとのリスク診断", Icon: AlertTriangle },
+] as const;
+
 export default function Demo() {
   return (
     <div className="min-h-screen bg-background">
@@ -446,81 +452,45 @@ export default function Demo() {
       </div>
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-4 pb-16">
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="text-base font-semibold text-balance">待機時間を、荷主に示せる記録にする</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            トラックの荷待ち時間を GPS とサーバー時刻で記録し、待機料の報告書にするアプリです。
-            ドライバーの打刻、荷主の呼出画面、荷主に渡す報告書を、架空のデータで試せます。
-          </p>
-          <p className="mt-2 text-sm font-medium">まず下の地図で「1日の流れを再生」を押してみてください。</p>
-          <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-sm">
-            <span className="text-xs text-muted-foreground">ほかの画面</span>
-            <Link to="/demo/report" className="font-medium underline underline-offset-4">報告書</Link>
-            <Link to="/demo/warning" className="font-medium underline underline-offset-4">警告レポート</Link>
-            <Link to="/demo/orders" className="font-medium underline underline-offset-4">発注の流れ</Link>
-          </p>
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-balance">水産物配送の荷待ちを、証拠にする</h2>
+            <p className="mt-1 text-sm text-muted-foreground">GPS とサーバー時刻で記録し、待機料の報告書まで。</p>
+          </div>
+          <nav aria-label="ほかの画面" className="grid grid-cols-3 gap-2">
+            {DEMO_LINKS.map(({ to, label, sub, Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className="flex flex-col items-center gap-1 rounded-xl border bg-card p-3 text-center active:bg-muted"
+              >
+                <Icon className="h-6 w-6 text-primary" aria-hidden />
+                <span className="text-sm font-semibold">{label}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">{sub}</span>
+              </Link>
+            ))}
+          </nav>
+          <p className="text-xs text-muted-foreground">下の地図で「1日の流れを再生」を押してください。</p>
         </section>
         <GpsPanel />
         <TimelinePanel />
         <KanbanPanel />
         <FeePanel />
         <DemoSubmitPanel />
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">発注の流れ</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              発注の文面を読み取り（デモでは、例文は固定の結果、自由入力は実際の AI で解析）、必須項目がそろっているかを確かめて承認し、取適法の4条書面にするまでの流れです。
-              項目が欠けたままの承認は拒否されます。
-            </p>
-            <Button asChild variant="outline">
-              <Link to="/demo/orders">発注の流れを見る</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">荷主に渡す報告書</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              上の記録から作られる、荷主向けの乗務記録兼待機時間報告書です。サーバー検証済の記録（等級A）と、
-              承認済みの申告（等級C）を区別して示し、そのまま印刷・PDF 保存できます。
-            </p>
-            <Button asChild variant="outline">
-              <Link to="/demo/report">報告書を見る</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">荷主別の警告レポート</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              1か月分の記録を荷主ごとにまとめた、待機のリスク診断です。算定できなかった訪問や、電波圏外で申告して承認された訪問も、件数と注記で区別して示します。
-            </p>
-            <Button asChild variant="outline">
-              <Link to="/demo/warning">警告レポートを見る</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">記録が改ざんされにくい理由</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {INTEGRITY_POINTS.map((p) => (
-                <li key={p.title} className="rounded-lg border p-3 text-sm">
-                  <div className="font-medium">{p.title}</div>
-                  <p className="mt-1 text-muted-foreground">{p.body}</p>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <details className="group rounded-xl border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+            記録が改ざんされにくい理由
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <ul className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
+            {INTEGRITY_POINTS.map((p) => (
+              <li key={p.title} className="rounded-lg border p-3 text-sm">
+                <div className="font-medium">{p.title}</div>
+                <p className="mt-1 text-muted-foreground">{p.body}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
       </main>
     </div>
   );
