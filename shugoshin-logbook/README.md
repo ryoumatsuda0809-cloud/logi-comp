@@ -187,7 +187,7 @@ npm run build                           # 本番ビルド
 
 - ルートの `tsconfig.json` は `files: []` なので、`tsc --noEmit` だけでは何も検査されません。`npm run build` も型を検査しません。型チェックは必ず `-p tsconfig.app.json` で行います。
 - DB は `supabase/migrations/` で管理し、コンソールからの直接変更はしません。変更後は `supabase/tests/security_checks.sql` を実行して全項目 `[OK]` を確認します（規約は [`CLAUDE.md`](./CLAUDE.md)）。
-- Edge Function `parse-order` / `parse-daily-report` には、Supabase 側のシークレットとして `GEMINI_API_KEY` が必要です。
+- Edge Function `parse-order` / `parse-daily-report` には、Supabase 側のシークレットとして `GEMINI_API_KEY` が必要です（`parse-order` は `DEMO_GEMINI_API_KEY` があればそちらを優先して読みます。公開デモ用の `demo-parse-order` は `DEMO_GEMINI_API_KEY` だけを読みます）。
 
 ## ディレクトリとドキュメント
 

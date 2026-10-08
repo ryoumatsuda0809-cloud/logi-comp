@@ -84,9 +84,10 @@ serve(async (req) => {
     }
 
     // --- AI processing ---
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    // DEMO_GEMINI_API_KEY を優先し、無ければ GEMINI_API_KEY を使う（2026-10-08、本人の指示）。空文字は未設定として扱う。
+    const GEMINI_API_KEY = Deno.env.get("DEMO_GEMINI_API_KEY") || Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
+      throw new Error("Neither DEMO_GEMINI_API_KEY nor GEMINI_API_KEY is configured");
     }
 
     const placeDictionary = Object.entries(SHIMONOSEKI_PLACES)
