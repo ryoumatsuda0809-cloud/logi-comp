@@ -81,6 +81,62 @@ export function missingForApproval(content: OrderFields, deliveryDueDate: string
   return missing;
 }
 
+/** 数量の単位として受け付けるもの（英字は大文字小文字を区別しない） */
+const QUANTITY_UNITS = new Set([
+  "kg", "キロ", "g", "t", "トン", "箱", "ケース", "パレット", "匹", "尾", "枚", "個", "本", "袋", "缶",
+]);
+
+// strict ではないので、ok の真偽による型の絞り込みは効かない。ok が false のときだけ reason が入る。
+export type QuantityCheck = { ok: boolean; reason?: string };
+
+/**
+ * 数量が「数字＋単位」の形で、単位が決まった一覧にあるかを調べる。直さない（読めなければ理由を返す）。
+ * 「20箱（500kg）」「10箱×20kg」のように複数並ぶ書き方と、全角・空白・カンマ・先頭の「約」は許す。
+ * AI も人も打ち間違える（例: 「123kgm」）ので、承認の前に決まった規則で止めるために使う。
+ */
+export function checkQuantity(value: unknown): QuantityCheck {
+  const text = cleanText(value);
+  if (!text) return { ok: false, reason: "数量が入っていません" };
+
+  const s = text.normalize("NFKC").replace(/約|およそ/g, " ").replace(/[()]/g, " ");
+  const found: { num: string; unit: string }[] = [];
+  const rest = s.replace(/(\d[\d,]*(?:\.\d+)?)\s*([^\d\s,、・/+×*().]+)/g, (_, num: string, unit: string) => {
+    found.push({ num, unit });
+    return " ";
+  });
+
+  if (found.length === 0) return { ok: false, reason: `数量は「数字＋単位」で入れてください（${text}）` };
+  if (rest.replace(/[\s,、・/+×*]/g, "") !== "") {
+    return { ok: false, reason: `数量の書き方を確認してください（${text}）` };
+  }
+  for (const { num, unit } of found) {
+    const n = Number(num.replace(/,/g, ""));
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: `数量は0より大きい数にしてください（${text}）` };
+    if (!QUANTITY_UNITS.has(unit.toLowerCase())) {
+      return { ok: false, reason: `数量の単位が読み取れません（${unit}）。kg・箱・ケースなどで入れてください` };
+    }
+  }
+  return { ok: true };
+}
+
+/** 数量が入っていて、かつ正しくないときだけ、その理由を返す。それ以外は null（空の扱いは missingForApproval）。 */
+export function quantityProblem(value: unknown): string | null {
+  if (!cleanText(value)) return null;
+  const q = checkQuantity(value);
+  return q.ok ? null : (q.reason ?? "数量を確認してください");
+}
+
+/**
+ * 承認の前に、入っているが正しくない項目の理由を返す。空配列なら問題なし。
+ * 空の項目は missingForApproval が扱うので、ここでは返さない。
+ */
+export function invalidForApproval(content: OrderFields): string[] {
+  const reasons: string[] = [];
+  const quantity = quantityProblem(content.quantity);
+  if (quantity) reasons.push(quantity);
+  return reasons;
+}
+
 /**
  * 発注の入力文から、AI解析が拾わない温度帯と納品日を読み取る。
  * 「冷凍」「冷蔵（チルド）」と、「今日・明日・明後日・M月D日・M/D」に対応する。

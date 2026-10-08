@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, quantityProblem } from "@/lib/orderContent";
 import { PageHeader } from "@/components/PageHeader";
 
 type ParsedOrder = {
@@ -261,13 +261,20 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
   // 承認に必要な項目が欠けていれば知らせて false を返す
   const checkApprovable = (content: Parameters<typeof missingForApproval>[0], dueDate: string | null | undefined, hint: string) => {
     const missing = missingForApproval(content, dueDate);
-    if (missing.length === 0) return true;
-    toast({
-      title: "承認できません",
-      description: `${missing.join("・")}が入っていません。${hint}`,
-      variant: "destructive",
-    });
-    return false;
+    if (missing.length > 0) {
+      toast({
+        title: "承認できません",
+        description: `${missing.join("・")}が入っていません。${hint}`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    const invalid = invalidForApproval(content);
+    if (invalid.length > 0) {
+      toast({ title: "承認できません", description: invalid.join("。"), variant: "destructive" });
+      return false;
+    }
+    return true;
   };
 
   const handleSave = async (status: "draft" | "approved") => {
@@ -529,7 +536,11 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                       <Label className="text-sm font-bold">数量</Label>
                       <Input
                         value={parsed.quantity}
+                        aria-invalid={quantityProblem(parsed.quantity) !== null}
                         onChange={(e) => setParsed({ ...parsed, quantity: e.target.value })} />
+                      {quantityProblem(parsed.quantity) && (
+                        <p className="mt-1 text-xs text-destructive">{quantityProblem(parsed.quantity)}</p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm font-bold">運賃（円）</Label>

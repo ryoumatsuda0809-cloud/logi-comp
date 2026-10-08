@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, quantityProblem } from "@/lib/orderContent";
 import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
 import {
@@ -186,6 +186,11 @@ export default function DemoOrders() {
       setRefusal(`${missing.join("・")}が入っていません。入力してから承認してください。`);
       return;
     }
+    const invalid = invalidForApproval(form);
+    if (invalid.length > 0) {
+      setRefusal(`${invalid.join("。")}。直してから承認してください。`);
+      return;
+    }
     setRefusal(null);
     setConfirmOpen(true);
   };
@@ -328,7 +333,15 @@ export default function DemoOrders() {
                 </div>
                 <div>
                   <Label htmlFor="demo-order-qty" className="text-sm font-bold">数量</Label>
-                  <Input id="demo-order-qty" value={form.quantity} onChange={(e) => updateField("quantity", e.target.value)} />
+                  <Input
+                    id="demo-order-qty"
+                    value={form.quantity}
+                    aria-invalid={quantityProblem(form.quantity) !== null}
+                    onChange={(e) => updateField("quantity", e.target.value)}
+                  />
+                  {quantityProblem(form.quantity) && (
+                    <p className="mt-1 text-xs text-destructive">{quantityProblem(form.quantity)}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="demo-order-price" className="text-sm font-bold">運賃（円）</Label>

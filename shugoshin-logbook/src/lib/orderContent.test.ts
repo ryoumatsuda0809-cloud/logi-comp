@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanText, displayRoute, displayText, displayYen, missingForApproval, orderHintsFromText, parseYen } from "./orderContent";
+import { checkQuantity, cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, parseYen } from "./orderContent";
 
 describe("cleanText / displayText", () => {
   it("AI が埋めた仮の値は未入力として扱う", () => {
@@ -75,5 +75,44 @@ describe("orderHintsFromText", () => {
   });
   it("書かれていなければ何も返さない", () => {
     expect(orderHintsFromText("フグ10箱を長府まで、運賃5万円", today)).toEqual({});
+  });
+});
+
+describe("checkQuantity", () => {
+  it.each([
+    "123kg", "123 kg", "１２３ＫＧ", "10箱", "5ケース", "1.5t", "2トン", "1,000kg", "約500kg",
+    "20箱（500kg）", "10箱（約50kg）", "10箱×20kg", "3パレット", "50匹", "8尾", "0.5kg",
+  ])("正しい数量として通す: %s", (value) => {
+    expect(checkQuantity(value)).toEqual({ ok: true });
+  });
+
+  it("読めない単位（kgm）は理由つきで拒否する", () => {
+    const r = checkQuantity("123kgm");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("kgm");
+  });
+
+  it.each(["123", "kg", "たくさん", "10 boxes", "0kg", "-5kg", "123kg."])("拒否する: %s", (value) => {
+    expect(checkQuantity(value).ok).toBe(false);
+  });
+
+  it("空・未入力は拒否する（空の扱いは missingForApproval と同じ）", () => {
+    expect(checkQuantity("").ok).toBe(false);
+    expect(checkQuantity(null).ok).toBe(false);
+    expect(checkQuantity("不明").ok).toBe(false);
+  });
+});
+
+describe("invalidForApproval", () => {
+  it("数量が正しければ空", () => {
+    expect(invalidForApproval({ quantity: "20箱" })).toEqual([]);
+  });
+  it("数量の単位が読めなければ理由を返す", () => {
+    const r = invalidForApproval({ quantity: "123kgm" });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toContain("kgm");
+  });
+  it("数量が空なら返さない（空は missingForApproval が扱う）", () => {
+    expect(invalidForApproval({ quantity: "" })).toEqual([]);
   });
 });
