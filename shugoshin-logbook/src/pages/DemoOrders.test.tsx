@@ -96,6 +96,23 @@ describe("DemoOrders", () => {
     expect(screen.getByRole("alert").textContent).toContain("納品日が入っていません");
   });
 
+  it("数量の単位が読めない（123kgm）と、理由を出して承認を拒否する。直すと承認できる", () => {
+    renderPage();
+    parseExample(/例1/);
+    fireEvent.change(field("数量"), { target: { value: "123kgm" } });
+    expect(screen.getByText(/数量の単位が読み取れません（kgm）/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
+    expect(screen.getByRole("alert").textContent).toContain("数量の単位が読み取れません（kgm）");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText("承認済み・編集不可")).toBeNull();
+
+    fireEvent.change(field("数量"), { target: { value: "123kg" } });
+    expect(screen.queryByText(/数量の単位が読み取れません/)).toBeNull();
+    approveWithConfirm();
+    expect(screen.getByText("承認済み・編集不可")).toBeTruthy();
+  });
+
   it("確認ダイアログで「やめる」と承認されない", () => {
     renderPage();
     parseExample(/例1/);
