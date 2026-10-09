@@ -55,7 +55,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
 
     expect(parseMock).toHaveBeenCalledTimes(1);
     expect(parseMock.mock.calls[0][0]).toBe("唐戸から架空冷蔵の本社倉庫まで、冷蔵のアジ8箱、運賃4万2千円、明日納品");
-    expect(screen.getByText("2. 解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
     expect(field("品名").value).toBe("アジ");
     expect(field("運賃（円）").value).toBe("42000");
     // 温度帯と納品日は、入力した文から読み取る（固定の例の文ではない）
@@ -72,7 +72,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
 
     await parseFree("何かの発注の文");
 
-    expect(screen.getByText("2. 解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
     // 例1の固定結果
     expect(field("品名").value).toBe("ブリ");
     expect(field("運賃（円）").value).toBe("60000");
@@ -92,13 +92,38 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     expect(screen.getByRole("status").textContent).toContain(DEMO_AI_FALLBACK_NOTE);
   });
 
-  it("例文を選んだときは AI を呼ばない。自由入力は空になる", () => {
+  it("例文を選ぶと入力欄にその文が入る。書き換えずに解析するときは AI を呼ばない", async () => {
     renderPage();
     fireEvent.change(freeInput(), { target: { value: "途中まで打った文" } });
     fireEvent.click(screen.getByRole("button", { name: /例2/ }));
-    expect(freeInput().value).toBe("");
+    expect(freeInput().value).toContain("冷蔵のタイ15箱");
+    expect(screen.getByText(DEMO_PARSE_NOTE)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
+    await act(async () => {});
     expect(parseMock).not.toHaveBeenCalled();
+  });
+
+  it("例文を書き換えたら自由入力として扱い、本物の AI に送る。固定結果の注記は消える", async () => {
+    parseMock.mockResolvedValue({
+      item_name: "タイ",
+      quantity: "20箱",
+      price: "50000",
+      origin: "A",
+      destination: "B",
+      payment_date: null,
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /例2/ }));
+    const edited = `${freeInput().value}（20箱に変更）`;
+    fireEvent.change(freeInput(), { target: { value: edited } });
+    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
+    expect(screen.getByRole("button", { name: /例2/ }).getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
+    await act(async () => {});
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(parseMock.mock.calls[0][0]).toBe(edited);
+    expect(screen.getByText(DEMO_AI_NOTE)).toBeTruthy();
   });
 
   it("自由入力は200文字で切る。空白だけなら解析できない", () => {
@@ -123,7 +148,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     resolve({ item_name: "ブリ", quantity: "1箱", price: "1000", origin: "A", destination: "B", payment_date: null });
     await act(async () => {});
 
-    expect(screen.queryByText("2. 解析結果（編集可能）")).toBeNull();
+    expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
     expect((screen.getByRole("button", { name: "AI解析" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

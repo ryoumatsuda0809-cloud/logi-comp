@@ -20,6 +20,9 @@ const parseExample = (label: RegExp) => {
   });
 };
 
+/** Radix のタブは mousedown で切り替わる（click では切り替わらない） */
+const openTab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0 });
+
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 
 /** 承認ボタン → 確認ダイアログの「承認して確定する」まで押す */
@@ -37,11 +40,29 @@ describe("DemoOrders", () => {
     vi.useRealTimers();
   });
 
-  it("デモ用の固定結果であることを常に示し、架空データの帯と戻るリンクがある", () => {
+  it("デモ用の固定結果であることを常に示し、架空データの帯がある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
     renderPage();
     expect(screen.getByText(DEMO_PARSE_NOTE)).toBeTruthy();
     expect(screen.getByText(/表示しているのは架空のデータです/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: /デモに戻る/ }).getAttribute("href")).toBe("/demo");
+    expect(screen.getByRole("heading", { name: "発注管理" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "戻る" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "新規発注" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "発注一覧" })).toBeTruthy();
+    // 一覧は最初は空
+    openTab("発注一覧");
+    expect(screen.getByText("発注データがありません")).toBeTruthy();
+    // 下のナビ。デモの画面だけを並べ、今の画面を示す
+    const nav = screen.getByRole("navigation");
+    expect(within(nav).getByRole("button", { name: "打刻" })).toBeTruthy();
+    expect(within(nav).getByRole("button", { name: "報告書" })).toBeTruthy();
+  });
+
+  it("例文を選ぶと、その文が入力欄に入る。例文のボタンは、押した例を示す", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /例1/ }));
+    expect((screen.getByLabelText(/自由入力/) as HTMLTextAreaElement).value).toContain("冷凍のブリ20箱");
+    expect(screen.getByRole("button", { name: /例1/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: /例2/ }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("例文を選んでAI解析すると、解析中を経て結果が出る。温度帯と納品日は入力文から読み取る", () => {
@@ -51,12 +72,12 @@ describe("DemoOrders", () => {
 
     // 待っている間は結果が出ない
     expect(screen.getByRole("button", { name: /解析中/ })).toBeTruthy();
-    expect(screen.queryByText("2. 解析結果（編集可能）")).toBeNull();
+    expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(DEMO_PARSE_DELAY_MS);
     });
-    expect(screen.getByText("2. 解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
     expect(field("品名").value).toBe("ブリ");
     expect(field("数量").value).toBe("20箱");
     expect(field("運賃（円）").value).toBe("60000");
@@ -79,13 +100,13 @@ describe("DemoOrders", () => {
     expect(alert.textContent).toContain("運賃が入っていません。入力してから承認してください。");
     // 確認ダイアログは開かない
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(screen.queryByText("承認済み・編集不可")).toBeNull();
+    expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
 
     // 入力すると拒否の表示は消え、承認できる
     fireEvent.change(field("運賃（円）"), { target: { value: "45000" } });
     expect(screen.queryByRole("alert")).toBeNull();
     approveWithConfirm();
-    expect(screen.getByText("承認済み・編集不可")).toBeTruthy();
+    expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
   });
 
   it("納品日が空のときも、その項目名を挙げて拒否される", () => {
@@ -105,12 +126,12 @@ describe("DemoOrders", () => {
     fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
     expect(screen.getByRole("alert").textContent).toContain("数量の単位が読み取れません（kgm）");
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(screen.queryByText("承認済み・編集不可")).toBeNull();
+    expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
 
     fireEvent.change(field("数量"), { target: { value: "123kg" } });
     expect(screen.queryByText(/数量の単位が読み取れません/)).toBeNull();
     approveWithConfirm();
-    expect(screen.getByText("承認済み・編集不可")).toBeTruthy();
+    expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
   });
 
   it("確認ダイアログで「やめる」と承認されない", () => {
@@ -120,8 +141,8 @@ describe("DemoOrders", () => {
     const dialog = screen.getByRole("alertdialog");
     expect(dialog.textContent).toContain("承認すると発注書（4条書面）として確定し、内容は後から変更・削除できません。");
     fireEvent.click(within(dialog).getByRole("button", { name: "やめる" }));
-    expect(screen.queryByText("承認済み・編集不可")).toBeNull();
-    expect(screen.getByText("2. 解析結果（編集可能）")).toBeTruthy();
+    expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
+    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
   });
 
   it("承認すると編集不可になり、修正を試しても拒否される。4条書面が出る", () => {
@@ -129,11 +150,16 @@ describe("DemoOrders", () => {
     parseExample(/例1/);
     approveWithConfirm();
 
-    expect(screen.getByText("承認済み・編集不可")).toBeTruthy();
-    // 入力欄はなくなり、例文も選び直せない
+    expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
+    // 承認すると一覧に移る。入力欄はなくなり、新規発注の画面に戻っても例文を選び直せない
+    expect(screen.getByRole("tab", { name: "発注一覧" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText(/納品日: 2026-10-04\s+→\s+支払期限: 2026-12-02/)).toBeTruthy();
+    expect(screen.queryByLabelText("品名")).toBeNull();
+    openTab("新規発注");
     expect(screen.queryByLabelText("品名")).toBeNull();
     expect((screen.getByRole("button", { name: "AI解析" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /例2/ }) as HTMLButtonElement).disabled).toBe(true);
+    openTab("発注一覧");
 
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));
@@ -163,14 +189,15 @@ describe("DemoOrders", () => {
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "最初の状態に戻す" }));
-    expect(screen.queryByText("承認済み・編集不可")).toBeNull();
+    expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
     expect(screen.queryByRole("article")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByTestId("demo-order-sentence")).toBeNull();
+    // 最初のタブ（新規発注）に戻り、入力欄は空
+    expect((screen.getByLabelText(/自由入力/) as HTMLTextAreaElement).value).toBe("");
     expect((screen.getByRole("button", { name: "AI解析" }) as HTMLButtonElement).disabled).toBe(true);
 
     parseExample(/例2/);
-    expect(screen.getByText("2. 解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
   });
 
   it("解析の待ち時間のあいだに戻すと、あとから結果が現れない", () => {
@@ -181,6 +208,6 @@ describe("DemoOrders", () => {
     act(() => {
       vi.advanceTimersByTime(DEMO_PARSE_DELAY_MS * 2);
     });
-    expect(screen.queryByText("2. 解析結果（編集可能）")).toBeNull();
+    expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
   });
 });

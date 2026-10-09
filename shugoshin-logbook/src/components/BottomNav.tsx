@@ -1,17 +1,20 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, ClipboardList, MapPin, FileText, Building2 } from "lucide-react";
+import { Home, ClipboardList, MapPin, FileText, Building2, type LucideIcon } from "lucide-react";
 
-export function BottomNav() {
+export type BottomNavItem = { path: string; icon: LucideIcon; label: string };
+
+const DEFAULT_ITEMS: BottomNavItem[] = [
+  { path: "/",                      icon: Home,          label: "ホーム" },
+  { path: "/orders",                icon: ClipboardList, label: "発注" },
+  { path: "/check-in",              icon: MapPin,        label: "打刻" },
+  { path: "/daily-report",          icon: FileText,      label: "日報" },
+  { path: "/organization-settings", icon: Building2,     label: "組織設定" },
+];
+
+/** 画面下の共通ナビ。items を渡すと行き先を差し替えられる（/demo が自分の画面だけを並べるのに使う） */
+export function BottomNav({ items = DEFAULT_ITEMS }: { items?: BottomNavItem[] }) {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const items = [
-    { path: "/",                      icon: Home,          label: "ホーム" },
-    { path: "/orders",                icon: ClipboardList, label: "発注" },
-    { path: "/check-in",              icon: MapPin,        label: "打刻" },
-    { path: "/daily-report",          icon: FileText,      label: "日報" },
-    { path: "/organization-settings", icon: Building2,     label: "組織設定" },
-  ];
 
   return (
     <nav
