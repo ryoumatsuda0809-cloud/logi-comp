@@ -27,6 +27,7 @@ export function BottomNav({ items = DEFAULT_ITEMS }: { items?: BottomNavItem[] }
           <button
             key={path}
             onClick={() => navigate(path)}
+            aria-current={isActive ? "page" : undefined}
             className={`flex flex-1 h-[60px] flex-col items-center justify-center gap-1 select-none transition-colors ${
               isActive
                 ? "text-accent"

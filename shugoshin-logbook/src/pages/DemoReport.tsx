@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
+import { FieldButton } from "@/components/ui/field-button";
+import { PageHeader } from "@/components/PageHeader";
+import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { ReportDocument, type ReportData, type ReportParties } from "@/components/report/ReportDocument";
 import { convertWaitLogsToTimeline, generateFormalReportFromWaitLogs } from "@/lib/waitLogToTimeline";
 import { calcWaitCost, sumWaitCost } from "@/lib/waitCostCalc";
@@ -44,34 +45,27 @@ export default function DemoReport() {
 
   return (
     <div
-      className="min-h-screen bg-gray-100 print:bg-white"
+      className="min-h-screen bg-gray-100 pb-24 print:bg-white print:pb-0"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
+      <PageHeader title="報告書" subtitle="荷主に届く報告書（デモ）" backTo="/demo" className="print:hidden" />
+
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground print:hidden">
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
       <div className="mx-auto max-w-4xl px-4 pt-4 print:hidden">
-        <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-          <Link to="/demo">
-            <ArrowLeft className="h-4 w-4" />
-            デモに戻る
-          </Link>
-        </Button>
-      </div>
-
-      <div className="mx-auto max-w-4xl px-4 pt-4 print:hidden">
-        <p className="mb-3 text-sm text-muted-foreground">
-          荷主に届く報告書です。実際の画面では、運送会社が作る閲覧リンクから、荷主がログインなしで開きます。
-          等級A（サーバー検証済）と等級C（承認済みの申告）は、記録方法の列と注記で区別して示します。
-        </p>
-        <Button size="lg" className="h-14 w-full gap-3 text-lg" onClick={() => window.print()}>
-          <Printer className="h-6 w-6" />
+        <FieldButton className="gap-3" onClick={() => window.print()}>
+          <Printer />
           この報告書を印刷・PDF保存する
-        </Button>
+        </FieldButton>
       </div>
 
       <ReportDocument report={report} parties={DEMO_PARTIES} showViewNote={false} />
+
+      <div className="print:hidden">
+        <DemoBottomNav />
+      </div>
     </div>
   );
 }
