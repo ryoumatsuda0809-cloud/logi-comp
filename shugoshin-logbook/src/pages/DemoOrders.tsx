@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Check, CheckCircle2, Loader2, Lock, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, FileText, Loader2, Lock, RotateCcw, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FieldButton } from "@/components/ui/field-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
+import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -49,10 +53,12 @@ const TEMPERATURE_ZONES = ["常温", "冷蔵", "冷凍"] as const;
 type ParseSource = "example" | "ai" | "fallback";
 
 /**
- * /demo/orders の「発注」。
- * 入力 → AI解析 → 内容を確認・入力 → 承認（取り消せない）→ 4条書面、の流れを見せる。
- * 入力は2通り。例文を選ぶと固定の結果が返る（AI は呼ばない）。自由入力は、公開デモ専用の
- * Edge Function（demoParseApi.ts）で本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
+ * /demo/orders の「発注管理」。実際の発注画面（/orders）と同じ並び（共通ヘッダー・「新規発注」「発注一覧」の
+ * タブ・下のナビ）で、入力 → AI解析 → 内容を確認・入力 → 承認（取り消せない）→ 一覧に承認済みで載り、
+ * 4条書面が出る、の流れを見せる。
+ * 入力欄は1つ。例文のボタンを押すと、その文が入力欄に入る。文を書き換えずに解析すると固定の結果が返る
+ * （AI は呼ばない）。書き換えた文・自由に打った文は、公開デモ専用の Edge Function（demoParseApi.ts）で
+ * 本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
  * 実際の発注画面（/orders）と同じ判定関数（orderContent.ts）を使う。状態はこの画面の中だけ。
  * DB には書かない。Supabase のクライアントも使わない。
  */
@@ -69,6 +75,9 @@ export default function DemoOrders() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [approved, setApproved] = useState<DemoOrderDocumentData | null>(null);
   const [editAttempted, setEditAttempted] = useState(false);
+  const [tab, setTab] = useState("new");
+  const [showDocument, setShowDocument] = useState(true);
+  const { toast } = useToast();
   const timerRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -89,11 +98,13 @@ export default function DemoOrders() {
   );
 
   const locked = approved !== null;
+  // 入力欄の文が、選んだ例文のまま（書き換えていない）か。そのままなら固定の結果、書き換えたら本物の AI
+  const textIsExample = example !== null && freeText === example.sentence;
 
   const selectExample = (ex: DemoOrderExample) => {
     if (locked || isParsing) return;
     setExample(ex);
-    setFreeText("");
+    setFreeText(ex.sentence);
     setSource("example");
     setForm(null);
     setDeliveryDate("");
@@ -103,9 +114,10 @@ export default function DemoOrders() {
 
   const changeFreeText = (value: string) => {
     if (locked || isParsing) return;
-    setFreeText(value.slice(0, DEMO_FREE_TEXT_MAX));
-    // 自由入力を始めたら、例文の選択は外す
-    setExample(null);
+    const next = value.slice(0, DEMO_FREE_TEXT_MAX);
+    setFreeText(next);
+    // 例文を書き換えたら、もう固定の例ではなく自由入力として扱う
+    if (example && next !== example.sentence) setExample(null);
     setSource("example");
   };
 
@@ -153,15 +165,15 @@ export default function DemoOrders() {
     }
   };
 
-  /** 実際の handleParse と同じ流れ。例文のときは、AI を呼ばず固定の結果を返す */
+  /** 実際の handleParse と同じ流れ。例文のままのときは、AI を呼ばず固定の結果を返す */
   const handleParse = () => {
     if (isParsing || locked) return;
     const text = freeText.trim();
-    if (text) {
+    if (!text) return;
+    if (!example || !textIsExample) {
       void parseFreeText(text);
       return;
     }
-    if (!example) return;
     setIsParsing(true);
     setForm(null);
     setRefusal(null);
@@ -201,6 +213,10 @@ export default function DemoOrders() {
     // 承認した内容をその場で固定する。以後は form を書き換えても書面は変わらない。
     setApproved({ ...form, temperatureZone, deliveryDate });
     setEditAttempted(false);
+    // 実際の画面と同じく、承認・保存すると一覧に移る
+    toast({ title: "承認・保存しました" });
+    setShowDocument(true);
+    setTab("list");
   };
 
   const reset = () => {
@@ -218,252 +234,275 @@ export default function DemoOrders() {
     setConfirmOpen(false);
     setApproved(null);
     setEditAttempted(false);
+    setTab("new");
   };
 
   // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
   const paymentDeadline = deliveryDate ? latestPaymentDate(deliveryDate) : null;
+  const approvedDeadline = approved ? latestPaymentDate(approved.deliveryDate) : null;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-primary px-4 py-3">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold text-primary-foreground">守護神 デモ：発注</h1>
-            <p className="text-xs text-primary-foreground/70">入力文から4条書面まで</p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="発注管理"
+        subtitle="デモ"
+        backTo="/demo"
+        right={
+          <button
+            type="button"
+            aria-label="最初の状態に戻す"
+            onClick={reset}
+            className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-primary-foreground/80 hover:bg-primary-foreground/10"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            <span>やり直す</span>
+          </button>
+        }
+      />
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-4 pb-16">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 gap-2 text-muted-foreground">
-          <Link to="/demo">
-            <ArrowLeft className="h-4 w-4" />
-            デモに戻る
-          </Link>
-        </Button>
+      <main className="mx-auto max-w-4xl p-4 pb-24">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="new" className="flex-1">新規発注</TabsTrigger>
+            <TabsTrigger value="list" className="flex-1">発注一覧</TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">1. 発注内容の入力</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              実際の画面では、文章を打つか声で話します。ここでは、例文を選ぶか、自由に打って試せます。
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2" role="group" aria-label="発注の例文">
-              {DEMO_ORDER_EXAMPLES.map((ex) => (
-                <Button
-                  key={ex.id}
-                  type="button"
-                  variant={example?.id === ex.id ? "default" : "outline"}
-                  size="sm"
-                  className="h-auto justify-start whitespace-normal py-2 text-left"
-                  aria-pressed={example?.id === ex.id}
-                  disabled={locked || isParsing}
-                  onClick={() => selectExample(ex)}
-                >
-                  {ex.label}
-                </Button>
-              ))}
-            </div>
-
-            {example && (
-              <p data-testid="demo-order-sentence" className="rounded-lg border bg-muted/40 p-3 text-sm">
-                {example.sentence}
-              </p>
-            )}
-
-            <div className="space-y-1">
-              <Label htmlFor="demo-order-free" className="text-sm font-bold">自由入力（AIが解析します）</Label>
-              <Textarea
-                id="demo-order-free"
-                value={freeText}
-                maxLength={DEMO_FREE_TEXT_MAX}
-                rows={3}
-                placeholder="例：架空水産の第2荷捌き場から架空冷蔵の本社倉庫まで、冷凍のブリ20箱、運賃6万円、明日納品"
-                disabled={locked || isParsing}
-                onChange={(e) => changeFreeText(e.target.value)}
-              />
-              <p className="flex justify-between gap-2 text-xs text-muted-foreground">
-                <span>{DEMO_FREE_TEXT_DISCLOSURE}</span>
-                <span className="shrink-0 tabular-nums">{freeText.length}/{DEMO_FREE_TEXT_MAX}</span>
-              </p>
-            </div>
-
-            <Button
-              className="w-full gap-2"
-              onClick={handleParse}
-              disabled={(!example && !freeText.trim()) || isParsing || locked}
-            >
-              {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {isParsing ? "解析中..." : "AI解析"}
-            </Button>
-            {source === "example" && <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>}
-            {source === "ai" && (
-              <p role="status" className="text-xs font-medium text-muted-foreground">
-                {DEMO_AI_NOTE}
-              </p>
-            )}
-            {source === "fallback" && (
-              <p role="status" className="rounded-lg border bg-muted/40 p-2 text-xs font-medium text-muted-foreground">
-                {DEMO_AI_FALLBACK_NOTE}
-                {fallbackExample ? `（${fallbackExample.label.split("：")[0]}の結果）` : ""}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {form && !locked && (
-          <Card className="border-accent">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">2. 解析結果（編集可能）</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                空欄の項目は、入力文から読み取れなかったものです。入力してから承認してください。
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="demo-order-item" className="text-sm font-bold">品名</Label>
-                  <Input id="demo-order-item" value={form.item_name} onChange={(e) => updateField("item_name", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="demo-order-qty" className="text-sm font-bold">数量</Label>
-                  <Input
-                    id="demo-order-qty"
-                    value={form.quantity}
-                    aria-invalid={quantityProblem(form.quantity) !== null}
-                    onChange={(e) => updateField("quantity", e.target.value)}
-                  />
-                  {quantityProblem(form.quantity) && (
-                    <p className="mt-1 text-xs text-destructive">{quantityProblem(form.quantity)}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="demo-order-price" className="text-sm font-bold">運賃（円）</Label>
-                  <Input id="demo-order-price" inputMode="numeric" value={form.price} onChange={(e) => updateField("price", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="demo-order-origin" className="text-sm font-bold">出発地</Label>
-                  <Input id="demo-order-origin" value={form.origin} onChange={(e) => updateField("origin", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="demo-order-dest" className="text-sm font-bold">到着地</Label>
-                  <Input id="demo-order-dest" value={form.destination} onChange={(e) => updateField("destination", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="demo-order-date" className="text-sm font-bold">納品日</Label>
-                  <Input
-                    id="demo-order-date"
-                    type="date"
-                    value={deliveryDate}
-                    min={DEMO_ORDER_TODAY_ISO}
-                    onChange={(e) => {
-                      setDeliveryDate(e.target.value);
-                      setRefusal(null);
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-bold">温度帯（必須）</Label>
-                <RadioGroup value={temperatureZone} onValueChange={setTemperatureZone} className="flex gap-2">
-                  {TEMPERATURE_ZONES.map((zone) => (
-                    <label key={zone} className="flex-1 cursor-pointer">
-                      <RadioGroupItem value={zone} className="peer sr-only" />
-                      <div
-                        className={`flex min-h-[44px] items-center justify-center rounded-lg border-2 text-base font-bold transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${
-                          temperatureZone === zone ? "border-primary bg-primary/10" : "border-border bg-card"
-                        }`}
-                      >
-                        {zone}
-                      </div>
-                    </label>
-                  ))}
-                </RadioGroup>
-              </div>
-
-              {paymentDeadline && (
-                <div className="rounded-lg bg-accent/10 p-3 text-sm">
-                  <span className="font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
-                </div>
-              )}
-
-              {refusal && (
-                <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-                  <p className="font-bold text-destructive">承認できません</p>
-                  <p className="mt-0.5 text-destructive">{refusal}</p>
-                </div>
-              )}
-
-              <Button className="w-full gap-2" onClick={handleApproveClick}>
-                <Check className="h-4 w-4" />
-                承認・保存
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {approved && (
-          <>
+          {/* 新規発注タブ */}
+          <TabsContent value="new" className="space-y-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">3. 承認済みの発注</CardTitle>
+              <CardHeader>
+                <CardTitle className="text-base">発注内容を入力</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border bg-muted/40 py-3">
-                  <div className="flex items-center gap-2 text-lg font-bold text-muted-foreground">
-                    <CheckCircle2 className="h-5 w-5" />
-                    承認済み・編集不可
-                  </div>
-                  <p className="text-xs tabular-nums text-muted-foreground">承認日時: {DEMO_ORDER_APPROVED_AT_LABEL}</p>
-                </div>
-
-                <div className="space-y-1 rounded-lg border p-3 text-sm">
-                  <p className="font-bold">{displayText(approved.item_name)}（{approved.temperatureZone}）</p>
-                  <p className="break-words text-muted-foreground">{displayRoute(approved.origin, approved.destination)}</p>
-                  <p className="text-muted-foreground">
-                    数量: {displayText(approved.quantity)} / 運賃: {displayYen(approved.price)}
+              <CardContent className="space-y-4">
+                <div className="space-y-1">
+                  <Textarea
+                    aria-label="発注内容（自由入力）"
+                    value={freeText}
+                    maxLength={DEMO_FREE_TEXT_MAX}
+                    placeholder="例：架空水産の第2荷捌き場から架空冷蔵の本社倉庫まで、冷凍のブリ20箱、運賃6万円、明日納品"
+                    disabled={locked || isParsing}
+                    onChange={(e) => changeFreeText(e.target.value)}
+                    className="min-h-[120px] text-base"
+                  />
+                  <p className="flex justify-between gap-2 text-xs text-muted-foreground">
+                    <span>{DEMO_FREE_TEXT_DISCLOSURE}</span>
+                    <span className="shrink-0 tabular-nums">{freeText.length}/{DEMO_FREE_TEXT_MAX}</span>
                   </p>
                 </div>
 
-                <Button variant="outline" className="w-full gap-2" onClick={() => setEditAttempted(true)}>
-                  <Lock className="h-4 w-4" />
-                  内容を修正してみる
-                </Button>
-                {editAttempted && (
-                  <div role="alert" className="rounded-lg border p-3 text-sm">
-                    <p className="font-bold">承認済みの発注です</p>
-                    <p className="mt-0.5">承認済みのデータは改ざん防止のため編集できません。</p>
-                  </div>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="発注の例文">
+                  {DEMO_ORDER_EXAMPLES.map((ex) => (
+                    <button
+                      key={ex.id}
+                      type="button"
+                      aria-pressed={example?.id === ex.id}
+                      disabled={locked || isParsing}
+                      onClick={() => selectExample(ex)}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                        example?.id === ex.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      {ex.label}
+                    </button>
+                  ))}
+                </div>
+
+                <FieldButton
+                  variant="accent"
+                  onClick={handleParse}
+                  disabled={!freeText.trim() || isParsing || locked}
+                >
+                  {isParsing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  {isParsing ? "解析中..." : "AI解析"}
+                </FieldButton>
+                {source === "example" && (!freeText.trim() || textIsExample) && (
+                  <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>
+                )}
+                {source === "ai" && (
+                  <p role="status" className="text-xs font-medium text-muted-foreground">
+                    {DEMO_AI_NOTE}
+                  </p>
+                )}
+                {source === "fallback" && (
+                  <p role="status" className="rounded-lg border bg-muted/40 p-2 text-xs font-medium text-muted-foreground">
+                    {DEMO_AI_FALLBACK_NOTE}
+                    {fallbackExample ? `（${fallbackExample.label.split("：")[0]}の結果）` : ""}
+                  </p>
+                )}
+                {locked && (
+                  <p className="text-sm text-muted-foreground">
+                    承認済みの発注があります。右上の「やり直す」で最初の状態に戻せます。
+                  </p>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">4. 4条書面</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  承認すると、この内容が発注書として確定します。実際の画面ではPDFでダウンロードできます（デモでは画面表示のみ）。
-                </p>
-              </CardHeader>
-              <CardContent>
-                <DemoOrderDocument data={approved} />
-              </CardContent>
-            </Card>
-          </>
-        )}
+            {form && !locked && (
+              <Card className="border-accent">
+                <CardHeader>
+                  <CardTitle className="text-base">解析結果（編集可能）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="demo-order-item" className="text-sm font-bold">品名</Label>
+                      <Input id="demo-order-item" value={form.item_name} onChange={(e) => updateField("item_name", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="demo-order-qty" className="text-sm font-bold">数量</Label>
+                      <Input
+                        id="demo-order-qty"
+                        value={form.quantity}
+                        aria-invalid={quantityProblem(form.quantity) !== null}
+                        onChange={(e) => updateField("quantity", e.target.value)}
+                      />
+                      {quantityProblem(form.quantity) && (
+                        <p className="mt-1 text-xs text-destructive">{quantityProblem(form.quantity)}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="demo-order-price" className="text-sm font-bold">運賃（円）</Label>
+                      <Input id="demo-order-price" inputMode="numeric" value={form.price} onChange={(e) => updateField("price", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="demo-order-origin" className="text-sm font-bold">出発地</Label>
+                      <Input id="demo-order-origin" value={form.origin} onChange={(e) => updateField("origin", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="demo-order-dest" className="text-sm font-bold">到着地</Label>
+                      <Input id="demo-order-dest" value={form.destination} onChange={(e) => updateField("destination", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="demo-order-date" className="text-sm font-bold">納品日</Label>
+                      <Input
+                        id="demo-order-date"
+                        type="date"
+                        value={deliveryDate}
+                        min={DEMO_ORDER_TODAY_ISO}
+                        onChange={(e) => {
+                          setDeliveryDate(e.target.value);
+                          setRefusal(null);
+                        }}
+                      />
+                    </div>
+                  </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={reset}>
-            最初の状態に戻す
-          </Button>
-        </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">温度帯（必須）</Label>
+                    <RadioGroup value={temperatureZone} onValueChange={setTemperatureZone} className="flex gap-2">
+                      {TEMPERATURE_ZONES.map((zone) => (
+                        <label key={zone} className="flex-1 cursor-pointer">
+                          <RadioGroupItem value={zone} className="peer sr-only" />
+                          <div
+                            className={`flex min-h-[48px] items-center justify-center rounded-lg border-2 text-base font-bold transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${
+                              temperatureZone === zone ? "border-primary bg-primary/10" : "border-border bg-card"
+                            }`}
+                          >
+                            {zone}
+                          </div>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+
+                  {paymentDeadline && (
+                    <div className="rounded-lg bg-accent/10 p-3 text-sm">
+                      <span className="font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
+                    </div>
+                  )}
+
+                  {refusal && (
+                    <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                      <p className="font-bold text-destructive">承認できません</p>
+                      <p className="mt-0.5 text-destructive">{refusal}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <FieldButton variant="accent" onClick={handleApproveClick}>
+                      <Check />
+                      承認・保存
+                    </FieldButton>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* 発注一覧タブ */}
+          <TabsContent value="list" className="space-y-4">
+            {!approved ? (
+              <p className="py-8 text-center text-muted-foreground">発注データがありません</p>
+            ) : (
+              <Card className="cursor-default">
+                <CardContent className="space-y-3 p-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-card-foreground">{displayText(approved.item_name)}</span>
+                      <Badge className="border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">承認済</Badge>
+                      <Badge variant="outline">{approved.temperatureZone}</Badge>
+                      <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        <Lock className="h-3 w-3" />
+                        承認済み（編集不可）
+                      </span>
+                    </div>
+                    <p className="break-words text-sm text-muted-foreground">
+                      {displayRoute(approved.origin, approved.destination)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      数量: {displayText(approved.quantity)} / 運賃: {displayYen(approved.price)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      納品日: {approved.deliveryDate} &nbsp;→&nbsp; 支払期限: {approvedDeadline ?? "—"}
+                    </p>
+                    <p className="text-xs font-medium tabular-nums text-emerald-700">
+                      承認日時: {DEMO_ORDER_APPROVED_AT_LABEL}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <button
+                      type="button"
+                      aria-expanded={showDocument}
+                      onClick={() => setShowDocument((v) => !v)}
+                      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <FileText className="h-5 w-5" />
+                      {showDocument ? "発注書（4条書面）を閉じる" : "発注書（4条書面）を表示"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditAttempted(true)}
+                      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition-colors hover:bg-muted"
+                    >
+                      <Lock className="h-5 w-5" />
+                      内容を修正してみる
+                    </button>
+                    {editAttempted && (
+                      <div role="alert" className="rounded-lg border p-3 text-sm">
+                        <p className="font-bold">承認済みの発注です</p>
+                        <p className="mt-0.5">承認済みのデータは改ざん防止のため編集できません。</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {showDocument && (
+                    <div className="space-y-2 border-t border-border pt-3">
+                      <DemoOrderDocument data={approved} />
+                      <p className="text-xs text-muted-foreground">実際の画面では、この書面をPDFでダウンロードします。</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -480,6 +519,8 @@ export default function DemoOrders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DemoBottomNav />
     </div>
   );
 }

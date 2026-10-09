@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
-import { AlertTriangle, ChevronDown, ClipboardList, FileText, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { ChevronDown, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -263,9 +264,9 @@ function KanbanPanel() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">荷主側の画面（施設の待機状況）</CardTitle>
+        <CardTitle className="text-base">荷主カンバン</CardTitle>
         <p className="text-xs text-muted-foreground">
-          {DEMO_FACILITIES[0].name}・{formatTimeOrNull(KANBAN_NOW)} 時点。ボタンを押せます。
+          {DEMO_FACILITIES[0].name}・{formatTimeOrNull(KANBAN_NOW)} 時点
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -429,20 +430,24 @@ const INTEGRITY_POINTS = [
   { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
 
-const DEMO_LINKS = [
-  { to: "/demo/orders", label: "発注", sub: "文面から4条書面へ", Icon: ClipboardList },
-  { to: "/demo/report", label: "報告書", sub: "荷主に渡す記録", Icon: FileText },
-  { to: "/demo/warning", label: "警告", sub: "月ごとのリスク診断", Icon: AlertTriangle },
-] as const;
+/** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
+const KEEP_TAB = "data-[state=inactive]:hidden";
 
+/**
+ * /demo。実際のアプリと同じ共通のナビ（下のバー）と、「打刻」「荷主」「待機料」のタブで、
+ * 1日の流れを操作しながら見られるようにしてある。
+ */
 export default function Demo() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-primary px-4 py-3">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold text-primary-foreground">守護神 デモ</h1>
-            <p className="text-xs text-primary-foreground/70">荷待ちの記録から待機料の算定まで</p>
+      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md">
+        <div className="mx-auto flex max-w-4xl items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent">
+            <img src="/icon-192.png" alt="" className="h-8 w-8 rounded-md" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold text-primary-foreground">守護神</h1>
+            <p className="truncate text-xs text-primary-foreground/70">デモ</p>
           </div>
         </div>
       </header>
@@ -451,47 +456,45 @@ export default function Demo() {
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-4 pb-16">
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-bold text-balance">水産物配送の荷待ちを、証拠にする</h2>
-            <p className="mt-1 text-sm text-muted-foreground">GPS とサーバー時刻で記録し、待機料の報告書まで。</p>
-          </div>
-          <nav aria-label="ほかの画面" className="grid grid-cols-3 gap-2">
-            {DEMO_LINKS.map(({ to, label, sub, Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className="flex flex-col items-center gap-1 rounded-xl border bg-card p-3 text-center active:bg-muted"
-              >
-                <Icon className="h-6 w-6 text-primary" aria-hidden />
-                <span className="text-sm font-semibold">{label}</span>
-                <span className="text-[11px] leading-tight text-muted-foreground">{sub}</span>
-              </Link>
-            ))}
-          </nav>
-          <p className="text-xs text-muted-foreground">下の地図で「1日の流れを再生」を押してください。</p>
-        </section>
-        <GpsPanel />
-        <TimelinePanel />
-        <KanbanPanel />
-        <FeePanel />
-        <DemoSubmitPanel />
-        <details className="group rounded-xl border bg-card">
-          <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
-            記録が改ざんされにくい理由
-            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
-          </summary>
-          <ul className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
-            {INTEGRITY_POINTS.map((p) => (
-              <li key={p.title} className="rounded-lg border p-3 text-sm">
-                <div className="font-medium">{p.title}</div>
-                <p className="mt-1 text-muted-foreground">{p.body}</p>
-              </li>
-            ))}
-          </ul>
-        </details>
+      <main className="mx-auto max-w-4xl p-4 pb-24">
+        <Tabs defaultValue="punch">
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="punch" className="flex-1">打刻</TabsTrigger>
+            <TabsTrigger value="kanban" className="flex-1">荷主</TabsTrigger>
+            <TabsTrigger value="fee" className="flex-1">待機料</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="punch" forceMount className={`space-y-4 ${KEEP_TAB}`}>
+            <GpsPanel />
+            <TimelinePanel />
+            <details className="group rounded-xl border bg-card">
+              <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+                記録が改ざんされにくい理由
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <ul className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
+                {INTEGRITY_POINTS.map((p) => (
+                  <li key={p.title} className="rounded-lg border p-3 text-sm">
+                    <div className="font-medium">{p.title}</div>
+                    <p className="mt-1 text-muted-foreground">{p.body}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </TabsContent>
+
+          <TabsContent value="kanban" forceMount className={`space-y-4 ${KEEP_TAB}`}>
+            <KanbanPanel />
+          </TabsContent>
+
+          <TabsContent value="fee" forceMount className={`space-y-4 ${KEEP_TAB}`}>
+            <FeePanel />
+            <DemoSubmitPanel />
+          </TabsContent>
+        </Tabs>
       </main>
+
+      <DemoBottomNav />
     </div>
   );
 }
