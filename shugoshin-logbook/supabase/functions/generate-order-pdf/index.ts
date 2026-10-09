@@ -182,16 +182,15 @@ Deno.serve(async (req) => {
     pdfDoc.registerFontkit(fontkit);
     const jpFont = await pdfDoc.embedFont(fontBytes);
 
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4
+    // 見た目の方針: 白地に黒とグレーと罫線だけ。色・帯・記号の飾り（★■【】）は使わない。
+    // 記号を使わない理由: 埋め込みフォント（Noto Sans JP）に「★」「■」の字形が無く、
+    // 書面では空白に、テキスト抽出でも空になるため。
+    let page = pdfDoc.addPage([595.28, 841.89]); // A4
     const { width, height } = page.getSize();
     const margin = 50;
     const black = rgb(0, 0, 0);
     const gray = rgb(0.4, 0.4, 0.4);
-    const navy = rgb(0.06, 0.09, 0.17);
-    const lineColor = rgb(0.7, 0.7, 0.7);
-    const red = rgb(0.87, 0.1, 0.1);
-    const orangeBg = rgb(1.0, 0.93, 0.88);
-    const labelBg = rgb(0.95, 0.96, 0.97);
+    const lineColor = rgb(0.6, 0.6, 0.6);
     const white = rgb(1, 1, 1);
     const cellPad = 6; // cell padding in pt
     console.log("[STEP 6] PDF document created.");
@@ -203,28 +202,47 @@ Deno.serve(async (req) => {
       page.drawText(text, { x, y: yPos, size, font: jpFont, color });
     };
 
-    const drawHLine = (yLine: number, x1 = margin, x2 = width - margin) => {
-      page.drawLine({ start: { x: x1, y: yLine }, end: { x: x2, y: yLine }, thickness: 0.5, color: lineColor });
+    const drawHLine = (yLine: number, x1 = margin, x2 = width - margin, color = lineColor, thickness = 0.5) => {
+      page.drawLine({ start: { x: x1, y: yLine }, end: { x: x2, y: yLine }, thickness, color });
     };
 
     const drawVLine = (xLine: number, y1: number, y2: number) => {
       page.drawLine({ start: { x: xLine, y: y1 }, end: { x: xLine, y: y2 }, thickness: 0.5, color: lineColor });
     };
 
-    // --- DRAFT watermark ---
-    if (order.status !== "approved" && order.status !== "delivered") {
+    // 長い文字列を折り返して描き、次の行の y を返す
+    const drawWrapped = (text: string, x: number, yPos: number, size: number, color: ReturnType<typeof rgb>, maxW: number, lh: number): number => {
+      let yy = yPos;
+      for (const ln of wrapText(text, size, jpFont, maxW)) {
+        drawText(ln, x, yy, size, color);
+        yy -= lh;
+      }
+      return yy;
+    };
+
+    // 1行の文字を、行の中心線に合わせて置くための基準線のずれ（文字サイズの約35%）
+    const baselineOffset = (size: number) => size * 0.35;
+
+    // --- DRAFT watermark（ページごとに入れる） ---
+    const needsWatermark = order.status !== "approved" && order.status !== "delivered";
+    const drawWatermark = () => {
+      if (!needsWatermark) return;
       page.drawText("DRAFT", {
         x: 130, y: 380, size: 110, font: jpFont,
         color: rgb(0.82, 0.82, 0.82), opacity: 0.25, rotate: degrees(45),
       });
-    }
+    };
+    const newPage = () => {
+      page = pdfDoc.addPage([595.28, 841.89]);
+      drawWatermark();
+    };
+    drawWatermark();
 
-    // ========== HEADER BAR ==========
-    page.drawRectangle({ x: 0, y: height - 70, width, height: 70, color: navy });
-    drawText("発注書 兼 取引条件通知書", margin, height - 42, 18, white);
-    drawText("製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律 第4条の明示", margin, height - 60, 7.5, rgb(0.7, 0.8, 0.95));
+    // ========== TITLE ==========
+    drawText("発注書 兼 取引条件通知書", margin, height - 60, 18, black);
+    drawHLine(height - 72, margin, width - margin, black, 1);
 
-    let y = height - 90;
+    let y = height - 96;
 
     // ========== DATE / ORDER NUM + HANKO ==========
     const orderNum = `Order_${order_id.slice(0, 8)}`;
@@ -248,23 +266,22 @@ Deno.serve(async (req) => {
       drawText(stampLabels[i], sx + 5, stampY - stampSize - 11, 6.5, gray);
     }
 
-    y -= 38;
+    // 印欄（枠の下のラベルまで）に発注元の文字が重ならないよう、十分に下げる
+    y -= 52;
 
     // ========== ISSUER INFO ==========
-    drawText("【発注元】", margin, y, 10, navy);
+    const tableW = width - margin * 2;
+    drawText("発注元", margin, y, 9, gray);
     y -= 15;
-    drawText(orgName, margin, y, 11, black);
-    y -= 14;
+    y = drawWrapped(orgName, margin, y, 11, black, tableW, 14);
     if (orgDetails?.prefecture || orgDetails?.city || orgDetails?.address_line1) {
-      drawText(`${orgDetails?.prefecture || ""}${orgDetails?.city || ""}${orgDetails?.address_line1 || ""}`, margin, y, 8.5, gray);
-      y -= 12;
+      y = drawWrapped(
+        `${orgDetails?.prefecture || ""}${orgDetails?.city || ""}${orgDetails?.address_line1 || ""}`,
+        margin, y, 9, gray, tableW, 12,
+      );
     }
     if (orgDetails?.phone_number) {
-      drawText(`TEL: ${orgDetails.phone_number}`, margin, y, 8.5, gray);
-      y -= 12;
-    }
-    if (financials?.is_regulated) {
-      drawText("★ 特定荷主（取適法 厳格規制対象）", margin, y, 8.5, red);
+      drawText(`TEL: ${orgDetails.phone_number}`, margin, y, 9, gray);
       y -= 12;
     }
 
@@ -273,109 +290,96 @@ Deno.serve(async (req) => {
     y -= 20;
 
     // ========== TRADE DETAILS TABLE ==========
-    drawText("■ 取引明細", margin, y, 12, navy);
-    y -= 22;
+    drawText("取引明細", margin, y, 11, black);
+    y -= 14;
 
     // Payment deadline calc
     // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
     const latestDue = latestPaymentDate(order.delivery_due_date);
     const paymentDeadlineStr = latestDue ? fmtDate(latestDue.toISOString()) : "—";
 
-    const tableData: Array<{
-      label: string;
-      value: string;
-      highlight?: boolean;
-      emphasize?: boolean;
-    }> = [
-      { label: "品目名", value: clean(content?.item_name), emphasize: true },
+    const tableData: Array<{ label: string; value: string }> = [
+      { label: "品目名", value: clean(content?.item_name) },
       { label: "数量", value: clean(content?.quantity) },
       { label: "温度帯", value: clean(order.temperature_zone || content?.temperature_zone) || "常温" },
-      { label: "出発地", value: clean(content?.origin), emphasize: true },
-      { label: "到着地", value: clean(content?.destination), emphasize: true },
-      { label: "運賃（税抜）", value: fmtCurrency(content?.price), emphasize: true },
+      { label: "出発地", value: clean(content?.origin) },
+      { label: "到着地", value: clean(content?.destination) },
+      { label: "運賃（税抜）", value: fmtCurrency(content?.price) },
       { label: "委託日（発注日）", value: createdDate },
-      { label: "納品日（役務の提供を受ける日）", value: fmtDate(order.delivery_due_date), emphasize: true },
-      { label: "支払期日（60日以内）", value: `${paymentDeadlineStr}（役務の提供を受けた日から起算して60日以内）`, highlight: true },
+      { label: "納品日（役務の提供を受ける日）", value: fmtDate(order.delivery_due_date) },
+      { label: "支払期日（60日以内）", value: `${paymentDeadlineStr}（役務の提供を受けた日から起算して60日以内）` },
     ];
 
     const colW = 150;
     const valX = margin + colW;
-    const tableW = width - margin * 2;
     const valColW = tableW - colW;
-    const lineH = 13; // line height for wrapped text
-
-    // Pre-calculate row heights with text wrapping
-    const rowMeta: Array<{
-      labelLines: string[];
-      valueLines: string[];
-      rowH: number;
-      fontSize: number;
-    }> = [];
+    const lineH = 14; // line height for wrapped text
+    const labelSize = 9;
+    const valueSize = 10; // 値の文字サイズは全行で同じ
 
     for (const row of tableData) {
-      const fontSize = row.emphasize ? 11 : 10;
-      const maxValW = valColW - cellPad * 2;
-      const valueLines = wrapText(row.value, fontSize, jpFont, maxValW);
-      const labelLines = [row.label]; // labels are short, no wrap needed
+      const valueLines = wrapText(row.value, valueSize, jpFont, valColW - cellPad * 2);
+      const labelLines = wrapText(row.label, labelSize, jpFont, colW - cellPad * 2);
       const textLines = Math.max(valueLines.length, labelLines.length);
       const rowH = Math.max(textLines * lineH + cellPad * 2, 26);
-      rowMeta.push({ labelLines, valueLines, rowH, fontSize });
-    }
 
-    // Draw table top border
-    drawHLine(y + 2);
-
-    for (let i = 0; i < tableData.length; i++) {
-      const row = tableData[i];
-      const meta = rowMeta[i];
-      const rowTop = y + 2;
-      const rowBottom = rowTop - meta.rowH;
-
-      if (row.highlight) {
-        // Orange bg for entire row
-        page.drawRectangle({ x: margin, y: rowBottom, width: tableW, height: meta.rowH, color: orangeBg });
-        page.drawRectangle({ x: margin, y: rowBottom, width: colW, height: meta.rowH, color: rgb(0.98, 0.82, 0.75) });
-      } else {
-        // Label col gray bg
-        page.drawRectangle({ x: margin, y: rowBottom, width: colW, height: meta.rowH, color: labelBg });
+      // 長い値で表が伸びたら次のページへ送る
+      if (y - rowH < margin) {
+        newPage();
+        y = height - margin;
       }
+      const rowTop = y;
+      const rowBottom = rowTop - rowH;
 
-      // Vertical divider between label and value
-      drawVLine(margin + colW, rowTop, rowBottom);
-
-      // Calculate vertical center for text
-      const totalTextH = meta.valueLines.length * lineH;
-      const textStartY = rowBottom + (meta.rowH + totalTextH) / 2 - lineH + 2;
-
-      // Draw label (vertically centered)
-      const labelColor = row.highlight ? red : gray;
-      const labelTotalH = meta.labelLines.length * lineH;
-      const labelStartY = rowBottom + (meta.rowH + labelTotalH) / 2 - lineH + 2;
-      for (let li = 0; li < meta.labelLines.length; li++) {
-        drawText(meta.labelLines[li], margin + cellPad, labelStartY - li * lineH, 9, labelColor);
-      }
-
-      // Draw value lines (vertically centered)
-      const valColor = row.highlight ? red : black;
-      for (let li = 0; li < meta.valueLines.length; li++) {
-        drawText(meta.valueLines[li], valX + cellPad, textStartY - li * lineH, meta.fontSize, valColor);
-      }
-
-      // Row bottom line
+      drawHLine(rowTop);
       drawHLine(rowBottom);
+      drawVLine(margin, rowTop, rowBottom);
+      drawVLine(valX, rowTop, rowBottom);
+      drawVLine(width - margin, rowTop, rowBottom);
 
-      y = rowBottom - 2;
+      // ラベルも値も、1行目の中心線にそろえる（上詰め）
+      const firstCenter = rowTop - cellPad - lineH / 2;
+      for (let li = 0; li < labelLines.length; li++) {
+        drawText(labelLines[li], margin + cellPad, firstCenter - li * lineH - baselineOffset(labelSize), labelSize, gray);
+      }
+      for (let li = 0; li < valueLines.length; li++) {
+        drawText(valueLines[li], valX + cellPad, firstCenter - li * lineH - baselineOffset(valueSize), valueSize, black);
+      }
+
+      y = rowBottom;
     }
 
-    // Left and right borders of the table
-    const tableTop = height - 90 - 38 - 8 - 20 - 22 + 2; // approximate top
-    // We'll draw side borders from first row top to last row bottom
-    // Already handled by individual row rectangles + horizontal lines
+    y -= 24;
 
-    y -= 18;
+    // ========== LEGAL NOTES（文面は変えない。枠で囲まず、ページ下に罫線を引いて置く） ==========
+    // 法律名はここに1回だけ出す。
+    const legalTitle = "法的注釈（製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律 第4条の明示）";
+    const legalLines = [
+      "本書面は、中小受託取引適正化法（取適法。2026年1月1日施行）第4条に基づく明示事項を記載した書面です。",
+      "・代金の支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）に定めます。",
+      "・支払期日までに支払わない場合、役務の提供を受けた日から60日を経過した日から支払日まで、年率14.6%の遅延利息を支払います。",
+      "・本書面の記載事項に変更が生じた場合は、速やかに書面にて通知します。",
+      "・代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
+      "備考: 特段の検収期間を定めない限り、役務の提供を受けた日をもって検査完了とする。",
+    ];
+    const legalTitleSize = 9;
+    const legalSize = 8;
+    const legalLH = 12;
+    const legalTitleWrapped = wrapText(legalTitle, legalTitleSize, jpFont, tableW);
+    const legalWrapped = legalLines.map((l) => wrapText(l, legalSize, jpFont, tableW));
+    const legalH =
+      10 + legalTitleWrapped.length * 13 + 4 +
+      legalWrapped.reduce((n, ls) => n + ls.length, 0) * legalLH;
+
+    // 発注先・署名欄・法的注釈が入りきらなければ、まとめて次のページへ
+    const signBlockH = 18 + 30 + 25 + 40;
+    if (y - signBlockH < margin + legalH) {
+      newPage();
+      y = height - margin;
+    }
 
     // ========== RECIPIENT ==========
-    drawText("【発注先（運送事業者）】", margin, y, 11, navy);
+    drawText("発注先（運送事業者）", margin, y, 11, black);
     y -= 18;
     drawText("会社名: ___________________", margin, y, 9, gray);
     drawText("担当者名: ___________________", margin + 220, y, 9, gray);
@@ -387,30 +391,19 @@ Deno.serve(async (req) => {
     drawText("発注者 署名・押印:", margin, y, 10, black);
     drawText("受注者 署名・押印:", width / 2, y, 10, black);
 
-    // ========== LEGAL FOOTER (boxed) ==========
-    const footerH = 100;
-    const footerY = margin;
-
-    page.drawRectangle({
-      x: margin, y: footerY, width: tableW, height: footerH,
-      borderColor: lineColor, borderWidth: 0.5, color: rgb(0.99, 0.99, 0.99),
-    });
-
-    const legalLines = [
-      "■ 法的注釈（製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律 第4条の明示）",
-      "本書面は、中小受託取引適正化法（取適法。2026年1月1日施行）第4条に基づく明示事項を記載した書面です。",
-      "・代金の支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）に定めます。",
-      "・支払期日までに支払わない場合、役務の提供を受けた日から60日を経過した日から支払日まで、年率14.6%の遅延利息を支払います。",
-      "・本書面の記載事項に変更が生じた場合は、速やかに書面にて通知します。",
-      "・代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
-      "備考: 特段の検収期間を定めない限り、役務の提供を受けた日をもって検査完了とする。",
-    ];
-
-    let fy = footerY + footerH - 14;
-    for (const line of legalLines) {
-      const isTitle = line.startsWith("■");
-      drawText(line, margin + 8, fy, isTitle ? 8.5 : 7.5, isTitle ? navy : gray);
-      fy -= 12;
+    // ========== LEGAL NOTES: draw ==========
+    drawHLine(margin + legalH);
+    let fy = margin + legalH - 10 - legalTitleSize;
+    for (const ln of legalTitleWrapped) {
+      drawText(ln, margin, fy, legalTitleSize, black);
+      fy -= 13;
+    }
+    fy -= 4;
+    for (const wrapped of legalWrapped) {
+      for (const ln of wrapped) {
+        drawText(ln, margin, fy, legalSize, gray);
+        fy -= legalLH;
+      }
     }
 
     console.log("[STEP 7] PDF content drawn.");
