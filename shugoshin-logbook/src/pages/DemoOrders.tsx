@@ -21,7 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, quantityProblem } from "@/lib/orderContent";
+import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { QuantityField } from "@/components/orders/QuantityField";
 import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
 import {
@@ -356,15 +357,7 @@ export default function DemoOrders() {
                     </div>
                     <div>
                       <Label htmlFor="demo-order-qty" className="text-sm font-bold">数量</Label>
-                      <Input
-                        id="demo-order-qty"
-                        value={form.quantity}
-                        aria-invalid={quantityProblem(form.quantity) !== null}
-                        onChange={(e) => updateField("quantity", e.target.value)}
-                      />
-                      {quantityProblem(form.quantity) && (
-                        <p className="mt-1 text-xs text-destructive">{quantityProblem(form.quantity)}</p>
-                      )}
+                      <QuantityField id="demo-order-qty" value={form.quantity} onChange={(v) => updateField("quantity", v)} />
                     </div>
                     <div>
                       <Label htmlFor="demo-order-price" className="text-sm font-bold">運賃（円）</Label>

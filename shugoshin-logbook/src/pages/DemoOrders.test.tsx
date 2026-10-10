@@ -24,6 +24,7 @@ const parseExample = (label: RegExp) => {
 const openTab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0 });
 
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+const unitSelect = () => screen.getByLabelText("数量の単位") as HTMLSelectElement;
 
 /** 承認ボタン → 確認ダイアログの「承認して確定する」まで押す */
 const approveWithConfirm = () => {
@@ -79,7 +80,9 @@ describe("DemoOrders", () => {
     });
     expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
     expect(field("品名").value).toBe("ブリ");
-    expect(field("数量").value).toBe("20箱");
+    // 「20箱」は、数字の欄と単位の選択に自動で振り分けられる
+    expect(field("数量").value).toBe("20");
+    expect(unitSelect().value).toBe("箱");
     expect(field("運賃（円）").value).toBe("60000");
     // 「明日」はデモの基準日（2026-10-03）の翌日
     expect(field("納品日").value).toBe("2026-10-04");
@@ -117,21 +120,22 @@ describe("DemoOrders", () => {
     expect(screen.getByRole("alert").textContent).toContain("納品日が入っていません");
   });
 
-  it("数量の単位が読めない（123kgm）と、理由を出して承認を拒否する。直すと承認できる", () => {
+  it("単位が空だと、理由を出して承認を拒否する。単位を選ぶと承認できる", () => {
     renderPage();
     parseExample(/例1/);
-    fireEvent.change(field("数量"), { target: { value: "123kgm" } });
-    expect(screen.getByText(/数量の単位が読み取れません（kgm）/)).toBeTruthy();
+    fireEvent.change(unitSelect(), { target: { value: "" } });
+    expect(screen.getByText("単位を選んでください")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
-    expect(screen.getByRole("alert").textContent).toContain("数量の単位が読み取れません（kgm）");
+    expect(screen.getByRole("alert").textContent).toContain("数量は「数字＋単位」で入れてください（20）");
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
 
-    fireEvent.change(field("数量"), { target: { value: "123kg" } });
-    expect(screen.queryByText(/数量の単位が読み取れません/)).toBeNull();
+    fireEvent.change(unitSelect(), { target: { value: "kg" } });
+    expect(screen.queryByText("単位を選んでください")).toBeNull();
     approveWithConfirm();
     expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
+    expect(screen.getByText(/数量: 20kg/)).toBeTruthy();
   });
 
   it("確認ダイアログで「やめる」と承認されない", () => {

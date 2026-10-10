@@ -119,6 +119,40 @@ export function checkQuantity(value: unknown): QuantityCheck {
   return { ok: true };
 }
 
+/** 数量の単位の選択肢。水産の現場でよく使うものだけにする（それ以外の単位は、AI が返したときだけ選択肢に足す）。 */
+export const QUANTITY_PRIMARY_UNITS = ["kg", "箱", "ケース", "パレット", "匹"] as const;
+
+export type QuantityParts = {
+  amount: string;
+  /** 読めた単位（QUANTITY_UNITS のどれか）。無い・読めないときは空 */
+  unit: string;
+  /** 数字のあとに付いていたが、単位として読めなかった文字（例: kgm） */
+  unreadUnit?: string;
+};
+
+/**
+ * 「数字＋単位」の数量を、数字と単位に分ける。AI の結果を入力欄と選択に振り分けるために使う。
+ * 「20箱（500kg）」「約500kg」のように1つの「数字＋単位」でない書き方は null（呼び出し側は自由入力のままにする）。
+ * 数字だけ（12）は、単位を空にして返す（人に選んでもらう）。「キロ」は kg にそろえる。
+ */
+export function splitQuantity(value: unknown): QuantityParts | null {
+  const text = cleanText(value);
+  if (!text) return { amount: "", unit: "" };
+  const m = text.normalize("NFKC").trim().match(/^(\d[\d,]*(?:\.\d+)?)\s*([^\d\s,、・/+×*().]*)$/);
+  if (!m) return null;
+  const [, amount, raw] = m;
+  if (!raw) return { amount, unit: "" };
+  const key = raw.toLowerCase();
+  if (!QUANTITY_UNITS.has(key)) return { amount, unit: "", unreadUnit: raw };
+  return { amount, unit: key === "キロ" ? "kg" : key };
+}
+
+/** 数字と単位を1つの文字列にする。数字が空なら空（単位だけの値は作らない）。 */
+export function joinQuantity(amount: string, unit: string): string {
+  const a = amount.trim();
+  return a ? `${a}${unit}` : "";
+}
+
 /** 数量が入っていて、かつ正しくないときだけ、その理由を返す。それ以外は null（空の扱いは missingForApproval）。 */
 export function quantityProblem(value: unknown): string | null {
   if (!cleanText(value)) return null;
