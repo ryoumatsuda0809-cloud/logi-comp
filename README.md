@@ -6,5 +6,3 @@
 公開デモ（ログイン不要・架空データ）: <https://shugoshin-logbook.vercel.app/demo>
 
 CI: [`.github/workflows/shugoshin-ci.yml`](./.github/workflows/shugoshin-ci.yml)（型チェック・テスト・ビルド）。
-
-`bloomers-app/` は別のアプリです（Next.js）。
