@@ -133,14 +133,14 @@ sequenceDiagram
 
 ## テストと CI
 
-2026-10-06 に `npx vitest run` を実行した結果は **17 ファイル・143 件・すべて成功** です。
+2026-10-10 に `npx vitest run` を実行した結果は **21 ファイル・237 件・すべて成功** です（`git archive` で書き出して `npm ci` した場所で実行）。
 
 | 種類 | ファイル | 件数 |
 |---|---|---|
-| ドメインロジック（純粋関数） | `src/lib/*.test.ts` 9本（発注内容、水産法の対象判定、日報の時刻算定、支払期日、JST の日付、認証・DB エラーの文言ほか） | 99 |
+| ドメインロジック（純粋関数） | `src/lib/*.test.ts` 10本（発注内容、発注書 PDF と画面の運賃の読み取りの一致、水産法の対象判定、日報の時刻算定、支払期日、JST の日付、認証・DB エラーの文言ほか） | 171 |
 | 打刻の結合（Supabase をモック） | `src/hooks/useEvidence.test.ts`、`src/components/evidence/EvidenceCollector.test.tsx` | 15 |
-| 画面（`/demo` 系） | `src/pages/DemoOrders.test.tsx`、`src/components/demo/DemoSubmitPanel.test.tsx`、`src/components/report/RiskReportDocument.test.tsx` | 18 |
-| デモのデータ | `src/demo/demoData.test.ts`、`src/demo/demoMonthlyReport.test.ts` | 10 |
+| 画面（`/demo` 系） | `src/pages/Demo*.test.tsx` 3本、`src/components/demo/DemoSubmitPanel.test.tsx`、`src/components/report/RiskReportDocument.test.tsx` | 32 |
+| デモのデータ | `src/demo/*.test.ts` 3本（固定データ、月次報告、デモの AI 解析 API の呼び出し） | 18 |
 | プレースホルダ | `src/test/example.test.ts`（`expect(true)` だけ） | 1 |
 
 CI は [`.github/workflows/shugoshin-ci.yml`](../.github/workflows/shugoshin-ci.yml)（リポジトリ直下）。`npm ci` → 型チェック（`npx tsc --noEmit -p tsconfig.app.json`）→ `npx vitest run` → `npm run build` を、push と pull request で実行します。シークレットは使わず、ビルド用の環境変数はダミー値です。
