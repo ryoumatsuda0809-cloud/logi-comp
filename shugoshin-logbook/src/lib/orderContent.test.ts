@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkQuantity, cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, parseYen } from "./orderContent";
+import { checkQuantity, cleanText, joinQuantity, splitQuantity, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, parseYen } from "./orderContent";
 
 describe("cleanText / displayText", () => {
   it("AI が埋めた仮の値は未入力として扱う", () => {
@@ -114,5 +114,51 @@ describe("invalidForApproval", () => {
   });
   it("数量が空なら返さない（空は missingForApproval が扱う）", () => {
     expect(invalidForApproval({ quantity: "" })).toEqual([]);
+  });
+});
+
+describe("splitQuantity", () => {
+  it.each([
+    ["20箱", { amount: "20", unit: "箱" }],
+    ["２キロ", { amount: "2", unit: "kg" }],
+    ["500 KG", { amount: "500", unit: "kg" }],
+    ["1,000kg", { amount: "1,000", unit: "kg" }],
+    ["1.5t", { amount: "1.5", unit: "t" }],
+    ["3トン", { amount: "3", unit: "トン" }],
+    ["5ケース", { amount: "5", unit: "ケース" }],
+  ])("数字と単位に分ける: %s", (value, expected) => {
+    expect(splitQuantity(value)).toEqual(expected);
+  });
+
+  it("数字だけなら、単位は空のまま返す（選んでもらう）", () => {
+    expect(splitQuantity("12")).toEqual({ amount: "12", unit: "" });
+    expect(splitQuantity(12)).toEqual({ amount: "12", unit: "" });
+  });
+
+  it("読めない単位は選ばずに、読んだ文字を unreadUnit で返す", () => {
+    expect(splitQuantity("123kgm")).toEqual({ amount: "123", unit: "", unreadUnit: "kgm" });
+  });
+
+  it("空なら、数字も単位も空", () => {
+    expect(splitQuantity("")).toEqual({ amount: "", unit: "" });
+    expect(splitQuantity(null)).toEqual({ amount: "", unit: "" });
+  });
+
+  it.each(["20箱（500kg）", "10箱×20kg", "約500kg", "たくさん", "kg"])("1つの数字と単位に分けられない書き方は null（自由入力のまま）: %s", (value) => {
+    expect(splitQuantity(value)).toBeNull();
+  });
+});
+
+describe("joinQuantity", () => {
+  it("数字と単位をつなぐ", () => {
+    expect(joinQuantity("12", "箱")).toBe("12箱");
+    expect(joinQuantity(" 2.5 ", "kg")).toBe("2.5kg");
+  });
+  it("単位が空なら数字だけ。数字が空なら空（単位だけの値は作らない）", () => {
+    expect(joinQuantity("12", "")).toBe("12");
+    expect(joinQuantity("", "箱")).toBe("");
+  });
+  it("つないだ値は checkQuantity を通る", () => {
+    expect(checkQuantity(joinQuantity("12", "箱"))).toEqual({ ok: true });
   });
 });

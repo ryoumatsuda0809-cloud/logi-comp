@@ -29,7 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText, quantityProblem } from "@/lib/orderContent";
+import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
+import { QuantityField } from "@/components/orders/QuantityField";
 import { PageHeader } from "@/components/PageHeader";
 
 type ParsedOrder = {
@@ -533,14 +534,8 @@ function smartTimestamp(dateStr: string): { label: string; variant: "default" | 
                         onChange={(e) => setParsed({ ...parsed, item_name: e.target.value })} />
                     </div>
                     <div>
-                      <Label className="text-sm font-bold">数量</Label>
-                      <Input
-                        value={parsed.quantity}
-                        aria-invalid={quantityProblem(parsed.quantity) !== null}
-                        onChange={(e) => setParsed({ ...parsed, quantity: e.target.value })} />
-                      {quantityProblem(parsed.quantity) && (
-                        <p className="mt-1 text-xs text-destructive">{quantityProblem(parsed.quantity)}</p>
-                      )}
+                      <Label htmlFor="order-qty" className="text-sm font-bold">数量</Label>
+                      <QuantityField id="order-qty" value={parsed.quantity} onChange={(v) => setParsed({ ...parsed, quantity: v })} />
                     </div>
                     <div>
                       <Label className="text-sm font-bold">運賃（円）</Label>
