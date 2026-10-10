@@ -151,6 +151,59 @@ BEGIN
       RESET ROLE;
     END IF;
   END;
+  -- 発注の承認: 管理者でも、数量が「数字＋単位」でなければ承認できない（20261010100000）。下書きは途中の入力を許す
+  DECLARE
+    v_adm record;
+  BEGIN
+    RESET ROLE;
+    SELECT ur.user_id, ur.organization_id INTO v_adm
+      FROM public.user_roles ur WHERE ur.role = 'admin'::public.app_role LIMIT 1;
+    IF v_adm.user_id IS NULL THEN
+      v_res := v_res || E'\n[--] 管理者がいないため、発注の承認のテストは省略';
+    ELSE
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adm.user_id, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      BEGIN
+        INSERT INTO public.transport_orders (organization_id, created_by, content_json, delivery_due_date, status)
+        VALUES (v_adm.organization_id, v_adm.user_id,
+          '{"item_name":"テスト","quantity":"12","price":"1000","origin":"A","destination":"B"}'::jsonb, current_date, 'approved');
+        v_res := v_res || E'\n[NG] 単位なしの数量（12）の発注を承認できた';
+      EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 単位なしの数量（12）の発注は承認拒否（INSERT）';
+      WHEN OTHERS THEN v_res := v_res || E'\n[??] 数量12の承認INSERT: ' || SQLERRM;
+      END;
+      BEGIN
+        INSERT INTO public.transport_orders (organization_id, created_by, content_json, delivery_due_date, status)
+        VALUES (v_adm.organization_id, v_adm.user_id,
+          '{"item_name":"テスト","quantity":"123kgm","price":"1000","origin":"A","destination":"B"}'::jsonb, current_date, 'approved');
+        v_res := v_res || E'\n[NG] 読めない単位（123kgm）の発注を承認できた';
+      EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 読めない単位（123kgm）の発注は承認拒否（INSERT）';
+      WHEN OTHERS THEN v_res := v_res || E'\n[??] 数量123kgmの承認INSERT: ' || SQLERRM;
+      END;
+      BEGIN
+        INSERT INTO public.transport_orders (organization_id, created_by, content_json, delivery_due_date, status)
+        VALUES (v_adm.organization_id, v_adm.user_id,
+          '{"item_name":"テスト","quantity":"12","price":"1000","origin":"A","destination":"B"}'::jsonb, current_date, 'draft');
+        v_res := v_res || E'\n[OK] 数量が単位なしでも、下書きは保存できる';
+      EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[NG] 下書きの保存が拒否された: ' || SQLERRM;
+      END;
+      BEGIN
+        UPDATE public.transport_orders SET status = 'approved'
+          WHERE organization_id = v_adm.organization_id AND created_by = v_adm.user_id
+            AND status = 'draft' AND content_json ->> 'quantity' = '12' AND content_json ->> 'item_name' = 'テスト';
+        v_res := v_res || E'\n[NG] 下書き →「12」の承認ができた';
+      EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 下書き →「12」の承認は拒否（UPDATE）';
+      WHEN OTHERS THEN v_res := v_res || E'\n[??] 数量12の承認UPDATE: ' || SQLERRM;
+      END;
+      BEGIN
+        INSERT INTO public.transport_orders (organization_id, created_by, content_json, delivery_due_date, status)
+        VALUES (v_adm.organization_id, v_adm.user_id,
+          '{"item_name":"テスト","quantity":"12箱","price":"1000","origin":"A","destination":"B"}'::jsonb, current_date, 'approved');
+        v_res := v_res || E'\n[OK] 数量「12箱」の発注は承認できる';
+      EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[NG] 数量「12箱」の承認が拒否された: ' || SQLERRM;
+      END;
+      RESET ROLE;
+    END IF;
+  END;
   RESET ROLE;
   RAISE EXCEPTION 'ROLLBACK_TEST_RESULT:%', v_res;
 END $$;
