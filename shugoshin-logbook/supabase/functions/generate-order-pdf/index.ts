@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { PDFDocument, rgb, degrees } from "https://esm.sh/pdf-lib@1.17.1";
 import fontkit from "https://esm.sh/@pdf-lib/fontkit@1.1.1";
+import { fmtCurrency } from "./yen.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,13 +47,6 @@ const fmtDateJst = (iso: string | null | undefined): string => {
   if (isNaN(t)) return String(iso);
   const dt = new Date(t + 9 * 60 * 60 * 1000);
   return `${dt.getUTCFullYear()}年${dt.getUTCMonth() + 1}月${dt.getUTCDate()}日`;
-};
-
-const fmtCurrency = (v: string | undefined | null): string => {
-  if (!v) return "—";
-  const n = Number(String(v).replace(/[^0-9.-]/g, ""));
-  if (isNaN(n)) return clean(v);
-  return `¥${n.toLocaleString()}`;
 };
 
 // Text wrapping: split text into lines that fit within maxWidth
@@ -426,13 +420,12 @@ Deno.serve(async (req) => {
 
   } catch (e: any) {
     const errorId = crypto.randomUUID();
+    // 詳細（メッセージ・スタック）は応答に載せず、ログにだけ出す。error_id で突き合わせる
     console.error(`[${errorId}] generate-order-pdf FATAL error:`, e);
     return new Response(
       JSON.stringify({
         error: "PDF生成中にエラーが発生しました。",
         error_id: errorId,
-        error_message: e?.message ?? String(e),
-        error_stack: e?.stack ?? null,
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
