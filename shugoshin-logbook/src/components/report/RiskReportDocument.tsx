@@ -57,6 +57,22 @@ function RiskBadge({ level }: { level: string | null }) {
   );
 }
 
+/**
+ * 算定不能・等級Cが混ざっていることを帳票上で明示する。
+ * 注記がないと「0円＝待機がなかった」と誤読される。表とカードの両方で使う。
+ */
+function VisitBreakdown({ row }: { row: RiskReportRow }) {
+  const unmeasured = row.unmeasured_visits ?? 0;
+  const approved = row.approved_claim_visits ?? 0;
+  if (unmeasured <= 0 && approved <= 0) return null;
+  return (
+    <div className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
+      {unmeasured > 0 && <div>うち算定不可 {row.unmeasured_visits}</div>}
+      {approved > 0 && <div>うち圏外承認 {row.approved_claim_visits}</div>}
+    </div>
+  );
+}
+
 interface RiskReportDocumentProps {
   rows: RiskReportRow[];
   loading?: boolean;
@@ -139,12 +155,53 @@ export function RiskReportDocument({
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-sm print:border-black print:bg-white print:shadow-none">
-          {/* 狭い画面では列を潰さず、カードの中で横にスクロールさせる。印刷では紙の幅に収める */}
-          {/* 表が 40rem に満たない幅（md 未満）でだけ、右の列が隠れていることを知らせる。印刷には出さない */}
-          <p className="border-b border-border px-3 py-1.5 text-right text-xs text-muted-foreground md:hidden print:hidden">
-            右へスクロールで総待機時間などが見えます →
-          </p>
-          <Table className="min-w-[40rem] print:min-w-0">
+          {/* 狭い画面（md 未満）は、7列の表を横にスクロールさせず、1行ずつのカードにする。
+              印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
+          <ul className="divide-y divide-border md:hidden print:hidden">
+            {rows.map((row, i) => (
+              <li key={i} className="space-y-2 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 font-semibold">
+                    {row.client_organization_name || "不明な荷主"}
+                    {row.location_name && (
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        ＠ {row.location_name}
+                      </span>
+                    )}
+                  </p>
+                  <RiskBadge level={row.gmen_risk_level} />
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">対象月</dt>
+                    <dd>{formatMonth(row.report_month)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">訪問回数</dt>
+                    <dd>
+                      {row.total_visits ?? 0}
+                      <VisitBreakdown row={row} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">総待機時間</dt>
+                    <dd className="font-semibold">{row.total_wait_minutes ?? 0}分</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">推定逸失利益</dt>
+                    <dd className="font-bold text-destructive">{formatJpy(row.estimated_loss_jpy)}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted-foreground">遅延利息の目安（1日あたり）</dt>
+                    <dd className="font-bold text-destructive">
+                      {formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+          <Table className="hidden min-w-[40rem] md:table print:table print:min-w-0">
             <TableHeader>
               <TableRow className="print:border-black">
                 <TableHead className="font-bold print:text-black">荷主名 / 拠点</TableHead>
@@ -172,19 +229,7 @@ export function RiskReportDocument({
                   <TableCell className="whitespace-nowrap print:text-black">{formatMonth(row.report_month)}</TableCell>
                   <TableCell className="text-right print:text-black">
                     {row.total_visits ?? 0}
-                    {/* 算定不能・等級Cが混ざっていることを帳票上で明示する。
-                        注記がないと「0円＝待機がなかった」と誤読される。 */}
-                    {((row.unmeasured_visits ?? 0) > 0 ||
-                      (row.approved_claim_visits ?? 0) > 0) && (
-                      <div className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
-                        {(row.unmeasured_visits ?? 0) > 0 && (
-                          <div>うち算定不可 {row.unmeasured_visits}</div>
-                        )}
-                        {(row.approved_claim_visits ?? 0) > 0 && (
-                          <div>うち圏外承認 {row.approved_claim_visits}</div>
-                        )}
-                      </div>
-                    )}
+                    <VisitBreakdown row={row} />
                   </TableCell>
                   <TableCell className="text-right font-semibold print:text-black">
                     {row.total_wait_minutes ?? 0}分
