@@ -49,7 +49,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
       payment_date: null,
     });
     renderPage();
-    expect(screen.getByText(DEMO_PARSE_NOTE)).toBeTruthy();
+    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
 
     await parseFree("唐戸から架空冷蔵の本社倉庫まで、冷蔵のアジ8箱、運賃4万2千円、明日納品");
 
