@@ -322,7 +322,7 @@ export default function DemoOrders() {
                   {isParsing ? <Loader2 className="animate-spin" /> : <Sparkles />}
                   {isParsing ? "解析中..." : "AI解析"}
                 </FieldButton>
-                {source === "example" && (!freeText.trim() || textIsExample) && (
+                {source === "example" && textIsExample && (
                   <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>
                 )}
                 {source === "ai" && (
