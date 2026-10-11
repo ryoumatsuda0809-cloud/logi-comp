@@ -20,7 +20,7 @@
 
 ## 触れる場所
 
-本番（Vercel）: <https://shugoshin-logbook.vercel.app>。公開しているのは `/demo` 系の4画面だけです。ログイン不要・架空データで、**DB には接続しません**（`src/pages/Demo.tsx` は supabase を使わない）。
+デモ（本番・Vercel）: <https://shugoshin-logbook.vercel.app/demo>（ルートはログイン画面に移ります）。公開しているのは `/demo` 系の4画面だけです。ログイン不要・架空データで、**DB には接続しません**（`src/pages/Demo.tsx` は supabase を使わない）。
 
 | パス | 見られるもの |
 |---|---|

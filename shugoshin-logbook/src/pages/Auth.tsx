@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { FieldButton } from "@/components/ui/field-button";
 import { Input } from "@/components/ui/input";
@@ -165,6 +165,12 @@ export default function Auth() {
           >
             {isLogin ? "アカウントをお持ちでない方はこちら" : "既にアカウントをお持ちの方はこちら"}
           </button>
+        </div>
+
+        <div className="mt-4 border-t pt-4 text-center">
+          <Link to="/demo" className="text-sm font-bold text-primary underline-offset-4 hover:underline">
+            ログインなしでデモを見る
+          </Link>
         </div>
       </div>
     </div>
