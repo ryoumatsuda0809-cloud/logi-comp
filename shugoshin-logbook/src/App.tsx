@@ -19,7 +19,6 @@ import Orders from "./pages/Orders";
 import CheckIn from "./pages/CheckIn";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
-import Simulator from "./pages/Simulator";
 import Demo from "./pages/Demo";
 import DemoReport from "./pages/DemoReport";
 import DemoOrders from "./pages/DemoOrders";
@@ -188,7 +187,6 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-            <Route path="/simulator" element={<Simulator />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/demo/report" element={<DemoReport />} />
             <Route path="/demo/orders" element={<DemoOrders />} />
