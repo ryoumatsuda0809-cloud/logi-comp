@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
+import { appendNewWaitLogEntries } from "@/lib/reportSnapshot";
 import type { Json } from "@/integrations/supabase/types";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -170,8 +171,8 @@ export default function DailyReportConfirm() {
         facilityMap[f.id] = f.name;
       }
       const { entries } = convertWaitLogsToTimeline(logsRes.data, facilityMap);
-      // Merge: existing timeline + wait_logs entries (deduplicated by adding source prefix)
-      snapshotData = [...snapshotData, ...entries.map(e => ({ ...e, source: "wait_log" }))];
+      // Merge: existing timeline + wait_logs entries that the timeline does not already have
+      snapshotData = appendNewWaitLogEntries(snapshotData, entries);
     }
 
     const { data: inserted, error } = await supabase.from("submitted_reports").insert([{

@@ -156,7 +156,7 @@ CI は [`.github/workflows/shugoshin-ci.yml`](../.github/workflows/shugoshin-ci.
 詳細と最新の状態は [`STATUS.md`](./STATUS.md)（§2d、§3）。ここでは技術者に関係するものを挙げます。
 
 - **提出時に帳票の中身を端末が決めている（最大の課題）**。`DailyReportConfirm.tsx` が `submitted_reports` へ直接 INSERT し、`timeline_snapshot`・`total_wait_minutes`・`estimated_wait_cost`・`formal_report` を端末から送る。提出後は書き換えられない（④のトリガー）が、偽の内容もそのまま固定され、荷主の共有帳票に「等級A：サーバー検証済」と出てしまう。サーバー側での再計算が未了。着手前に「日報が何を数えるか」（今は `wait_logs` に加え、旧 `compliance_logs` と音声日報の申告分も足している）を決める必要があり、案は2つある（BEFORE INSERT トリガーで再計算する小案／提出専用 RPC にして直接 INSERT を REVOKE する大案）。ローカルに DB 環境が無いので、本番へ出す前にロールバック付きの検査を別環境で通す。本番の `submitted_reports` は5件で、すべてテスト期のデータ。
-- **重複行の疑い（未確認）**: 提出時に同じ待機が `timeline` に2回入る経路がありそう（`useDailyTimeline.ts` と `DailyReportConfirm.tsx`）。実際の共有帳票で確認できていない。
+- **提出時の明細の二重入り（直した）**: 提出する `timeline_snapshot` に、同じ待機の打刻が2回入る経路があった（画面の `timeline` と、提出直前に取り直した `wait_logs` の両方が入る。コードの読み取りで確認）。合計の待機分・金額は `timeline` から計算するので、ずれるのは明細だけ。取り直した行のうちすでにある打刻は足さないように直した（`src/lib/reportSnapshot.ts`、テスト 5 件）。本番で提出して確かめてはいない（提出は取り消せないため）。
 - **共有リンクの粒度**: 1本のリンクで、その日の全荷主の訪問が見える。荷主ごとに絞るかは未決。リンクの一覧・個別失効の画面、開封通知も未実装。`/shared/*` には `Referrer-Policy: no-referrer` などのヘッダーを足したが（`vercel.json`）、本番での効き目の確認は STATUS.md の手順待ち。
 - **料率表がコード内の定数**（`src/lib/waitCostCalc.ts`）。DB 化と、算定のサーバー側への一本化が未了。
 - **施設の登録 UI が無い**（運用側の SQL で登録。`docs/CONTEXT_SUPABASE.md`）。組織の作成 UI はある（`OrganizationSettings.tsx` から RPC `create_organization_with_admin`）。荷主による施設の所有確認も未実装。
