@@ -171,8 +171,9 @@ PR のマージは自動モードに拒否される（`gh pr merge`）。GitHub 
   サーバーで作り直すと「日報が何を数えるか」が変わるので、先にそこを決める。また、このマシンには Docker・`supabase` CLI・`psql` が無く、ローカルで動作を確かめられない。
   壊れた BEFORE INSERT トリガーは日報の提出を全部止めるので、本番へ出す前に、ロールバック付きの検査を別環境で通す。
   案: （小）`submitted_reports` に BEFORE INSERT トリガーを足し、`wait_logs` 由来の行と合計をサーバーが作り直して、端末が送った等級A/Cの行は捨てる／（大）提出専用の RPC にして直接 INSERT を REVOKE する。
-- 🟡 **重複行の疑い（未確認）**: 提出時、同じ `wait_logs` の訪問が `timeline` に1回（`useDailyTimeline.ts` が `source: "gps"` で入れる）、`DailyReportConfirm.tsx:174` でもう1回（`source: "wait_log"`）入る。
-  表示側（`ReportDocument.tsx`）に重複を除く処理が無いので、実際の共有帳票で同じ行が2回出る可能性がある。本番の5件は、この経路ができる前のデータで、確認も反証もできていない。ログインして1日分を提出し、共有帳票を開けば分かる。
+- ✅ **提出時の明細の二重入り（直した。#57、2026-10-11）**: 提出時、同じ `wait_logs` の訪問が `timeline` に1回（`useDailyTimeline.ts` が `source: "gps"` で入れる）、`DailyReportConfirm.tsx` でもう1回（`source: "wait_log"`）入っていた。
+  `eventType` と `timestamp` が同じ打刻は足さないように直した（`src/lib/reportSnapshot.ts` の `appendNewWaitLogEntries`、テスト 5 件）。
+  残り: 実際の共有帳票で同じ行が2回出ないことの目視は未了（提出は取り消せず、確認用の打刻は施設の近くでしかできないため。次に施設で本当に打刻した日に見る）。修正前に提出した分は書き換えられないので、二重の行が残っていても直らない（本番の5件は、この経路ができる前のデータで、確認も反証もできていない）。
 - 🟡 1本のリンクで、その日の全荷主の訪問（施設名・時刻・待機料）が見える。帳票は複数荷主宛の1通のため、荷主Aに渡したリンクで荷主B・Cの訪問も見える。荷主ごとに絞るかは本人の判断。
 - ✅ 対応済み（#12、本番で確認済み 2026-10-06）: `vercel.json` に、`/shared/*` と `/shared-report/*` 向けの `Referrer-Policy: no-referrer`・`X-Robots-Tag: noindex, nofollow`・`X-Frame-Options: DENY` を足した。トークンが URL のパスに入るための対策。
 - ⚪ 宛名の荷主名（`shipper_names`）は、その日の `wait_logs` を状態で絞らずに引くので、キャンセルした訪問の荷主名も載りうる。
