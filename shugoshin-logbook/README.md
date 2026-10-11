@@ -160,7 +160,7 @@ CI は [`.github/workflows/shugoshin-ci.yml`](../.github/workflows/shugoshin-ci.
 - **共有リンクの粒度**: 1本のリンクで、その日の全荷主の訪問が見える。荷主ごとに絞るかは未決。リンクの一覧・個別失効の画面、開封通知も未実装。`/shared/*` には `Referrer-Policy: no-referrer` などのヘッダーを足したが（`vercel.json`）、本番での効き目の確認は STATUS.md の手順待ち。
 - **料率表がコード内の定数**（`src/lib/waitCostCalc.ts`）。DB 化と、算定のサーバー側への一本化が未了。
 - **施設の登録 UI が無い**（運用側の SQL で登録。`docs/CONTEXT_SUPABASE.md`）。組織の作成 UI はある（`OrganizationSettings.tsx` から RPC `create_organization_with_admin`）。荷主による施設の所有確認も未実装。
-- **取適法の4条書面**: 発注先（中小受託事業者）の名称を発注データに持たせていない（必須項目）。法務の目通しも未了。発注書 PDF の Edge Function の最新版は 2026-10-06 に本番へデプロイ済み。ただし、承認済みの発注で出した PDF の実描画の目視は未了（STATUS.md §2c）。
+- **取適法の4条書面**: 発注先（中小受託事業者）の名称を発注データに持たせていない（必須項目）。法務の目通しも未了。発注書 PDF の Edge Function の最新版は 2026-10-06 に本番へデプロイ済み。その PDF の実描画は、承認済みの発注3件を 2026-10-10 に本人が目視で確認した（STATUS.md）。
 - **使っていないコード**: Edge Function `parse-daily-report` は、現行のフロントから呼ばれていない。
 - **実運用の実績はほぼ無い**。デモに向けた作り込みの段階で、本番 DB のデータはテスト期のものが中心（`docs/PROGRESS_LOG.md` 2026-10-04）。
 - 規模・履歴の事情: 初期の migration は Lovable の生成物で、ファイル名が UUID（`supabase/migrations/README.md`）。一部は SQL Editor 経由で適用したため、履歴の記録を後から補正した（`docs/PROGRESS_LOG.md`）。フロントは単一の JS バンドル（約 917 kB）で、コード分割はしていない。
