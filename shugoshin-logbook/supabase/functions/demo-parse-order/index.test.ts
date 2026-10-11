@@ -354,6 +354,18 @@ Deno.test("入力に仕込まれた指示は、出力の形を変えられない
   );
 });
 
+Deno.test("プロンプトは、入力に無い地名を辞書の地名で補わないよう指示している", async () => {
+  await withStub(() => geminiOk(GOOD_ARGS), async (handler, calls) => {
+    await handler(post({ text: "架空水産から架空冷蔵まで" }));
+    const prompt = String(JSON.parse(String(calls[0].init.body)).system_instruction.parts[0].text);
+    assert.match(prompt, /略称で入力された場合だけ/);
+    assert.match(prompt, /辞書の地名に置き換えたり/);
+    assert.match(prompt, /空文字を返してください/);
+    // 項目の説明も「入力にある地名」が先で、辞書による補完は略称のときだけ
+    assert.match(prompt, /origin: 出発地（入力にある地名。略称のときだけ地名辞書で補完）/);
+  });
+});
+
 Deno.test("DEMO_GEMINI_API_KEY を読み、Gemini へのヘッダーに使う", async () => {
   await withStub(() => geminiOk(GOOD_ARGS), async (handler, calls) => {
     const res = await handler(post({ text: "フグ" }));

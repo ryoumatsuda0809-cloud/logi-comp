@@ -31,6 +31,8 @@
 
 デモの例文ボタンは固定の結果を返します（関数は呼びません）。自由入力欄に入れた文だけが、公開デモ専用の Edge Function `demo-parse-order` 経由で実際の Gemini API を呼びます（入力は外部の AI に送信されます）。本番画面（`/orders`）は別の Edge Function `parse-order` が Gemini API を呼びます。
 
+デモの中の「今日」は 2026-10-03 に固定しています（`/demo`・`/demo/orders`・`/demo/report` で同じ日）。自由入力の「明日」は 10/4、「明後日」は 10/5 と読み取られるため、実際の今日の日付とは1週間ほどずれて見えます。
+
 ## 構成図
 
 ```mermaid
