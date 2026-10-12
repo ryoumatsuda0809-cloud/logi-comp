@@ -27,7 +27,7 @@ export default defineConfig(() => ({
       manifest: {
         name: "守護神 — 物流コンプライアンス管理",
         short_name: "守護神",
-        description: "取適法（中小受託取引適正化法）対応。書面の明示と支払期日のルールを自動管理。",
+        description: "運送ドライバーの到着・待機・出発を、あとから書き換えにくい形で記録するアプリ（デモ公開中）",
         start_url: "/",
         display: "standalone",
         orientation: "portrait",
