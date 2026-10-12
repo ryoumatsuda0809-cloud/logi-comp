@@ -3,6 +3,7 @@ import { Printer } from "lucide-react";
 import { FieldButton } from "@/components/ui/field-button";
 import { PageHeader } from "@/components/PageHeader";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
 import { ReportDocument, type ReportData, type ReportParties } from "@/components/report/ReportDocument";
 import { convertWaitLogsToTimeline, generateFormalReportFromWaitLogs } from "@/lib/waitLogToTimeline";
 import { calcWaitCost, sumWaitCost } from "@/lib/waitCostCalc";
@@ -54,11 +55,15 @@ export default function DemoReport() {
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
-      <div className="mx-auto max-w-4xl px-4 pt-4 print:hidden">
+      <div className="mx-auto flex max-w-4xl flex-col gap-3 px-4 pt-4 print:hidden">
         <FieldButton className="gap-3" onClick={() => window.print()}>
           <Printer />
           この報告書を印刷・PDF保存する
         </FieldButton>
+        <DemoPdfLink href={DEMO_SAMPLE_PDF.report}>PDFの見本を開く</DemoPdfLink>
+        <p className="text-xs text-muted-foreground">
+          印刷が動かない端末（ホーム画面から開いたアプリなど）では、PDFの見本を開いてください。
+        </p>
       </div>
 
       <ReportDocument report={report} parties={DEMO_PARTIES} showViewNote={false} />

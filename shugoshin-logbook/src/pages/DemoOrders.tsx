@@ -25,6 +25,7 @@ import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, m
 import { QuantityField } from "@/components/orders/QuantityField";
 import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
+import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
 import {
   DEMO_AI_FALLBACK_NOTE,
   DEMO_AI_NOTE,
@@ -489,6 +490,7 @@ export default function DemoOrders() {
                     <div className="space-y-2 border-t border-border pt-3">
                       <DemoOrderDocument data={approved} />
                       <p className="text-xs text-muted-foreground">実際の画面では、この書面をPDFでダウンロードします。</p>
+                      <DemoPdfLink href={DEMO_SAMPLE_PDF.order}>PDFの見本を開く（例1の内容）</DemoPdfLink>
                     </div>
                   )}
                 </CardContent>

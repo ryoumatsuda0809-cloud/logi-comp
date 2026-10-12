@@ -20,7 +20,9 @@ export default defineConfig(() => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/~oauth/],
+        // PDF の見本（public/samples/）へのリンクは「ページ移動」として扱われるので、除外しないと
+        // サービスワーカーが index.html（アプリの画面）を返してしまい、PDF が開けない。
+        navigateFallbackDenylist: [/^\/~oauth/, /\.pdf$/],
       },
       manifest: {
         name: "守護神 — 物流コンプライアンス管理",
