@@ -145,7 +145,7 @@ export function ReportDocument({
             </div>
 
             {/* Right: Date / Doc No */}
-            <div className="sm:text-right space-y-1 font-mono text-sm shrink-0">
+            <div className="sm:text-right space-y-1 text-sm shrink-0">
               <div>
                 <span className="text-gray-500">{report.id.startsWith("live-") ? "作成日時: " : "提出日時: "}</span>
                 <span className="font-bold text-black">{new Date(report.submitted_at).toLocaleString("ja-JP")}</span>
@@ -165,7 +165,7 @@ export function ReportDocument({
         {/* ══════════════════════════════════════════════ */}
         <section className="mb-8 print:mb-3 break-inside-avoid">
           <table
-            className="w-full border-collapse text-black font-mono"
+            className="w-full border-collapse text-black"
             style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
           >
             <tbody>
@@ -238,7 +238,7 @@ export function ReportDocument({
               法定乗務記録
             </h2>
             <div
-              className="font-mono text-sm leading-relaxed whitespace-pre-wrap text-black bg-gray-50 border border-gray-400 p-4 print:p-2 print:bg-gray-50"
+              className="text-sm leading-relaxed whitespace-pre-wrap text-black bg-gray-50 border border-gray-400 p-4 print:p-2 print:bg-gray-50"
               style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
             >
               {report.formal_report}
@@ -256,7 +256,7 @@ export function ReportDocument({
             </h2>
             <div className="overflow-x-auto print:overflow-visible">
             <table
-              className="w-full border-collapse text-black font-mono text-sm"
+              className="w-full border-collapse text-black text-sm"
               style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
             >
               <thead className="print:table-header-group">
@@ -311,11 +311,11 @@ export function ReportDocument({
         {/* ══════════════════════════════════════════════ */}
         <footer className="border-t-2 border-black mt-12 pt-4 print:mt-4 print:pt-2 break-inside-avoid">
           {showViewNote && (
-            <p className="text-xs text-gray-700 font-mono leading-relaxed print:hidden">
+            <p className="text-xs text-gray-700 leading-relaxed print:hidden">
               ※共有リンクで開かれた回数と最終閲覧日時は記録されます。
             </p>
           )}
-          <p className="text-xs text-gray-400 mt-3 font-mono text-right">
+          <p className="text-xs text-gray-400 mt-3 text-right">
             — 本書は電子的に生成されました —
           </p>
         </footer>
