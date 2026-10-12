@@ -16,10 +16,7 @@ const DOC_TITLE = "発注書 兼 取引条件通知書";
 const LEGAL_NOTES_TITLE = "注記";
 const LEGAL_NOTES = [
   "デモ用の見本です。実際の取引条件を示すものではありません。",
-  "代金の支払期日は、役務の提供を受けた日から起算して60日以内（受領日を算入）に定めます。",
-  "支払期日までに支払わない場合、役務の提供を受けた日から60日を経過した日から支払日まで、年率14.6%の遅延利息を支払います。",
   "本書面の記載事項に変更が生じた場合は、速やかに書面にて通知します。",
-  "代金の減額、買いたたき、不当な給付内容の変更等は禁止されています。",
 ];
 const LEGAL_REMARK = "備考: 特段の検収期間を定めない限り、役務の提供を受けた日をもって検査完了とする。";
 
@@ -42,7 +39,7 @@ function formatJaDate(iso: string): string {
 }
 
 /**
- * 承認した発注の「4条書面」（架空データ）。
+ * 承認した発注の発注書（架空データ）。
  * 実際の画面ではPDFでダウンロードする書面と同じ項目・同じ並びを、画面上に出す。
  */
 export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
@@ -64,7 +61,7 @@ export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
   ];
 
   return (
-    <article aria-label="4条書面（架空）" className="rounded-lg border bg-card p-4 font-serif-jp text-card-foreground">
+    <article aria-label="発注書（架空）" className="rounded-lg border bg-card p-4 font-serif-jp text-card-foreground">
       <h3 className="border-b-2 border-foreground pb-2 text-lg font-bold">{DOC_TITLE}</h3>
 
       <div className="mt-4 space-y-4">

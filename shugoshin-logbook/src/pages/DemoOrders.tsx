@@ -59,7 +59,7 @@ type ParseSource = "example" | "ai" | "fallback";
 /**
  * /demo/orders の「発注管理」。実際の発注画面（/orders）と同じ並び（共通ヘッダー・「新規発注」「発注一覧」の
  * タブ・下のナビ）で、入力 → AI解析 → 内容を確認・入力 → 承認（取り消せない）→ 一覧に承認済みで載り、
- * 4条書面が出る、の流れを見せる。
+ * 発注書が出る、の流れを見せる。
  * 入力欄は1つ。例文のボタンを押すと、その文が入力欄に入る。文を書き換えずに解析すると固定の結果が返る
  * （AI は呼ばない）。書き換えた文・自由に打った文は、公開デモ専用の Edge Function（demoParseApi.ts）で
  * 本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
@@ -490,7 +490,7 @@ export default function DemoOrders() {
                       className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       <FileText className="h-5 w-5" />
-                      {showDocument ? "発注書（4条書面）を閉じる" : "発注書（4条書面）を表示"}
+                      {showDocument ? "発注書を閉じる" : "発注書を表示"}
                     </button>
                     <button
                       type="button"
@@ -527,7 +527,7 @@ export default function DemoOrders() {
           <AlertDialogHeader>
             <AlertDialogTitle>この発注を承認しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              承認すると発注書（4条書面）として確定し、内容は後から変更・削除できません。
+              承認すると発注書として確定し、内容は後から変更・削除できません。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -179,13 +179,13 @@ describe("DemoOrders", () => {
     parseExample(/例1/);
     fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
     const dialog = screen.getByRole("alertdialog");
-    expect(dialog.textContent).toContain("承認すると発注書（4条書面）として確定し、内容は後から変更・削除できません。");
+    expect(dialog.textContent).toContain("承認すると発注書として確定し、内容は後から変更・削除できません。");
     fireEvent.click(within(dialog).getByRole("button", { name: "やめる" }));
     expect(screen.queryByText("承認済み（編集不可）")).toBeNull();
     expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
   });
 
-  it("承認すると編集不可になり、修正を試しても拒否される。4条書面が出る", () => {
+  it("承認すると編集不可になり、修正を試しても拒否される。発注書が出る", () => {
     renderPage();
     parseExample(/例1/);
     approveWithConfirm();
@@ -205,7 +205,7 @@ describe("DemoOrders", () => {
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));
     expect(screen.getByRole("alert").textContent).toContain("承認済みのデータは改ざん防止のため編集できません。");
 
-    const doc = screen.getByRole("article", { name: /4条書面/ });
+    const doc = screen.getByRole("article", { name: /発注書/ });
     expect(doc.textContent).toContain("発注書 兼 取引条件通知書");
     expect(doc.textContent).toContain("架空運送株式会社");
     expect(doc.textContent).toContain("ブリ");
@@ -221,7 +221,8 @@ describe("DemoOrders", () => {
     expect(doc.textContent).not.toContain("特定受託事業者に係る取引の適正化等に関する法律");
     expect(doc.textContent).not.toContain("下請");
     expect(doc.textContent).not.toContain("物品受領");
-    expect(doc.textContent).toContain("年率14.6%の遅延利息");
+    expect(doc.textContent).not.toContain("遅延利息");
+    expect(doc.textContent).not.toContain("禁止");
   });
 
   it("「最初の状態に戻す」で最初に戻り、もう一度やり直せる", () => {

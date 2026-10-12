@@ -142,7 +142,7 @@ export function RiskReportDocument({
           <span className="inline-block">荷主別</span> <span className="inline-block">待機時間リスクレポート</span>
         </h1>
         <p className="mt-0.5 text-xs text-muted-foreground print:text-gray-500">
-          守護神 — 物流コンプライアンス管理システム
+          守護神 — 物流記録管理システム
         </p>
       </div>
 

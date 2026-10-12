@@ -25,7 +25,7 @@ export default defineConfig(() => ({
         navigateFallbackDenylist: [/^\/~oauth/, /\.pdf$/],
       },
       manifest: {
-        name: "守護神 — 物流コンプライアンス管理",
+        name: "守護神 — 物流記録管理",
         short_name: "守護神",
         description: "運送ドライバーの到着・待機・出発を、あとから書き換えにくい形で記録するアプリ（デモ公開中）",
         start_url: "/",
