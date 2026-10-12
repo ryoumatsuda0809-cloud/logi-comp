@@ -66,7 +66,8 @@ describe("RiskReportDocument", () => {
     expect(screen.getAllByText("うち算定不可 2")).toHaveLength(BOTH);
     expect(screen.getAllByText("うち圏外承認 1")).toHaveLength(BOTH);
     expect(screen.getByText(/待機が無かったことを意味しません（2件）/)).toBeTruthy();
-    expect(screen.getByText(/時刻の自動検証なし/)).toBeTruthy();
+    // 「時刻の自動検証なし」は要約・注記にも出るので、フッターの文だけを指して確かめる
+    expect(screen.getByText(/本資料は.*時刻の自動検証なし/)).toBeTruthy();
   });
 
   it("算定不可・圏外承認の行と注記には注意マークが付き、無ければ付かない", () => {
@@ -80,8 +81,8 @@ describe("RiskReportDocument", () => {
         monthLabel="2026年9月"
       />,
     );
-    // 表とカードの内訳で 2 種 × 2、注記で 2 つ
-    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2);
+    // 表とカードの内訳で 2 種 × 2、注記で 2 つ、表の上の要約で 1 つ
+    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2 + 1);
     // マークは飾りなので読み上げない。意味は隣の文が持つ
     container.querySelectorAll("svg").forEach((svg) => {
       expect(svg.getAttribute("aria-hidden")).toBe("true");

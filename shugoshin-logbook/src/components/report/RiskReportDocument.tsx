@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { NoticeMark } from "@/components/NoticeMark";
+import { RiskReportSummary } from "./RiskReportSummary";
 
 /** monthly_wait_risk_reports ビューの1行（荷主 × 拠点 × 月） */
 export interface RiskReportRow {
@@ -152,6 +153,8 @@ export function RiskReportDocument({
       <div className="hidden print:block print:mb-4 print:text-center">
         <p className="text-base font-bold text-black">対象月: {monthLabel}</p>
       </div>
+
+      {!loading && rows.length > 0 && <RiskReportSummary rows={rows} monthLabel={monthLabel} />}
 
       {/* Data Table */}
       {loading ? (
