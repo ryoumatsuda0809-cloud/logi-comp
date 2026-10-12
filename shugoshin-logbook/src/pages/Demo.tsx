@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { NoticeMark } from "@/components/NoticeMark";
 import { ChevronDown, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
@@ -363,7 +364,8 @@ function FeePanel() {
                 <span className="text-muted-foreground">
                   到着 {formatTimeOrNull(effectiveArrival(log))} → 荷役開始 {formatTimeOrNull(loadingStartedAt(log))}（{mins ?? "-"}分）
                 </span>
-                <span className="shrink-0 whitespace-nowrap pl-2 text-base font-semibold">
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap pl-2 text-base font-semibold">
+                  {fee === null && <NoticeMark />}
                   {fee === null ? "算定不能" : `${fee.toLocaleString()}円`}
                 </span>
               </div>
@@ -371,7 +373,8 @@ function FeePanel() {
                 <p className="mt-1 text-xs text-muted-foreground">30分以内のため課金対象外</p>
               )}
               {log.evidence_grade === "C" && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+                  <NoticeMark className="mt-0.5" />
                   電波圏外のため後から申告。申告された時刻で算定し、等級Cと明示します。
                 </p>
               )}

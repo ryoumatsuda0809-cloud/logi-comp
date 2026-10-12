@@ -69,6 +69,25 @@ describe("RiskReportDocument", () => {
     expect(screen.getByText(/時刻の自動検証なし/)).toBeTruthy();
   });
 
+  it("算定不可・圏外承認の行と注記には注意マークが付き、無ければ付かない", () => {
+    const { container, rerender } = renderDoc([row()]);
+    expect(container.querySelector("svg")).toBeNull();
+    rerender(
+      <RiskReportDocument
+        rows={[row({ unmeasured_visits: 2, approved_claim_visits: 1 })]}
+        orgName="架空運送株式会社"
+        issueDate="2026年10月3日"
+        monthLabel="2026年9月"
+      />,
+    );
+    // 表とカードの内訳で 2 種 × 2、注記で 2 つ
+    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2);
+    // マークは飾りなので読み上げない。意味は隣の文が持つ
+    container.querySelectorAll("svg").forEach((svg) => {
+      expect(svg.getAttribute("aria-hidden")).toBe("true");
+    });
+  });
+
   it("狭い画面ではカード、広い画面と印刷では表を出す。どちらにも同じ数値が入る", () => {
     const { container } = renderDoc([
       row({ client_organization_name: "架空冷蔵", location_name: "本社倉庫", total_visits: 6, total_wait_minutes: 168, estimated_loss_jpy: 1750, gmen_risk_level: "中" }),
