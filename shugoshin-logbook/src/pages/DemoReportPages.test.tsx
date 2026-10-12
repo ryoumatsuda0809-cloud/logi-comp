@@ -31,6 +31,14 @@ describe.each([
     expect(within(nav).getAllByRole("button").filter((b) => b.hasAttribute("aria-current"))).toHaveLength(1);
   });
 
+  it("印刷が動かない端末でも開けるよう、PDFの見本へのリンクがある（新しいタブで開く）", () => {
+    renderAt(path);
+    const link = screen.getByRole("link", { name: "PDFの見本を開く" });
+    expect(link).toHaveAttribute("href", path === "/demo/report" ? "/samples/demo-report.pdf" : "/samples/demo-warning.pdf");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  });
+
   it("ヘッダーと下ナビは印刷しない（print:hidden）", () => {
     renderAt(path);
     expect(screen.getAllByRole("banner")[0].className).toContain("print:hidden");

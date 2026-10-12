@@ -3,6 +3,7 @@ import { Printer } from "lucide-react";
 import { FieldButton } from "@/components/ui/field-button";
 import { PageHeader } from "@/components/PageHeader";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
 import { RiskReportDocument } from "@/components/report/RiskReportDocument";
 import {
   DEMO_REPORT_ISSUE_DATE,
@@ -42,6 +43,12 @@ export default function DemoWarningReport() {
               <Printer />
               レポートを印刷 / PDF保存
             </FieldButton>
+            <DemoPdfLink href={DEMO_SAMPLE_PDF.warning} fullWidth={false}>
+              PDFの見本を開く
+            </DemoPdfLink>
+            <p className="text-center text-xs text-muted-foreground">
+              印刷が動かない端末（ホーム画面から開いたアプリなど）では、PDFの見本を開いてください。
+            </p>
           </div>
         }
       />
