@@ -48,7 +48,7 @@ describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テス�
     ).toBe(0);
   });
 
-  it("取消済み(cancelled)の打刻は待機時間・待機料・法定乗務記録のいずれにも計上しない", () => {
+  it("取消済み(cancelled)の打刻は待機時間・待機料・乗務記録のいずれにも計上しない", () => {
     // cancel_ticket は status='called'/'working' の行も取消可能なため、
     // called_time が入ったまま cancelled になった行が課金対象に混入しうる。
     const logs: WaitLogRow[] = [
@@ -84,13 +84,13 @@ describe("convertWaitLogsToTimeline — 待機料誤課金防止の回帰テス�
     expect(totalWaitMinutes).toBe(40);
     expect(waitMinutesPerEvent).toEqual([40]);
 
-    // 荷主へ提示する法定乗務記録にも取消済みの打刻が現れないこと
+    // 荷主へ提示する乗務記録にも取消済みの打刻が現れないこと
     const report = generateFormalReportFromWaitLogs(logs, facilityMap);
     expect(report).toContain("整理券 #1");
     expect(report).not.toContain("整理券 #2");
   });
 
-  it("全ログが取消済みの場合、法定乗務記録は「記録なし」になる", () => {
+  it("全ログが取消済みの場合、乗務記録は「記録なし」になる", () => {
     const logs: WaitLogRow[] = [
       {
         id: "log-cancelled",
@@ -179,7 +179,7 @@ describe("荷待ち時間の終端（荷役開始）", () => {
     expect(entries.map((e) => e.eventType)).toEqual(["arrival", "departure"]);
   });
 
-  it("法定乗務記録の荷待ち時間も荷役開始を終端にする", () => {
+  it("乗務記録の荷待ち時間も荷役開始を終端にする", () => {
     const report = generateFormalReportFromWaitLogs(
       [
         {
@@ -281,7 +281,7 @@ describe("等級C（圏外申告の承認記録）の扱い", () => {
     expect(entries.every((e) => e.evidenceGrade === undefined)).toBe(true);
   });
 
-  it("法定乗務記録に、サーバー検証されていない旨の注記が入る", () => {
+  it("乗務記録に、サーバー検証されていない旨の注記が入る", () => {
     const report = generateFormalReportFromWaitLogs([gradeCLog], facilityMap);
     expect(report).toContain("運行管理者が承認した記録");
     expect(report).toContain("時刻のサーバー自動検証は行われていません");
@@ -289,7 +289,7 @@ describe("等級C（圏外申告の承認記録）の扱い", () => {
     expect(report).toContain("60分");
   });
 
-  it("自己承認の場合はその旨も法定乗務記録に明示される", () => {
+  it("自己承認の場合はその旨も乗務記録に明示される", () => {
     const report = generateFormalReportFromWaitLogs(
       [{ ...gradeCLog, self_approved: true }],
       facilityMap

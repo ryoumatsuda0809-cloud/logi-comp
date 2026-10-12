@@ -115,9 +115,6 @@ export function ReportDocument({
             <h1 className="text-xl sm:text-2xl font-bold tracking-widest text-black">
               乗務記録 兼 待機時間報告書
             </h1>
-            <p className="text-sm text-gray-600 mt-1 tracking-wider">
-              中小受託取引適正化法（取適法）準拠
-            </p>
           </div>
 
           {/* Two-column: To/From + Meta */}
@@ -235,7 +232,7 @@ export function ReportDocument({
         {report.formal_report && (
           <section className="mb-8 print:mb-3 break-inside-avoid">
             <h2 className="text-base font-bold text-black border-b border-black pb-1 mb-4 print:mb-1">
-              法定乗務記録
+              乗務記録
             </h2>
             <div
               className="text-sm leading-relaxed whitespace-pre-wrap text-black bg-gray-50 border border-gray-400 p-4 print:p-2 print:bg-gray-50"

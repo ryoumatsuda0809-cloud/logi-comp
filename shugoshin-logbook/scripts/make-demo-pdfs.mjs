@@ -109,7 +109,7 @@ try {
   if (!(await clickByText("承認して確定する"))) throw new Error("confirm button not found");
   await sleep(1000);
   const ok = await evaluate(`(() => {
-    const doc = document.querySelector('article[aria-label="4条書面（架空）"]');
+    const doc = document.querySelector('article[aria-label="発注書（架空）"]');
     if (!doc) return false;
     const clone = doc.cloneNode(true);
     clone.style.border = 'none';

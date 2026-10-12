@@ -107,7 +107,7 @@ export function DemoSubmitPanel() {
                 <CheckCircle2 className="h-5 w-5" />
                 本日は提出済みです
               </div>
-              <p className="text-xs text-muted-foreground">送信済みの法定記録のため変更できません</p>
+              <p className="text-xs text-muted-foreground">送信済みの記録のため変更できません</p>
               <p className="text-xs tabular-nums text-muted-foreground">提出 {SUBMITTED_AT_LABEL}</p>
             </div>
 

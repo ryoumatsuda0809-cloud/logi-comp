@@ -214,7 +214,7 @@ export function convertWaitLogsToTimeline(
 }
 
 /**
- * wait_logs データから法定乗務記録テキストを自動生成
+ * wait_logs データから乗務記録テキストを自動生成
  */
 export function generateFormalReportFromWaitLogs(
   logs: WaitLogRow[],
@@ -223,7 +223,7 @@ export function generateFormalReportFromWaitLogs(
   const billableLogs = logs.filter(isBillableWaitLog);
   if (billableLogs.length === 0) return "（記録なし）";
 
-  const lines: string[] = ["【法定乗務記録】", ""];
+  const lines: string[] = ["【乗務記録】", ""];
 
   for (const log of billableLogs) {
     const facilityName = facilityMap[log.facility_id] || "不明な施設";
