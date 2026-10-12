@@ -65,7 +65,7 @@ export function DemoOrderDocument({ data }: { data: DemoOrderDocumentData }) {
   ];
 
   return (
-    <article aria-label="4条書面（架空）" className="rounded-lg border bg-card p-4 text-card-foreground">
+    <article aria-label="4条書面（架空）" className="rounded-lg border bg-card p-4 font-serif-jp text-card-foreground">
       <h3 className="border-b-2 border-foreground pb-2 text-lg font-bold">{DOC_TITLE}</h3>
 
       <div className="mt-4 space-y-4">

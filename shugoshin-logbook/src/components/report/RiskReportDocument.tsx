@@ -119,7 +119,7 @@ export function RiskReportDocument({
   const totalApprovedClaims = rows.reduce((s, r) => s + (r.approved_claim_visits ?? 0), 0);
 
   return (
-    <main className="mx-auto max-w-4xl p-4 pb-28 print:max-w-none print:p-0 print:pb-0">
+    <main className="mx-auto max-w-4xl p-4 pb-28 print:max-w-none print:p-0 print:pb-0 print:font-serif-jp">
       {/* Report Title */}
       <div className="mb-6 text-center print:mb-8">
         {/* 発行元情報 */}
