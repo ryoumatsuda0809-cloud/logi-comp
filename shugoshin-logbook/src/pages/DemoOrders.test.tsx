@@ -214,8 +214,10 @@ describe("DemoOrders", () => {
     expect(doc.textContent).toContain("¥60,000");
     expect(doc.textContent).toContain("2026年10月4日");
     expect(doc.textContent).toContain("2026年12月2日（役務の提供を受けた日から起算して60日以内）");
-    // 法令名は取適法の正式名。フリーランス法の名称や旧法の言い方を出さない
-    expect(doc.textContent).toContain("製造委託等に係る中小受託事業者に対する代金の支払の遅延等の防止に関する法律");
+    // 法律名・条文番号は出さず、デモ用の見本である旨だけを書く
+    expect(doc.textContent).toContain("デモ用の見本です。実際の取引条件を示すものではありません。");
+    expect(doc.textContent).not.toContain("取適法");
+    expect(doc.textContent).not.toContain("中小受託");
     expect(doc.textContent).not.toContain("特定受託事業者に係る取引の適正化等に関する法律");
     expect(doc.textContent).not.toContain("下請");
     expect(doc.textContent).not.toContain("物品受領");

@@ -42,7 +42,7 @@ describe("DemoSubmitPanel", () => {
       vi.advanceTimersByTime(HOLD_DURATION_MS);
     });
     expect(screen.getByText("本日は提出済みです")).toBeTruthy();
-    expect(screen.getByText("送信済みの法定記録のため変更できません")).toBeTruthy();
+    expect(screen.getByText("送信済みの記録のため変更できません")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /長押し/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));

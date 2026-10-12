@@ -46,12 +46,13 @@ describe("RiskReportDocument", () => {
     expect(screen.getAllByText("¥5")).toHaveLength(BOTH);
   });
 
-  it("遅延利息の列は「1日あたりの目安」と分かる見出しにし、起算日を条文どおりに書く", () => {
+  it("遅延利息の列は「1日あたりの目安」と分かる見出しにし、年率を仮定した参考値であると書く", () => {
     renderDoc([row()]);
     // 表の見出し・カードの見出し・注記の3か所に出る
     expect(screen.getAllByText(/遅延利息の目安（1日あたり）/).length).toBeGreaterThanOrEqual(BOTH);
     expect(screen.queryByText(/遅延損害金/)).toBeNull();
-    expect(screen.getByText(/役務の提供を受けた日から起算して60日を経過した日から/)).toBeTruthy();
+    expect(screen.getByText(/遅延利息の目安は、年率14\.6%を仮定して計算した参考値です。法的助言ではありません。/)).toBeTruthy();
+    expect(screen.queryByText(/取適法|中小受託|国土交通省|支払う義務/)).toBeNull();
   });
 
   it("算定不可・圏外承認が無ければ注記を出さず、通常のフッターにする", () => {
