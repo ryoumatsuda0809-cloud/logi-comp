@@ -114,11 +114,13 @@ ${placeDictionary}
 必ず extract_order_data 関数を呼び出して結果を返してください。`;
 
     const response = await fetch(
-      `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+      GEMINI_ENDPOINT,
       {
         method: "POST",
+        // 鍵は URL ではなくヘッダーで渡す（URL はログやエラー文に残りやすい）
         headers: {
           "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
         },
         body: JSON.stringify({
           system_instruction: {

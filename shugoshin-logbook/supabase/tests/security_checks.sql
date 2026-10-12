@@ -152,5 +152,14 @@ BEGIN
     END IF;
   END;
   RESET ROLE;
+
+  -- 発注の一括削除: authenticated / anon は TRUNCATE できない（権限の REVOKE。トリガーは全ロールの最後の砦）
+  BEGIN
+    SET LOCAL ROLE authenticated;
+    TRUNCATE public.transport_orders;
+    v_res := v_res || E'\n[NG] authenticated が transport_orders を TRUNCATE できた';
+  EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] transport_orders の TRUNCATE は拒否';
+  END;
+  RESET ROLE;
   RAISE EXCEPTION 'ROLLBACK_TEST_RESULT:%', v_res;
 END $$;
