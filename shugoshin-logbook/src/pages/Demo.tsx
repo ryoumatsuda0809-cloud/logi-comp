@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
+import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
 import { ChevronDown, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
@@ -397,27 +398,43 @@ function TimelinePanel() {
     () => convertWaitLogsToTimeline(DEMO_WAIT_LOGS, DEMO_FACILITY_NAMES),
     [],
   );
-  const entries = [...summary.entries].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
+  const visits = useMemo(() => groupTimelineByVisit(summary.entries), [summary]);
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">打刻タイムライン</CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="space-y-2 border-l pl-4">
-          {entries.map((e, i) => (
-            <li key={i} className="text-sm">
-              <span className="tabular-nums font-medium">{formatTimeOrNull(e.timestamp)}</span>{" "}
-              {EVENT_LABEL[e.eventType] ?? e.eventType}
-              <span className="text-muted-foreground">　{e.locationName}</span>
-              {e.waitMinutes !== undefined && (
-                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">待機 {e.waitMinutes}分</span>
-              )}
-              {e.evidenceGrade === "C" && (
-                <span className="ml-2 rounded border px-1.5 py-0.5 text-xs">等級C</span>
-              )}
+        <ol className="space-y-3">
+          {visits.map((v) => (
+            <li key={v.key} className="rounded-lg border p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{v.locationName}</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  {v.evidenceGrade === "C" && (
+                    <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs">
+                      <NoticeMark />
+                      等級C
+                    </span>
+                  )}
+                  {v.waitMinutes === null ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold">
+                      <NoticeMark />
+                      待機 算定不能
+                    </span>
+                  ) : (
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs font-semibold">待機 {v.waitMinutes}分</span>
+                  )}
+                </span>
+              </div>
+              <ol className="mt-2 space-y-1 border-l pl-3">
+                {v.entries.map((e, i) => (
+                  <li key={i}>
+                    <span className="tabular-nums font-medium">{formatTimeOrNull(e.timestamp)}</span>{" "}
+                    {EVENT_LABEL[e.eventType] ?? e.eventType}
+                  </li>
+                ))}
+              </ol>
             </li>
           ))}
         </ol>
