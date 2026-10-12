@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cleanText, displayRoute, displayText, displayYen, invalidForApproval, missingForApproval, orderHintsFromText } from "@/lib/orderContent";
 import { QuantityField } from "@/components/orders/QuantityField";
+import { NoticeMark } from "@/components/NoticeMark";
+import { orderPrecheckNotices } from "@/demo/orderPrecheck";
 import { latestPaymentDate } from "@/lib/paymentDeadline";
 import { DemoOrderDocument, type DemoOrderDocumentData } from "@/components/demo/DemoOrderDocument";
 import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
@@ -239,6 +241,9 @@ export default function DemoOrders() {
     setTab("new");
   };
 
+  // 承認ボタンの前に見せる確認（デモ用の事前表示）。承認ボタンを押して拒否が出ているときは、拒否の文に任せる
+  const precheck = form && !refusal ? orderPrecheckNotices(form, deliveryDate) : [];
+
   // 納品日（役務の提供を受ける日）から60日以内。受領日を算入するので上限は59日後
   const paymentDeadline = deliveryDate ? latestPaymentDate(deliveryDate) : null;
   const approvedDeadline = approved ? latestPaymentDate(approved.deliveryDate) : null;
@@ -408,6 +413,23 @@ export default function DemoOrders() {
                   {paymentDeadline && (
                     <div className="rounded-lg bg-accent/10 p-3 text-sm">
                       <span className="font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
+                    </div>
+                  )}
+
+                  {precheck.length > 0 && (
+                    <div role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      <p className="flex items-center gap-1.5 font-bold text-foreground">
+                        <NoticeMark />
+                        承認の前に確認してください
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-foreground">
+                        {precheck.map((notice) => (
+                          <li key={notice}>{notice}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        デモ用の事前表示です。承認できるかどうかは、承認ボタンを押したときの確認で決まります。
+                      </p>
                     </div>
                   )}
 

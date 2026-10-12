@@ -115,6 +115,39 @@ describe("DemoOrders", () => {
     expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
   });
 
+  it("解析結果に欠けがあれば、承認ボタンを押す前から「承認の前に確認してください」が出て、直すと消える。承認の可否は変えない", () => {
+    renderPage();
+    // そろっている例1では出ない
+    parseExample(/例1/);
+    expect(screen.queryByText("承認の前に確認してください")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "最初の状態に戻す" }));
+    parseExample(/例2/);
+    expect(screen.getByText("承認の前に確認してください")).toBeTruthy();
+    expect(screen.getByText("運賃が入っていません")).toBeTruthy();
+    // 表示だけ。まだ承認は試していないので、拒否の表示は出ていない
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // 承認を押すと、これまでどおり拒否される。拒否の文が出ている間は、事前表示は重ねない
+    fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
+    expect(screen.getByRole("alert").textContent).toContain("運賃が入っていません。入力してから承認してください。");
+    expect(screen.queryByText("承認の前に確認してください")).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    // 直すと事前表示も出ない
+    fireEvent.change(field("運賃（円）"), { target: { value: "45000" } });
+    expect(screen.queryByText("承認の前に確認してください")).toBeNull();
+  });
+
+  it("入力を直している途中でも、事前表示が追従する（運賃を消すと出て、入れると消える）", () => {
+    renderPage();
+    parseExample(/例1/);
+    fireEvent.change(field("運賃（円）"), { target: { value: "" } });
+    expect(screen.getByText("運賃が入っていません")).toBeTruthy();
+    fireEvent.change(field("運賃（円）"), { target: { value: "60000" } });
+    expect(screen.queryByText("承認の前に確認してください")).toBeNull();
+  });
+
   it("納品日が空のときも、その項目名を挙げて拒否される", () => {
     renderPage();
     parseExample(/例3/);
