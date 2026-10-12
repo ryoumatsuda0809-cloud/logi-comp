@@ -6,6 +6,7 @@ import {
   TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { NoticeMark } from "@/components/NoticeMark";
 
 /** monthly_wait_risk_reports ビューの1行（荷主 × 拠点 × 月） */
 export interface RiskReportRow {
@@ -67,8 +68,22 @@ function VisitBreakdown({ row }: { row: RiskReportRow }) {
   if (unmeasured <= 0 && approved <= 0) return null;
   return (
     <div className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
-      {unmeasured > 0 && <div>うち算定不可 {row.unmeasured_visits}</div>}
-      {approved > 0 && <div>うち圏外承認 {row.approved_claim_visits}</div>}
+      {unmeasured > 0 && (
+        <div>
+          <span className="inline-flex items-center gap-1">
+            <NoticeMark />
+            うち算定不可 {row.unmeasured_visits}
+          </span>
+        </div>
+      )}
+      {approved > 0 && (
+        <div>
+          <span className="inline-flex items-center gap-1">
+            <NoticeMark />
+            うち圏外承認 {row.approved_claim_visits}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -259,16 +274,22 @@ export function RiskReportDocument({
             ※ 遅延利息の目安は、推定逸失利益が未払のままのとき、1日遅れるごとに加わる額（推定逸失利益 × 年率14.6% ÷ 365日）です。実際の額は、未払額と遅れた日数で決まります。
           </p>
           {totalUnmeasured > 0 && (
-            <p>
-              ※「算定不可」は荷役開始が記録されておらず荷待ち時間を確定できなかった訪問です。
-              待機が無かったことを意味しません（{totalUnmeasured}件）。
+            <p className="flex items-start gap-1">
+              <NoticeMark className="mt-0.5" />
+              <span>
+                ※「算定不可」は荷役開始が記録されておらず荷待ち時間を確定できなかった訪問です。
+                待機が無かったことを意味しません（{totalUnmeasured}件）。
+              </span>
             </p>
           )}
           {totalApprovedClaims > 0 && (
-            <p>
-              ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
-              {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
-              時刻についてはサーバーによる自動検証が行われていません。
+            <p className="flex items-start gap-1">
+              <NoticeMark className="mt-0.5" />
+              <span>
+                ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
+                {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
+                時刻についてはサーバーによる自動検証が行われていません。
+              </span>
             </p>
           )}
         </div>
