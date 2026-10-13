@@ -135,15 +135,15 @@ sequenceDiagram
 
 ## テストと CI
 
-2026-10-10 に `npx vitest run` を実行した結果は **22 ファイル・264 件・すべて成功** です（`git archive` で書き出して `npm ci` した場所で実行）。
+2026-10-13 に `npx vitest run` を実行した結果（コミット `c25f55c` 時点）は **27 ファイル・294 件・すべて成功** です（クリーンな clone に `npm ci` して実行）。対象は画面側とロジックのテストで、**DB 側（RPC・トリガー・RLS）と E2E は含みません**（下の「CI で確かめていないこと」を参照）。
 
 | 種類 | ファイル | 件数 |
 |---|---|---|
-| ドメインロジック（純粋関数） | `src/lib/*.test.ts` 10本（発注内容、発注書 PDF と画面の運賃の読み取りの一致、水産法の対象判定、日報の時刻算定、支払期日、JST の日付、認証・DB エラーの文言ほか） | 189 |
+| ドメインロジック（純粋関数） | `src/lib/*.test.ts` 11本（発注内容、発注書 PDF と画面の運賃の読み取りの一致、水産法の対象判定、日報の時刻算定、支払期日、JST の日付、認証・DB エラーの文言ほか） | 194 |
 | 打刻の結合（Supabase をモック） | `src/hooks/useEvidence.test.ts`、`src/components/evidence/EvidenceCollector.test.tsx` | 15 |
-| 画面（`/demo` 系） | `src/pages/Demo*.test.tsx` 3本、`src/components/demo/DemoSubmitPanel.test.tsx`、`src/components/report/RiskReportDocument.test.tsx` | 32 |
+| 画面（`/demo` 系・報告書） | `src/pages/Demo*.test.tsx` 3本、`src/components/demo/DemoSubmitPanel.test.tsx`、`src/components/report/RiskReportDocument.test.tsx`、`src/components/report/RiskReportSummary.test.tsx` | 45 |
 | 画面（発注の数量入力） | `src/components/orders/QuantityField.test.tsx` | 9 |
-| デモのデータ | `src/demo/*.test.ts` 3本（固定データ、月次報告、デモの AI 解析 API の呼び出し） | 18 |
+| デモのデータ | `src/demo/*.test.ts` 5本、`src/components/demo/DemoPdfLink.test.ts`（固定データ、月次報告、デモの AI 解析 API の呼び出し、訪問ごとの並べ替え、発注の事前チェック、PDF リンク） | 30 |
 | プレースホルダ | `src/test/example.test.ts`（`expect(true)` だけ） | 1 |
 
 CI は [`.github/workflows/shugoshin-ci.yml`](../.github/workflows/shugoshin-ci.yml)（リポジトリ直下）。`npm ci` → 型チェック（`npx tsc --noEmit -p tsconfig.app.json`）→ `npx vitest run` → `npm run build` を、push と pull request で実行します。シークレットは使わず、ビルド用の環境変数はダミー値です。
