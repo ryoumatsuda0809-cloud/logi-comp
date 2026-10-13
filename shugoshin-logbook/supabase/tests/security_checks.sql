@@ -7,6 +7,8 @@
 --
 -- 確認すること:
 --   正常系: 到着 → 荷役開始 → 完了（正規の RPC フロー）が通る
+--   圏外:   施設から約5km離れた座標での到着打刻（issue_ticket）が拒否される（500m ジオフェンス）
+--   権限:   anon / authenticated に TRUNCATE が付いたテーブルが無い
 --   拒否系: 直接 INSERT での記録偽装 / 証拠の直接 INSERT / 状態の巻き戻し /
 --           権限のない荷主操作 / 未ログインでの RPC 実行
 --
@@ -37,6 +39,21 @@ BEGIN
     PERFORM public.complete_ticket(v_log, v_fac.lat, v_fac.lng, NULL);
     v_res := v_res || E'\n[OK] complete_ticket';
   EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[NG] 正規フロー: ' || SQLERRM;
+  END;
+
+  -- 圏外: 施設から約5km離れた座標では、RPC 経由でも打刻（整理券の発行）が拒否される。
+  --   enforce_wait_log_geofence トリガーが check_violation で止める。
+  --   他の理由（GPS NULL など）で止まった場合を [OK] と誤判定しないよう、メッセージも見る。
+  BEGIN
+    PERFORM public.issue_ticket(v_fac.id, v_fac.lat + 0.05, v_fac.lng);
+    v_res := v_res || E'\n[NG] 施設から約5km離れた座標で issue_ticket が通った';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM LIKE '%500m圏外%' THEN
+      v_res := v_res || E'\n[OK] 圏外（約5km）の issue_ticket は拒否';
+    ELSE
+      v_res := v_res || E'\n[??] 圏外の issue_ticket が別の理由で拒否: ' || SQLERRM;
+    END IF;
+  WHEN OTHERS THEN v_res := v_res || E'\n[??] 圏外の issue_ticket: ' || SQLERRM;
   END;
 
   -- 偽装: 完了済みの記録を直接 INSERT
@@ -150,6 +167,25 @@ BEGIN
         THEN E'\n[OK] 失効後の共有リンクは取得できない' ELSE E'\n[NG] 失効が効かない' END;
       RESET ROLE;
     END IF;
+  END;
+  -- TRUNCATE: API ロール（anon / authenticated）に TRUNCATE が付いたテーブルが無い。
+  --   TRUNCATE は行トリガーも RLS も通らないため、権限そのものが無いことを確かめる。
+  --   拡張が持つテーブル（spatial_ref_sys など）は対象外。
+  DECLARE
+    v_bad text;
+  BEGIN
+    RESET ROLE;
+    SELECT string_agg(c.relname, ', ' ORDER BY c.relname) INTO v_bad
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
+      AND (has_table_privilege('anon', c.oid, 'TRUNCATE')
+        OR has_table_privilege('authenticated', c.oid, 'TRUNCATE'));
+    v_res := v_res || CASE WHEN v_bad IS NULL
+      THEN E'\n[OK] API ロールに TRUNCATE が付いたテーブルは無い'
+      ELSE E'\n[NG] TRUNCATE が付いたテーブルがある: ' || v_bad END;
   END;
   RESET ROLE;
 
