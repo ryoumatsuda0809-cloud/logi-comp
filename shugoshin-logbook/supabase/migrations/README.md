@@ -128,4 +128,4 @@ facilities
 
 各段階のあとに `supabase/tests/security_checks.sql` と `supabase/tests/server_side_report_totals.sql` を実行し、結果の先頭に省略の警告が出ていないことを確認する
 （6 を入れる前は、`server_side_report_totals.sql` に「直接INSERTの剥奪が未適用」の省略が1件出るのが正常）。
-戻す手順は `supabase/rollbacks/` を参照（作成中）。
+戻す手順（適用前の本番の定義に戻す SQL と、使い方・注意）は `supabase/rollbacks/` を参照。実行前にバックアップを取ること。
