@@ -6,6 +6,19 @@
 - 🔗 **デモ**: `/demo`（ログイン不要・架空データ・DBには接続しません）
 - 技術: React 18 / Vite / TypeScript / Tailwind / shadcn-ui / Supabase（Auth・Postgres・Edge Functions）/ PWA
 
+## 画面（`/demo`・架空データ）
+
+| 施設の500m圏内で到着を打刻 | 待機料の算定 |
+|---|---|
+| <img src="docs/images/demo-gps-mobile.png" width="300" alt="GPS軌跡と500m圏。到着打刻後は整理券番号とサーバー時刻が表示される"> | <img src="docs/images/demo-fee-mobile.png" width="300" alt="施設ごとの待機時間と待機料。等級A・等級Cを区別して表示"> |
+| 圏外では打刻ボタンが無効になり、圏内に入って打刻すると整理券番号とサーバー時刻が表示されます。 | 30分を超えた分のみ、待機1回ごとに30分を控除して合計します。承認済みの申告は「等級C」と明示します。 |
+
+| PC幅（再生バーで1日の流れを動かせます） | 荷主に渡す報告書（印刷・PDF保存） |
+|---|---|
+| <img src="docs/images/demo-desktop.png" width="420" alt="PC幅のデモ画面"> | <img src="docs/images/demo-report.png" width="420" alt="乗務記録兼待機時間報告書"> |
+
+画像は `/demo` を撮ったもので、施設・運送会社・金額はすべて架空です。時刻は端末の設定に関係なく日本時間で表示します。
+
 ## 何ができるか
 
 | 利用者 | できること |
@@ -72,7 +85,7 @@ docs/               設計メモ・実装要約・進捗ログ
 - 荷主への到着通知、完了の押し忘れ通知
 - 料率表・水産法の対象魚種の DB 管理（現在はコード内の定数）
 
-**テスト状況**: `npx vitest run` で 11 ファイル・82 件が成功（2026-10-13 実行時点。単体・コンポーネントテストのみ）。
+**テスト状況**: `npx vitest run` で 12 ファイル・113 件が成功、型チェック（`npx tsc -p tsconfig.app.json --noEmit`）はエラーなし（2026-10-13 実測。単体・コンポーネントテストのみ）。
 
 ## 既知の課題
 
