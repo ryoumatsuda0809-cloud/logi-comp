@@ -479,6 +479,20 @@ export default function Demo() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-base">月ごとの警告レポート（運送会社の管理者向け）</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              荷主ごと・拠点ごとに、待機時間・逸失額・遅延損害金の目安・リスク判定をまとめます。
+              算定できなかった訪問や、圏外承認の訪問は、注記で明示します。
+            </p>
+            <Button asChild variant="outline">
+              <Link to="/demo/risk">警告レポートを見る</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">記録が改ざんされにくい理由</CardTitle>
           </CardHeader>
           <CardContent>
