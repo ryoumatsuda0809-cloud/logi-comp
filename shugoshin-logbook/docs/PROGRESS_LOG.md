@@ -104,7 +104,7 @@ CLAUDE.md Rule 1（RPCチェーン必須）はこれまでコード規約のみ�
 
 ### ブロッカー: Supabase MCP接続先プロジェクトの不一致
 
-migration適用を試みる前に `mcp__claude_ai_Supabase__list_projects` で確認したところ、MCP経由で見えるプロジェクトは **`Bloomers Project`**（id: `cpvuugafgabiqekvbiiy`, org: `smnpzpiqeqnmltultqtu`）の1件のみだった。一方、このリポジトリの `supabase/config.toml` は `project_id = "qojhncmwmsqzycxrfezv"` を指しており、**一致していない**。
+migration適用を試みる前に `mcp__claude_ai_Supabase__list_projects` で確認したところ、MCP経由で見えるプロジェクトは **`Bloomers Project`**（別プロジェクトの識別子は公開リポジトリのため省略）の1件のみだった。一方、このリポジトリの `supabase/config.toml` は `project_id = "qojhncmwmsqzycxrfezv"` を指しており、**一致していない**。
 
 誤ったプロジェクトへDDLを適用する事故を避けるため、適用は中止した。ユーザーに確認したところ「適用を中止する」を選択（正しいプロジェクトへの接続切り替えが必要という認識）。
 
