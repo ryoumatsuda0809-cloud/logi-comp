@@ -116,12 +116,16 @@ facilities
   └─ monthly_wait_risk_reports (VIEW)
 ```
 
-## 2026-10-13 の追加（適用順序: この順）
-1. `20261013100000_register_unverified_facilities.sql` — 運送会社の管理者による施設の登録（未確認施設）と、`facilities` の可視性の絞り込み
+## 2026-10-13 の追加（適用順序: この順。**フロントのデプロイを間に挟む**）
+**原則: 既存の動きを壊さない。足すものを先に入れ、既存を締める変更は、フロントの切り替えが済んでから最後に入れる。**
+
+1. `20261013100000_register_unverified_facilities.sql` — 運送会社の管理者による施設の登録（未確認施設）と、`facilities` の可視性の絞り込み（既存施設は全て「確認済み」なので、既存の動きは変わらない）
 2. `20261013100001_shared_report_unverified_facilities.sql` — 共有帳票に「位置未確認の施設」を出す
-3. `20261013200000_server_side_report_totals.sql` — 日報の数値をサーバーで計算（`wait_rates`、`submit_daily_report`、月次ビューの作り直し）
+3. `20261013200000_server_side_report_totals.sql` — 日報の数値をサーバーで計算（`wait_rates`、`submit_daily_report`、月次ビューの作り直し）。**RPC を足すだけで、旧い画面の提出は引き続き動く**
 4. `20261013300000_monthly_report_unverified_visits.sql` — 月次ビューに `unverified_visits`（末尾の列）を追加
+5. **ここで、新しいフロントをデプロイする**（`submit_daily_report` を呼ぶ画面、施設の登録画面）
+6. `20261013200001_lock_submitted_reports_direct_insert.sql` — 日報の直接 INSERT を剥奪（**フロントのデプロイ後に**。先に入れると旧い画面の提出が失敗する）
 
-**フロントのデプロイは、マイグレーションの適用後**（逆だと、共有帳票・日報の提出・施設の登録が失敗する）。
-適用後に `supabase/tests/security_checks.sql` と `supabase/tests/server_side_report_totals.sql` を実行し、先頭に省略の警告が出ていないことを確認する。
-
+各段階のあとに `supabase/tests/security_checks.sql` と `supabase/tests/server_side_report_totals.sql` を実行し、結果の先頭に省略の警告が出ていないことを確認する
+（6 を入れる前は、`server_side_report_totals.sql` に「直接INSERTの剥奪が未適用」の省略が1件出るのが正常）。
+戻す手順は `supabase/rollbacks/` を参照（作成中）。

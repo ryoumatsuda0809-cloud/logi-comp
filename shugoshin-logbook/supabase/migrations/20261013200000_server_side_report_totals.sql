@@ -446,15 +446,11 @@ COMMENT ON FUNCTION public.submit_daily_report(date, text, text, jsonb, boolean,
   '日報を提出する唯一の入口。待機時間・待機料はサーバーが wait_logs から計算する（引数にしない）。提出できるのは本人の本日（日本時間）の分だけ。同じ日の二重提出は拒否。';
 
 -- ---------------------------------------------------------------------------
--- STEP 6: submitted_reports への直接 INSERT を剥奪する
---   提出は submit_daily_report だけ。SELECT は残す（本人の閲覧）。
---   更新・削除は RESTRICTIVE ポリシーとトリガーで引き続き禁止。
---   anon には何も付けない（これまでは表の権限だけ付いていた）。
+-- STEP 6（直接 INSERT の剥奪）は、このマイグレーションに含めない。
+--   `20261013200001_lock_submitted_reports_direct_insert.sql` に分けた。
+--   理由: ここで剥奪すると、まだデプロイされていない旧い画面（クライアントが直接 INSERT する）の
+--   日報の提出が、その瞬間から失敗する。適用順序は次のとおり。
+--     1. このマイグレーション（RPC を足すだけ。旧い画面は引き続き提出できる）
+--     2. 新しいフロントをデプロイ（submit_daily_report を呼ぶ）
+--     3. 20261013200001（直接 INSERT を剥奪）
 -- ---------------------------------------------------------------------------
-REVOKE ALL ON public.submitted_reports FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
-  ON public.submitted_reports FROM authenticated;
-
--- INSERT のポリシーは不要になった（権限が無いので使われない）。残すと「直接 INSERT できる」と読める。
-DROP POLICY IF EXISTS "Users can insert own report" ON public.submitted_reports;
-DROP POLICY IF EXISTS "Users can insert own submitted reports" ON public.submitted_reports;

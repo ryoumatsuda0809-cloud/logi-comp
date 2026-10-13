@@ -324,7 +324,10 @@ BEGIN
     WHEN OTHERS THEN v_res := v_res || E'\n[??] 日付違いの提出: ' || SQLERRM;
     END;
 
-    -- 直接 INSERT / UPDATE / DELETE は権限が無い
+    -- 直接 INSERT は 20261013200001 の適用後に権限が無くなる。未適用の移行中は省略として数える。
+    IF has_table_privilege('authenticated', 'public.submitted_reports', 'INSERT') THEN
+      v_res := v_res || E'\n[--] 直接INSERTの剥奪（20261013200001）が未適用のため、直接INSERTの拒否は検証していません（フロントのデプロイ後に適用する）';
+    ELSE
     BEGIN
       INSERT INTO public.submitted_reports (user_id, report_date, total_wait_minutes, estimated_wait_cost)
       VALUES (v_rpc_uid, v_today, 999, 99999);
@@ -332,6 +335,7 @@ BEGIN
     EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] submitted_reports への直接INSERTは拒否';
     WHEN OTHERS THEN v_res := v_res || E'\n[??] submitted_reports INSERT: ' || SQLERRM;
     END;
+    END IF;
 
     -- 正常: 手修正の待機分数 45 を添えて提出（サーバーの計算は 72+20+40(等級C)=132分・2600円）
     BEGIN
@@ -381,7 +385,9 @@ BEGIN
   -- ---------------------------------------------------------------------------
   -- 5. 権限
   -- ---------------------------------------------------------------------------
-  v_res := v_res || CASE WHEN has_table_privilege('authenticated', 'public.submitted_reports', 'SELECT')
+  v_res := v_res || CASE WHEN has_table_privilege('authenticated', 'public.submitted_reports', 'INSERT')
+    THEN E'\n[--] submitted_reports のテーブル権限: 剥奪（20261013200001）が未適用のため検証していません'
+    WHEN has_table_privilege('authenticated', 'public.submitted_reports', 'SELECT')
       AND NOT has_table_privilege('authenticated', 'public.submitted_reports', 'INSERT')
       AND NOT has_table_privilege('authenticated', 'public.submitted_reports', 'UPDATE')
       AND NOT has_table_privilege('authenticated', 'public.submitted_reports', 'DELETE')
