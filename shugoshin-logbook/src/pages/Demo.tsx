@@ -451,6 +451,20 @@ export default function Demo() {
         <FeePanel />
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-base">1日の終わりに：日報を提出する</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              打刻の記録から日報が作られます。報告書の文面は直せますが、GPS で記録した待機時間は変わりません。
+              長押しで提出すると「提出済み・変更不可」になり、荷主向けの報告書につながります。
+            </p>
+            <Button asChild variant="outline">
+              <Link to="/demo/daily">日報を提出してみる</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">荷主に渡す報告書</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
