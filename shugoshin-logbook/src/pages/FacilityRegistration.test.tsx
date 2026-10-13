@@ -98,8 +98,28 @@ describe("FacilityRegistration — 施設の登録", () => {
       p_lat: 35.681236,
       p_lng: 139.767125,
       p_address: null,
-      p_notification_number: null,
     });
+  });
+
+  it("登録中に続けて押しても、register_facility は1回しか呼ばれない", async () => {
+    mockGeolocation("ok");
+    mockRpc.mockReturnValue(new Promise(() => {}));
+    setup();
+    await waitFor(() => expect(screen.getByText("まだ登録した施設はありません。")).toBeTruthy());
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: /現在地を取得する/ }));
+    await waitFor(() => expect((registerButton() as HTMLButtonElement).disabled).toBe(false));
+    const button = registerButton();
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("位置は端末が報告した値でサーバーは検証していない、と注意書きを出す", async () => {
+    mockGeolocation("ok");
+    setup();
+    await waitFor(() => expect(screen.getByText("まだ登録した施設はありません。")).toBeTruthy());
+    expect(screen.getByText(/端末が報告した値です。サーバーは検証していません/)).toBeTruthy();
   });
 
   it("登録済みの施設を「未確認」バッジ付きで一覧する", async () => {

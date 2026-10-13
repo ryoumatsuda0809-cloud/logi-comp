@@ -55,7 +55,6 @@ export default function FacilityRegistration() {
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
   const [address, setAddress] = useState("");
-  const [notificationNumber, setNotificationNumber] = useState("");
   const [position, setPosition] = useState<RegistrationPosition | null>(null);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(
@@ -99,7 +98,7 @@ export default function FacilityRegistration() {
   // 一覧が読めていないときは上限を判断できないので、登録は一覧が読めてから
   const canJudgeQuota = !listLoading && !listError;
 
-  const result = validateFacilityForm({ name, clientName, address, notificationNumber, position });
+  const result = validateFacilityForm({ name, clientName, address, position });
   const blockReason =
     geoError && !position
       ? geoError
@@ -132,6 +131,7 @@ export default function FacilityRegistration() {
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (!result.ok || !result.values || blockReason) return;
     const v = result.values;
     setSubmitting(true);
@@ -141,7 +141,6 @@ export default function FacilityRegistration() {
       p_lat: v.lat,
       p_lng: v.lng,
       p_address: v.address,
-      p_notification_number: v.notificationNumber,
     });
     setSubmitting(false);
 
@@ -162,7 +161,6 @@ export default function FacilityRegistration() {
     setName("");
     setClientName("");
     setAddress("");
-    setNotificationNumber("");
     setPosition(null);
     void fetchFacilities();
   };
@@ -238,26 +236,6 @@ export default function FacilityRegistration() {
               {result.errors.address && <p className="text-xs text-destructive">{result.errors.address}</p>}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="facility-notification" className="text-base font-semibold">
-                届出番号（任意・7桁）
-              </Label>
-              <Input
-                id="facility-notification"
-                value={notificationNumber}
-                onChange={(e) => setNotificationNumber(e.target.value)}
-                inputMode="numeric"
-                placeholder="水産物を扱う荷主のみ"
-                className="h-12 text-base"
-              />
-              {notificationNumber.trim().length > 0 && result.errors.notificationNumber && (
-                <p className="text-xs text-destructive">{result.errors.notificationNumber}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                漁獲番号の先頭7桁に使われます。確かな番号が分からないときは空欄にしてください。
-              </p>
-            </div>
-
             <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
               <p className="text-base font-semibold">施設の位置</p>
               {position ? (
@@ -274,6 +252,7 @@ export default function FacilityRegistration() {
                     <span className="text-xs text-muted-foreground">
                       この地点から半径{FACILITY_RADIUS_M}m以内で打刻できる施設になります。
                     </span>
+
                   </span>
                 </p>
               ) : (
@@ -299,6 +278,9 @@ export default function FacilityRegistration() {
                 )}
                 {locating ? "現在地を取得中..." : position ? "現在地を取得し直す" : "現在地を取得する"}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                位置は、登録時点の現在地を端末が報告した値です。サーバーは検証していません。
+              </p>
             </div>
 
             <FieldButton

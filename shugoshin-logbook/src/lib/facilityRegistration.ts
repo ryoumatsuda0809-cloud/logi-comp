@@ -4,6 +4,7 @@
  * ここでの検証は「入力の取りこぼしを早く知らせる」ためのもの。最終的な検証と制限
  * （権限・件数の上限・重複・座標の範囲）は、サーバーの register_facility が行う。
  * 数値は supabase/migrations/20261013100000_register_unverified_facilities.sql と一致させること。
+ * 届出番号は登録時に入力させない（運営者が確認済みにするときに SQL で設定する）。
  */
 
 export const FACILITY_NAME_MAX = 100;
@@ -27,7 +28,6 @@ export interface FacilityFormInput {
   name: string;
   clientName: string;
   address: string;
-  notificationNumber: string;
   position: RegistrationPosition | null;
 }
 
@@ -35,7 +35,6 @@ export interface FacilityFormErrors {
   name?: string;
   clientName?: string;
   address?: string;
-  notificationNumber?: string;
   /** 現在地が使えない理由。登録ボタンを無効にする理由として表示する */
   position?: string;
 }
@@ -48,7 +47,6 @@ export interface FacilityFormResult {
     name: string;
     clientName: string;
     address: string | null;
-    notificationNumber: string | null;
     lat: number;
     lng: number;
   } | null;
@@ -58,7 +56,6 @@ export function validateFacilityForm(input: FacilityFormInput): FacilityFormResu
   const name = input.name.trim();
   const clientName = input.clientName.trim();
   const address = input.address.trim();
-  const notification = input.notificationNumber.trim();
   const errors: FacilityFormErrors = {};
 
   if (name.length === 0) errors.name = "施設名を入力してください。";
@@ -70,9 +67,6 @@ export function validateFacilityForm(input: FacilityFormInput): FacilityFormResu
 
   if (address.length > FACILITY_ADDRESS_MAX)
     errors.address = `住所は${FACILITY_ADDRESS_MAX}文字以内で入力してください。`;
-
-  if (notification.length > 0 && !/^[0-9]{7}$/.test(notification))
-    errors.notificationNumber = "届出番号は7桁の数字で入力してください（分からなければ空欄で構いません）。";
 
   const positionError = describePositionProblem(input.position);
   if (positionError) errors.position = positionError;
@@ -87,7 +81,6 @@ export function validateFacilityForm(input: FacilityFormInput): FacilityFormResu
             name,
             clientName,
             address: address.length > 0 ? address : null,
-            notificationNumber: notification.length > 0 ? notification : null,
             lat: input.position.lat,
             lng: input.position.lng,
           }
@@ -156,5 +149,5 @@ export function registrationBlockReason(result: FacilityFormResult, quotaFull: b
   if (quotaFull) return QUOTA_FULL_MESSAGE;
   if (result.ok) return null;
   const e = result.errors;
-  return e.position ?? e.name ?? e.clientName ?? e.address ?? e.notificationNumber ?? "入力内容を確認してください。";
+  return e.position ?? e.name ?? e.clientName ?? e.address ?? "入力内容を確認してください。";
 }

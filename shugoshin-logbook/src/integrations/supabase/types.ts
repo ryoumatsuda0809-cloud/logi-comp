@@ -960,7 +960,6 @@ export type Database = {
           p_lat: number
           p_lng: number
           p_name: string
-          p_notification_number?: string | null
         }
         Returns: string
       }

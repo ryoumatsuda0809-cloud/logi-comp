@@ -16,7 +16,6 @@ const valid: FacilityFormInput = {
   name: "第二物流センター",
   clientName: "株式会社サンプル",
   address: "",
-  notificationNumber: "",
   position: { lat: 35.68, lng: 139.76, accuracyM: 12 },
 };
 
@@ -28,7 +27,6 @@ describe("validateFacilityForm", () => {
       name: "第二物流センター",
       clientName: "株式会社サンプル",
       address: "東京都千代田区",
-      notificationNumber: null,
       lat: 35.68,
       lng: 139.76,
     });
@@ -47,13 +45,6 @@ describe("validateFacilityForm", () => {
     expect(validateFacilityForm({ ...valid, name: "あ".repeat(101) }).errors.name).toMatch(/100文字/);
     expect(validateFacilityForm({ ...valid, clientName: "あ".repeat(101) }).errors.clientName).toMatch(/100文字/);
     expect(validateFacilityForm({ ...valid, address: "あ".repeat(201) }).errors.address).toMatch(/200文字/);
-  });
-
-  it("届出番号は空欄か7桁の数字だけ", () => {
-    expect(validateFacilityForm({ ...valid, notificationNumber: "1234567" }).ok).toBe(true);
-    expect(validateFacilityForm({ ...valid, notificationNumber: "123456" }).errors.notificationNumber).toBeDefined();
-    expect(validateFacilityForm({ ...valid, notificationNumber: "12345678" }).errors.notificationNumber).toBeDefined();
-    expect(validateFacilityForm({ ...valid, notificationNumber: "12345ab" }).errors.notificationNumber).toBeDefined();
   });
 
   it("現在地が未取得なら通らず、理由が出る", () => {

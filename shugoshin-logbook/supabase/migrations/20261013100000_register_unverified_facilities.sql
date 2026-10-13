@@ -15,8 +15,9 @@
 --   3. 未確認の施設は「登録した組織のメンバー」だけが見え、打刻に使える。
 --      他の組織には見えない・使えない。検査する場所:
 --        - facilities の SELECT ポリシー
---        - get_nearest_facility / issue_ticket / queue_offline_punch / verify_company_name
+--        - get_nearest_facility / issue_ticket / queue_offline_punch
 --          （SECURITY DEFINER で RLS を迂回するので、関数の中で明示的に検査する）
+--        - verify_company_name（組織名の候補。確認済みの施設だけにする）
 --        - wait_logs の INSERT トリガー enforce_wait_log_geofence（最後の砦。
 --          approve_pending_punch など issue_ticket 以外の経路も止める）
 --   4. 「確認済み」にする操作は RPC を作らない。運営者が SQL で行う（下記）。
@@ -33,9 +34,11 @@
 --     WHERE f.verification_status = 'unverified'
 --     ORDER BY f.created_at;
 --
---     -- 2. 確認済みにする。
+--     -- 2. 確認済みにする。届出番号（水産物を扱う荷主のみ・7桁）は登録画面では入力させないので、
+--     --    ここで運営者が設定する（不明なら NULL のまま）。
 --     UPDATE public.facilities
---        SET verification_status = 'verified'
+--        SET verification_status = 'verified',
+--            notification_number = '<7桁の届出番号。無ければ行ごと削除>'
 --      WHERE id = '<施設の id>' AND verification_status = 'unverified';
 --
 --     -- 3. 荷主が組織としてアプリに登録済みなら、あわせて紐付ける（任意）。
@@ -48,6 +51,13 @@
 --   確認済みになった施設は、全ての組織のドライバーから見え、打刻に使える。
 --   未確認に戻すのも運営者の SQL（UPDATE ... SET verification_status = 'unverified'）。
 --   ただし、他組織が既に打刻した記録は残る（wait_logs は不変）。
+--   【注意】既存の確認済み施設は registered_by_organization_id が NULL。これを unverified に
+--   戻すと、誰にも見えず誰も使えなくなる（登録組織が無いため）。戻すなら、先に
+--   registered_by_organization_id を設定すること。
+--
+-- 【適用順序】マイグレーション → フロントの順。逆にすると、新しいフロント
+--   （SharedReportView が verification_status / unverified_facility_names を読む）が
+--   存在しない列・項目を読み、荷主名と未確認の注記が空になる。
 --
 -- 【既存の経路への影響】
 --   既存の行は全て 'verified' になるので、既存の挙動は変わらない。
@@ -141,7 +151,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.can_use_facility(uuid, uuid) FROM PUBLIC, anon, authenticated;
 
 COMMENT ON FUNCTION public.can_use_facility(uuid, uuid) IS
-  '確認済みの施設、または未確認でも利用者が登録組織のメンバーなら true。get_nearest_facility / issue_ticket / queue_offline_punch / verify_company_name / wait_logs の INSERT トリガーが使う内部用。クライアントには公開しない。';
+  '確認済みの施設、または未確認でも利用者が登録組織のメンバーなら true。get_nearest_facility / issue_ticket / queue_offline_punch / wait_logs の INSERT トリガーが使う内部用。クライアントには公開しない。';
 
 -- ---------------------------------------------------------------------------
 -- STEP 4: register_facility（施設を未確認として登録する唯一の入口）
@@ -149,7 +159,10 @@ COMMENT ON FUNCTION public.can_use_facility(uuid, uuid) IS
 --   - 呼べるのは、自組織の admin のみ。
 --   - 半径は 500m 固定（引数にしない）。
 --   - 組織ごとの未確認施設は最大20件。
+--   - 確認済みの施設（他組織のものを含む）から 30m 以内の座標は拒否。未確認の施設が、
+--     近くの確認済みの施設を覆い隠して（最寄りに選ばれて）しまうのを防ぐ。
 --   - 同じ組織で、50m 以内・同名の重複登録は拒否。
+--   - 届出番号は引数にしない。NULL で作り、運営者が確認済みにするときに SQL で設定する。
 --   - 同じ組織の同時登録で上限・重複の検査がすり抜けないよう、組織の行をロックする。
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.register_facility(
@@ -157,8 +170,7 @@ CREATE OR REPLACE FUNCTION public.register_facility(
   p_client_name         text,
   p_lat                 double precision,
   p_lng                 double precision,
-  p_address             text DEFAULT NULL,
-  p_notification_number text DEFAULT NULL
+  p_address             text DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -168,12 +180,14 @@ AS $$
 DECLARE
   c_max_unverified CONSTANT integer := 20;
   c_dup_radius_m   CONSTANT double precision := 50;
+  -- 確認済みの施設の近く（他組織のものを含む）には登録させない距離。
+  -- 同じ市場に施設が密集している実態があるので 30m。
+  c_verified_near_m CONSTANT double precision := 30;
   v_uid     uuid := auth.uid();
   v_org_id  uuid;
   v_name    text := btrim(COALESCE(p_name, ''));
   v_client  text := btrim(COALESCE(p_client_name, ''));
   v_address text := NULLIF(btrim(COALESCE(p_address, '')), '');
-  v_notif   text := NULLIF(btrim(COALESCE(p_notification_number, '')), '');
   v_count   integer;
   v_id      uuid;
 BEGIN
@@ -200,9 +214,6 @@ BEGIN
   IF v_address IS NOT NULL AND char_length(v_address) > 200 THEN
     RAISE EXCEPTION '住所は200文字以内で入力してください。' USING ERRCODE = 'check_violation';
   END IF;
-  IF v_notif IS NOT NULL AND v_notif !~ '^[0-9]{7}$' THEN
-    RAISE EXCEPTION '届出番号は7桁の数字で入力してください。' USING ERRCODE = 'check_violation';
-  END IF;
   -- NaN / Infinity もここで弾かれる（BETWEEN が偽になる）
   IF p_lat IS NULL OR p_lng IS NULL
      OR NOT (p_lat BETWEEN -90 AND 90) OR NOT (p_lng BETWEEN -180 AND 180) THEN
@@ -211,7 +222,7 @@ BEGIN
   END IF;
 
   -- 同じ組織の同時登録を直列化する（上限・重複の検査をすり抜けさせない）
-  PERFORM 1 FROM public.organizations o WHERE o.id = v_org_id FOR UPDATE;
+  PERFORM 1 FROM public.organizations o WHERE o.id = v_org_id FOR NO KEY UPDATE;
 
   SELECT count(*) INTO v_count
   FROM public.facilities f
@@ -219,6 +230,21 @@ BEGIN
     AND f.verification_status = 'unverified';
   IF v_count >= c_max_unverified THEN
     RAISE EXCEPTION '未確認の施設は最大%件までです。運営者の確認が済むまで、新しい施設は登録できません。', c_max_unverified
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 確認済みの施設（他組織のものを含む）の近くには登録できない。施設名は出さない。
+  IF EXISTS (
+    SELECT 1
+    FROM public.facilities f
+    WHERE f.verification_status = 'verified'
+      AND 6371000 * 2 * asin(sqrt(least(1.0::double precision,
+            sin(radians(f.lat - p_lat) / 2) ^ 2 +
+            cos(radians(p_lat)) * cos(radians(f.lat)) *
+            sin(radians(f.lng - p_lng) / 2) ^ 2
+          ))) <= c_verified_near_m
+  ) THEN
+    RAISE EXCEPTION '既に登録されている施設の近くです。同じ現場の場合は、運営者に確認を依頼してください。'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -239,11 +265,11 @@ BEGIN
   END IF;
 
   INSERT INTO public.facilities (
-    name, client_name, address, lat, lng, radius, notification_number,
+    name, client_name, address, lat, lng, radius,
     verification_status, registered_by_organization_id, registered_by
   )
   VALUES (
-    v_name, v_client, v_address, p_lat, p_lng, 500, v_notif,
+    v_name, v_client, v_address, p_lat, p_lng, 500,
     'unverified', v_org_id, v_uid
   )
   RETURNING id INTO v_id;
@@ -252,13 +278,13 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.register_facility(text, text, double precision, double precision, text, text)
+REVOKE EXECUTE ON FUNCTION public.register_facility(text, text, double precision, double precision, text)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.register_facility(text, text, double precision, double precision, text, text)
+GRANT EXECUTE ON FUNCTION public.register_facility(text, text, double precision, double precision, text)
   TO authenticated;
 
-COMMENT ON FUNCTION public.register_facility(text, text, double precision, double precision, text, text) IS
-  '自組織の管理者が、施設を「未確認」として登録する唯一の入口。半径500m固定・未確認は組織ごとに最大20件・同組織の50m以内同名は拒否。確認済みにする RPC は無い（運営者の SQL）。';
+COMMENT ON FUNCTION public.register_facility(text, text, double precision, double precision, text) IS
+  '自組織の管理者が、施設を「未確認」として登録する唯一の入口。半径500m固定・未確認は組織ごとに最大20件・確認済み施設の30m以内は拒否・同組織の50m以内同名は拒否・届出番号は登録時に受け取らない。確認済みにする RPC は無い（運営者の SQL）。';
 
 -- ---------------------------------------------------------------------------
 -- STEP 5: get_nearest_facility（SECURITY DEFINER なので RLS は効かない。明示的に絞る）
@@ -517,9 +543,10 @@ GRANT  EXECUTE ON FUNCTION public.queue_offline_punch(timestamptz, double precis
   TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- STEP 8: verify_company_name（組織名の入力補助。本番の定義に、利用可否の絞り込みだけを足す）
---   絞らないと、他組織が登録した未確認の施設の荷主名・住所が、組織作成時の
---   候補として全員に見えてしまう。
+-- STEP 8: verify_company_name（組織名の入力補助。本番の定義に、確認済みへの絞り込みだけを足す）
+--   絞らないと、運送会社が自分で登録した荷主名・住所（未確認）が、組織作成時の
+--   候補として他組織に見えてしまう。自組織の未確認施設も候補には出さない
+--   （候補は、運営者が確認した荷主名だけにする）。
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.verify_company_name(_input text)
 RETURNS TABLE(matched_client_name text, matched_facility_id uuid, matched_address text)
@@ -544,14 +571,14 @@ BEGIN
 
   SELECT count(DISTINCT client_name) INTO match_count
   FROM facilities f
-  WHERE public.can_use_facility(auth.uid(), f.id)
+  WHERE f.verification_status = 'verified'
     AND regexp_replace(btrim(f.client_name), '(株式会社|有限会社|合同会社|合資会社|合名会社|\(株\)|（株）|㈱|\(有\)|（有）|㈲|\s+)', '', 'g') ILIKE '%' || cleaned || '%';
 
   -- 1社だけに特定できた場合のみ返す
   IF match_count = 1 THEN
     SELECT f.client_name, f.id, f.address INTO result_name, result_id, result_address
     FROM facilities f
-    WHERE public.can_use_facility(auth.uid(), f.id)
+    WHERE f.verification_status = 'verified'
       AND regexp_replace(btrim(f.client_name), '(株式会社|有限会社|合同会社|合資会社|合名会社|\(株\)|（株）|㈱|\(有\)|（有）|㈲|\s+)', '', 'g') ILIKE '%' || cleaned || '%'
     LIMIT 1;
 
