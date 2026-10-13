@@ -115,18 +115,25 @@ export function diffMinutes(a: string | null, b: string | null): number | null {
   return isNaN(diff) ? null : Math.max(0, diff);
 }
 
+/** 帳票の時刻は、閲覧する端末のタイムゾーンに関係なく日本時間で出す */
+const JST_HHMM = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 /**
- * 時刻フォーマット（HH:MM）。nullの場合は "未記録" を返す
+ * 時刻フォーマット（HH:MM・日本時間）。nullの場合は "未記録" を返す
+ *
+ * 端末のタイムゾーンで整形すると、日本以外の端末で開いた荷主には
+ * 到着・荷役開始の時刻がずれて見える（証拠書面として致命的）ため、JST に固定する。
  */
 export function formatTimeOrNull(iso: string | null): string {
   if (!iso) return "未記録";
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "未記録";
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  } catch {
-    return "未記録";
-  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "未記録";
+  return JST_HHMM.format(d);
 }
 
 /**

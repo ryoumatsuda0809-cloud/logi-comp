@@ -337,3 +337,22 @@ describe("sumWaitCost — 30分控除の適用単位（過大請求防止）", (
     expect(sumWaitCost([], "4t")).toBe(0);
   });
 });
+
+describe("formatTimeOrNull — 端末のタイムゾーンに依存しない", () => {
+  it("UTC の 22:50 は日本時間の 07:50 として出す", async () => {
+    const { formatTimeOrNull } = await import("./waitLogToTimeline");
+    expect(formatTimeOrNull("2026-10-02T22:50:00Z")).toBe("07:50");
+    expect(formatTimeOrNull("2026-10-03T08:05:00+09:00")).toBe("08:05");
+  });
+
+  it("日付をまたぐ時刻も日本時間（00:17）で出す", async () => {
+    const { formatTimeOrNull } = await import("./waitLogToTimeline");
+    expect(formatTimeOrNull("2026-10-02T15:17:00Z")).toBe("00:17");
+  });
+
+  it("null や不正な値は「未記録」", async () => {
+    const { formatTimeOrNull } = await import("./waitLogToTimeline");
+    expect(formatTimeOrNull(null)).toBe("未記録");
+    expect(formatTimeOrNull("not-a-date")).toBe("未記録");
+  });
+});
