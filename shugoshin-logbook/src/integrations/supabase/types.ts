@@ -451,6 +451,8 @@ export type Database = {
           organization_id: string | null
           original_ai_output: string | null
           report_date: string
+          reported_wait_minutes: number | null
+          server_calculation: Json | null
           submitted_at: string
           timeline_snapshot: Json
           total_wait_minutes: number
@@ -466,6 +468,8 @@ export type Database = {
           organization_id?: string | null
           original_ai_output?: string | null
           report_date?: string
+          reported_wait_minutes?: number | null
+          server_calculation?: Json | null
           submitted_at?: string
           timeline_snapshot?: Json
           total_wait_minutes?: number
@@ -481,6 +485,8 @@ export type Database = {
           organization_id?: string | null
           original_ai_output?: string | null
           report_date?: string
+          reported_wait_minutes?: number | null
+          server_calculation?: Json | null
           submitted_at?: string
           timeline_snapshot?: Json
           total_wait_minutes?: number
@@ -747,6 +753,24 @@ export type Database = {
           },
         ]
       }
+      wait_rates: {
+        Row: {
+          is_default: boolean
+          vehicle_class: string
+          yen_per_minute: number
+        }
+        Insert: {
+          is_default?: boolean
+          vehicle_class: string
+          yen_per_minute: number
+        }
+        Update: {
+          is_default?: boolean
+          vehicle_class?: string
+          yen_per_minute?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       monthly_wait_risk_reports: {
@@ -772,6 +796,18 @@ export type Database = {
       shipper_advance_wait: {
         Args: { p_log_id: string; p_new_status: string }
         Returns: undefined
+      }
+      submit_daily_report: {
+        Args: {
+          p_report_date: string
+          p_formal_report: string
+          p_original_ai_output?: string | null
+          p_timeline_snapshot?: Json
+          p_has_discrepancy?: boolean
+          p_is_edited?: boolean
+          p_reported_wait_minutes?: number | null
+        }
+        Returns: string
       }
       create_report_share_link: {
         Args: { p_report_id: string; p_days?: number }

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { calcWaitCost, sumWaitCost } from "@/lib/waitCostCalc";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
 import type { WaitLogRow } from "@/lib/waitLogToTimeline";
+import { isOnJstDay, waitLogsOfJstDayFilter } from "@/lib/waitLogDay";
 
 // ---------- Types ----------
 
@@ -33,6 +34,11 @@ export interface UnifiedTimelineItem {
   shipperName?: string;
   uncompensatedWork?: boolean;
   formalReport?: string;
+  /**
+   * wait_logs（サーバーが記録した証拠）から作った項目なら true。
+   * 提出時にサーバーが数えるのはこれだけ。音声の申告や旧 compliance_logs の待機分は合計に入れない。
+   */
+  fromWaitLog?: boolean;
   // raw ref
   rawId: string;
 }
@@ -48,6 +54,8 @@ export interface DailyTimelineResult {
   latestFormalReport: string | null;
   /** その日に打刻した施設の荷主名（facilities.client_name）。施設名ではない */
   shipperNames: string[];
+  /** 音声・旧記録で申告された待機分（合計には入らない。サーバーは証拠の wait_logs だけを数える） */
+  declaredWaitMinutesExcluded: number;
 }
 
 // ---------- Event label mapping ----------
@@ -146,12 +154,13 @@ export function useDailyTimeline(): DailyTimelineResult {
         .eq("user_id", user.id)
         .eq("report_date", todayStr)
         .maybeSingle(),
+      // サーバー（submit_daily_report）と同じ基準で「その日」を決める:
+      // COALESCE(claimed_at, arrival_time) が日本時間の今日（waitLogDay.ts）。
       supabase
         .from("wait_logs")
         .select("*")
         .eq("user_id", user.id)
-        .gte("arrival_time", todayStart)
-        .lte("arrival_time", todayEnd)
+        .or(waitLogsOfJstDayFilter(todayStr))
         .order("arrival_time", { ascending: true }),
       supabase.from("facilities").select("id, name, client_name"),
     ]);
@@ -228,7 +237,7 @@ export function useDailyTimeline(): DailyTimelineResult {
         claimed_loading_at: wl.claimed_loading_at,
         claimed_end_at: wl.claimed_end_at,
         self_approved: wl.self_approved,
-      }));
+      })).filter((w) => isOnJstDay(w, todayStr));
       const visitedIds = new Set(waitLogRows.map((w) => w.facility_id));
       setShipperNames(
         Array.from(
@@ -255,6 +264,7 @@ export function useDailyTimeline(): DailyTimelineResult {
           estimatedCost: cost,
           evidenceGrade: entry.evidenceGrade,
           selfApproved: entry.selfApproved,
+          fromWaitLog: true,
           rawId: entry.ticketNumber?.toString() ?? "",
         });
       }
@@ -276,24 +286,27 @@ export function useDailyTimeline(): DailyTimelineResult {
     fetchTimeline();
   }, [fetchTimeline]);
 
-  // 待機料の集計対象は「実際の待機イベント」に限定する。
-  // 作業時間（loading_start/departure等）を誤って合算すると待機料が過大計算されるため、
-  // waiting_start（GPS由来の荷待ち）と voice_report（音声申告の荷待ち）のみを対象とする。
+  // 待機料の集計対象は「wait_logs（サーバーが記録した証拠）の荷待ち」に限定する。
+  // 提出時にサーバー（submit_daily_report）が数えるのと同じ範囲にして、画面の見積もりと
+  // 提出される値が食い違わないようにする。
+  //   - 作業時間（loading_start/departure等）を合算すると待機料が過大になるため waiting_start のみ。
+  //   - 音声日報・旧 compliance_logs の申告待機分は、証拠ではないので合計に入れない。
   const isWaitEligible = (i: UnifiedTimelineItem) =>
-    i.eventType === "waiting_start" || i.eventType === "voice_report";
+    i.eventType === "waiting_start" && i.fromWaitLog === true;
 
-  const totalWaitMinutes = timeline
+  const eligibleWaitMinutes = timeline
     .filter((i) => isWaitEligible(i) && i.waitMinutes && i.waitMinutes > 0)
-    .reduce((sum, i) => sum + (i.waitMinutes ?? 0), 0);
+    .map((i) => i.waitMinutes ?? 0);
+
+  const totalWaitMinutes = eligibleWaitMinutes.reduce((sum, m) => sum + m, 0);
 
   // 30分の控除は待機1回ごとに適用するため、合計分数ではなく待機1回ごとの分数を
   // sumWaitCost() に渡す。日次合計に calcWaitCost() を1回だけ適用すると過大計算になる。
-  const totalWaitCost = sumWaitCost(
-    timeline
-      .filter((i) => isWaitEligible(i) && i.waitMinutes && i.waitMinutes > 0)
-      .map((i) => i.waitMinutes ?? 0),
-    vehicleClass
-  );
+  const totalWaitCost = sumWaitCost(eligibleWaitMinutes, vehicleClass);
+
+  const declaredWaitMinutesExcluded = timeline
+    .filter((i) => !i.fromWaitLog && (i.eventType === "waiting_start" || i.eventType === "voice_report"))
+    .reduce((sum, i) => sum + (i.waitMinutes ?? 0), 0);
 
   const hasDiscrepancy = detectDiscrepancies(timeline);
 
@@ -307,5 +320,6 @@ export function useDailyTimeline(): DailyTimelineResult {
     alreadySubmitted,
     latestFormalReport,
     shipperNames,
+    declaredWaitMinutesExcluded,
   };
 }
