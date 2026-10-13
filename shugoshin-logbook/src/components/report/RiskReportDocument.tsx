@@ -19,6 +19,8 @@ export interface ReportRow {
   total_wait_minutes: number | null;
   estimated_loss_jpy: number | null;
   gmen_risk_level: string | null;
+  /** 位置が運営者に確認されていない施設（運送会社が登録）での訪問数 */
+  unverified_visits?: number | null;
 }
 
 function formatMonth(val: string | null): string {
@@ -80,6 +82,7 @@ export function RiskReportDocument({
   // 算定できなかった訪問と時刻未検証の訪問を注記で明示するために集計する。
   const totalUnmeasured = rows.reduce((s, r) => s + (r.unmeasured_visits ?? 0), 0);
   const totalApprovedClaims = rows.reduce((s, r) => s + (r.approved_claim_visits ?? 0), 0);
+  const totalUnverified = rows.reduce((s, r) => s + (r.unverified_visits ?? 0), 0);
 
   return (
     <>
@@ -139,6 +142,7 @@ export function RiskReportDocument({
               {rows.map((row, i) => {
                 const unmeasured = row.unmeasured_visits ?? 0;
                 const approved = row.approved_claim_visits ?? 0;
+                const unverified = row.unverified_visits ?? 0;
                 return (
                   <li key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
@@ -161,10 +165,11 @@ export function RiskReportDocument({
                         <dt className="text-xs text-muted-foreground">訪問回数</dt>
                         <dd>
                           {row.total_visits ?? 0}
-                          {(unmeasured > 0 || approved > 0) && (
+                          {(unmeasured > 0 || approved > 0 || unverified > 0) && (
                             <span className="ml-1 text-xs text-muted-foreground">
                               {unmeasured > 0 && `（うち算定不可 ${unmeasured}）`}
                               {approved > 0 && `（うち圏外承認 ${approved}）`}
+                              {unverified > 0 && `（うち位置未確認 ${unverified}）`}
                             </span>
                           )}
                         </dd>
@@ -221,13 +226,17 @@ export function RiskReportDocument({
                       {/* 算定不能・等級Cが混ざっていることを帳票上で明示する。
                           注記がないと「0円＝待機がなかった」と誤読される。 */}
                       {((row.unmeasured_visits ?? 0) > 0 ||
-                        (row.approved_claim_visits ?? 0) > 0) && (
+                        (row.approved_claim_visits ?? 0) > 0 ||
+                        (row.unverified_visits ?? 0) > 0) && (
                         <div className="text-xs text-muted-foreground print:text-gray-600">
                           {(row.unmeasured_visits ?? 0) > 0 && (
                             <div>うち算定不可 {row.unmeasured_visits}</div>
                           )}
                           {(row.approved_claim_visits ?? 0) > 0 && (
                             <div>うち圏外承認 {row.approved_claim_visits}</div>
+                          )}
+                          {(row.unverified_visits ?? 0) > 0 && (
+                            <div>うち位置未確認 {row.unverified_visits}</div>
                           )}
                         </div>
                       )}
@@ -264,6 +273,12 @@ export function RiskReportDocument({
               <p>
                 ※「算定不可」は荷役開始が記録されておらず荷待ち時間を確定できなかった訪問です。
                 待機が無かったことを意味しません（{totalUnmeasured}件）。
+              </p>
+            )}
+            {totalUnverified > 0 && (
+              <p>
+                ※「位置未確認」は、運送会社が登録した施設で、その位置を運営者がまだ確認していない訪問です（
+                {totalUnverified}件）。記録の時刻はサーバー時刻ですが、施設の位置は登録者の申告にもとづきます。
               </p>
             )}
             {totalApprovedClaims > 0 && (

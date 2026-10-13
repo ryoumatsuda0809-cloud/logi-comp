@@ -190,9 +190,9 @@ BEGIN
       GROUP BY client_organization_name, location_name, report_month
     )
     SELECT count(*) INTO v_diff FROM (
-      (SELECT * FROM legacy EXCEPT ALL SELECT * FROM public.monthly_wait_risk_reports)
+      (SELECT * FROM legacy EXCEPT ALL SELECT client_organization_name, location_name, report_month, total_visits, unmeasured_visits, approved_claim_visits, total_wait_minutes, estimated_loss_jpy, gmen_risk_level FROM public.monthly_wait_risk_reports)
       UNION ALL
-      (SELECT * FROM public.monthly_wait_risk_reports EXCEPT ALL SELECT * FROM legacy)
+      (SELECT client_organization_name, location_name, report_month, total_visits, unmeasured_visits, approved_claim_visits, total_wait_minutes, estimated_loss_jpy, gmen_risk_level FROM public.monthly_wait_risk_reports EXCEPT ALL SELECT * FROM legacy)
     ) d;
     v_res := v_res || CASE WHEN v_diff = 0
       THEN format(E'\n[OK] 月次ビューは旧定義と同じ結果（車格=%s）', COALESCE(NULLIF(v_vc, ''), CASE WHEN v_vc IS NULL THEN 'NULL' ELSE '空' END))
@@ -202,6 +202,13 @@ BEGIN
   v_res := v_res || format(E'\n[情報] 月次ビューの行数（突き合わせた件数）: %s', v_n);
   v_res := v_res || CASE WHEN (SELECT reloptions::text FROM pg_class WHERE oid = 'public.monthly_wait_risk_reports'::regclass) LIKE '%security_invoker=true%'
     THEN E'\n[OK] 月次ビューは security_invoker のまま' ELSE E'\n[NG] 月次ビューの security_invoker が外れている' END;
+
+  -- 月次ビューの末尾の列 unverified_visits（位置未確認の訪問数）。既存の施設は全て確認済みなので 0
+  v_res := v_res || CASE
+    WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='monthly_wait_risk_reports' AND column_name='unverified_visits')
+         AND (SELECT count(*) FROM public.monthly_wait_risk_reports WHERE unverified_visits <> 0) = 0
+    THEN E'\n[OK] 月次ビューに unverified_visits があり、確認済みの施設だけの集計では 0'
+    ELSE E'\n[NG] 月次ビューの unverified_visits が無い、または確認済みの施設で 0 でない' END;
 
   -- ---------------------------------------------------------------------------
   -- 4. submit_daily_report

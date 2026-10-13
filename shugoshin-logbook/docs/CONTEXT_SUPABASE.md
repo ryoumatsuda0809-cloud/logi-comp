@@ -17,7 +17,7 @@
 | `wait_logs` | 本人／施設の荷主組織の admin／ドライバー所属組織の admin | `issue_ticket`, `start_loading`, `complete_ticket`, `cancel_ticket`, `approve_pending_punch`, `shipper_advance_wait` |
 | `waiting_evidence` | 本人／同じ組織のメンバー | 上記の RPC（内部で挿入・署名） |
 | `pending_punches` | 本人／組織の admin | `queue_offline_punch`, `approve_pending_punch`, `reject_pending_punch` |
-| `facilities` | ログイン済み全員 | なし（施設の登録は運用側のSQL） |
+| `facilities` | 確認済みの施設は全員／**未確認の施設は、登録した組織のメンバーだけ** | `register_facility`（自組織の admin のみ。登録すると「未確認」）。確認済みにするのは運営者の SQL のみ |
 
 - 圏外の仮記録（`pending_punches`）は、管理者の承認で `wait_logs` に反映され、**等級C**になる。
   算定は申告時刻（`claimed_*`）を使い、承認した時刻は使わない。
@@ -46,9 +46,32 @@
   `issue_ticket` は衝突時に採番をやり直す。
 - `submitted_reports` は自分の所属組織名義でしか提出できない。
 
+## 施設の登録（未確認施設）
+- 運送会社の管理者が、現在地で施設を登録できる（`register_facility`）。登録した施設は `verification_status='unverified'` で、
+  登録した組織のメンバーだけが見えて、打刻に使える（`can_use_facility`。`get_nearest_facility` / `issue_ticket` /
+  `queue_offline_punch` / `wait_logs` の INSERT トリガーが検査する）。
+- 誰でも好きな座標に施設を作れると GPS の証拠の意味がなくなるため、次の制限がある: 半径は 500m 固定／組織ごとに未確認は最大20件／
+  確認済みの施設から30m以内には登録できない（既存施設の脇に偽の施設を置いて打刻を横取りさせない）／届出番号は登録時に入力させない。
+- **サーバーは「現在地で登録した」ことを検証できない**（座標は端末の申告）。だから「未確認」で、荷主向けの帳票には「施設の位置は未確認」と明記する
+  （共有帳票・月次の警告レポート）。
+- 「確認済み」にする手順（運営者の SQL）は `20261013100000_register_unverified_facilities.sql` の冒頭に書いてある。
+  荷主組織に紐付けるなら `client_organization_id` も同時に設定する（未確認のままでは荷主 admin に見えない）。
+
+## 日報の数値（サーバー計算）
+- 日報は `submit_daily_report`（RPC）だけで提出する。`submitted_reports` への直接 INSERT は不可。
+- 待機時間・待機料・組織・車格・提出時刻は**サーバーが `wait_logs` から決める**（引数にしない）。クライアントが渡せるのは、報告書の文面・表示用の
+  タイムライン・手修正した待機分数（GPS の記録とは別に残る）だけ。適用した料率や待機ごとの内訳は `server_calculation` に残る。
+- 料率は `wait_rates` が唯一のサーバー側の表（既定行は削除不可）。画面の見積もり用に `src/lib/waitCostCalc.ts` にも同じ値があり、
+  変更時は両方を直す（テストが一致を検査する）。月次ビューも `wait_rates` を引く。
+- 日報に含める日は `wait_logs.arrival_time` の日本時間の日付。**圏外承認（等級C）の記録は承認した日の日報に入る**（申告した日の日報は提出済みで
+  変更できないため、記録が消えないようにしている）。分数は申告時刻から計算する。
+- 提出できるのはサーバー時計の「今日」だけで、今日の打刻が0件なら提出できない。音声の申告は日報の合計に入らない（自己申告は証拠ではない）。
+- 回帰テスト: `supabase/tests/server_side_report_totals.sql`（計算・RPC・権限・ビューの突き合わせ。期待値の表を TypeScript 側のテストも読む）。
+
 ## 既知の未対応
-- 施設・組織の登録 UI、荷主による施設の所有確認。
-- `submitted_reports` の数値（待機時間・金額）のサーバー側再計算。料率と30分控除の計算が
-  コード・月次ビュー・SQLに分散しないよう、料率表をDBに持たせる設計と合わせて行う。
-- マイグレーション履歴の整合（本番は SQL エディタ経由で適用した分が履歴に未記録。
-  `supabase db pull` でベースラインを取る）。
+- 荷主による施設の所有確認（施設の登録 UI は対応済み。運営者向けの確認 UI は無く、SQL で行う）。
+- 帳票の行ごとの分数・金額（`timeline_snapshot`）と文面（`formal_report`）は、まだクライアントが組み立てた表示用の値。権威ある値は
+  `server_calculation.visits` にあり、帳票へ出すのは未対応（合計だけがサーバー値）。
+- 夜勤で日付をまたぐ運転者が前日分を翌日に提出する経路。
+- 未確認の施設を登録した組織を削除して作り直すと、未確認の上限（20件）を回避できる（運営者の確認待ちが増えるだけ）。
+- マイグレーション履歴の整合（本番は SQL エディタ経由で適用した分が履歴に未記録。`supabase db pull` でベースラインを取る）。

@@ -800,6 +800,7 @@ export type Database = {
           total_visits: number | null
           total_wait_minutes: number | null
           unmeasured_visits: number | null
+          unverified_visits: number | null
         }
         Relationships: []
       }

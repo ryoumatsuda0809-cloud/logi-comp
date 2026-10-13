@@ -56,4 +56,15 @@ describe("RiskReportDocument — 実画面とデモで共用する紙面", () =>
     renderDoc([row()], { loading: true });
     expect(screen.queryAllByText(/テスト拠点/).length).toBe(0);
   });
+
+  it("位置未確認の施設での訪問は、行と注記で明示する（確認済みと同じ重みに見せない）", () => {
+    renderDoc([row({ unverified_visits: 2 })]);
+    expect(screen.getAllByText(/うち位置未確認 2/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/位置を運営者がまだ確認していない訪問です（2件）/)).toBeTruthy();
+  });
+
+  it("位置未確認が無い（古いビューで列が無い場合を含む）ときは、注記を出さない", () => {
+    renderDoc([row({ unverified_visits: 0 }), row({ unverified_visits: undefined })]);
+    expect(screen.queryByText(/位置未確認/)).toBeNull();
+  });
 });

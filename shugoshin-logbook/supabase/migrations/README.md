@@ -115,3 +115,13 @@ facilities
   └─ wait_logs (facility_id)
   └─ monthly_wait_risk_reports (VIEW)
 ```
+
+## 2026-10-13 の追加（適用順序: この順）
+1. `20261013100000_register_unverified_facilities.sql` — 運送会社の管理者による施設の登録（未確認施設）と、`facilities` の可視性の絞り込み
+2. `20261013100001_shared_report_unverified_facilities.sql` — 共有帳票に「位置未確認の施設」を出す
+3. `20261013200000_server_side_report_totals.sql` — 日報の数値をサーバーで計算（`wait_rates`、`submit_daily_report`、月次ビューの作り直し）
+4. `20261013300000_monthly_report_unverified_visits.sql` — 月次ビューに `unverified_visits`（末尾の列）を追加
+
+**フロントのデプロイは、マイグレーションの適用後**（逆だと、共有帳票・日報の提出・施設の登録が失敗する）。
+適用後に `supabase/tests/security_checks.sql` と `supabase/tests/server_side_report_totals.sql` を実行し、先頭に省略の警告が出ていないことを確認する。
+
