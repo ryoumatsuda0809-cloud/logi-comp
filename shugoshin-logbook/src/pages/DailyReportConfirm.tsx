@@ -1,5 +1,6 @@
 import { toDisplayMessage } from "@/lib/dbErrors";
 import { jstDateString, jstDayRange } from "@/lib/jstDate";
+import { submitBlockReason } from "@/lib/submitGuard";
 import { MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { useDailyTimeline, type UnifiedTimelineItem } from "@/hooks/useDailyTimeline";
-import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
@@ -26,7 +26,6 @@ function generateFormalReport(waitMinutes: number, hasExtraWork: boolean, shippe
   return `■ 業務報告\n・報告日時：${timeStr}\n・荷主様　：${shipperName}\n・待機時間：${waitMinutes}分\n・附帯作業：${hasExtraWork ? "あり" : "なし"}\n\n上記の通り、特定受託事業者取引適正化法に基づく業務記録をご報告いたします。よろしくお願い申し上げます。`;
 }
 
-const FALLBACK_ORG_ID = "00000000-0000-0000-0000-000000000000";
 const HOLD_DURATION_MS = 1000;
 
 // ---------- Icon per event type ----------
@@ -75,8 +74,7 @@ function formatTime(iso: string) {
 export default function DailyReportConfirm() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { orgId } = useOrganization();
-  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames } = useDailyTimeline();
+  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames, declaredWaitMinutesExcluded, hasWaitLogRecords } = useDailyTimeline();
   const [submitting, setSubmitting] = useState(false);
 
   // Dialog & editable parameters
@@ -110,6 +108,8 @@ export default function DailyReportConfirm() {
   const isWaitEdited = editWaitMinutes !== totalWaitMinutes;
   const draftReportText = generateFormalReport(draftWaitMinutes, draftExtraWork, derivedShipper);
   const hasRecords = !loading && timeline.length > 0;
+  // 打刻（wait_logs）が0件の日は提出できない。サーバーも拒否する（音声の申告だけでは提出不可）
+  const blockReason = submitBlockReason({ loading, hasWaitLogRecords, timelineLength: timeline.length });
 
   // ---------- Press-and-hold logic ----------
   const [holdProgress, setHoldProgress] = useState(0);
@@ -146,9 +146,9 @@ export default function DailyReportConfirm() {
 
     setSubmitting(true);
 
-    const resolvedOrgId = orgId || FALLBACK_ORG_ID;
-
-    // Fetch today's wait_logs to include real data in snapshot
+    // 表示用のスナップショットに、その日の wait_logs の項目を足す。
+    // 注意: ここで組み立てるのは表示用の情報だけ。待機時間・待機料・車格・組織・提出時刻は
+    // サーバー（submit_daily_report）が wait_logs とプロフィールから決める。送らない。
     const todayStr = jstDateString();
     const { start: dayStart, end: dayEnd } = jstDayRange(todayStr);
     const [logsRes, facilitiesRes] = await Promise.all([
@@ -174,19 +174,16 @@ export default function DailyReportConfirm() {
       snapshotData = [...snapshotData, ...entries.map(e => ({ ...e, source: "wait_log" }))];
     }
 
-    const { data: inserted, error } = await supabase.from("submitted_reports").insert([{
-      user_id: user.id,
-      organization_id: resolvedOrgId,
-      report_date: todayStr,
-      vehicle_class: vehicleClass,
-      total_wait_minutes: totalWaitMinutes,
-      estimated_wait_cost: totalWaitCost,
-      has_discrepancy: hasDiscrepancy,
-      timeline_snapshot: snapshotData,
-      original_ai_output: originalAiOutput || null,
-      is_edited: isEdited,
-      formal_report: formalReportText || null,
-    }]).select("id").single();
+    // 手で修正した待機分数は、GPS の記録（サーバーが計算する total_wait_minutes）とは別に残す
+    const { data: reportId, error } = await supabase.rpc("submit_daily_report", {
+      p_report_date: todayStr,
+      p_formal_report: formalReportText,
+      p_original_ai_output: originalAiOutput,
+      p_timeline_snapshot: snapshotData,
+      p_has_discrepancy: hasDiscrepancy,
+      p_is_edited: isEdited,
+      p_reported_wait_minutes: isWaitEdited ? editWaitMinutes : null,
+    });
 
     setSubmitting(false);
 
@@ -204,11 +201,11 @@ export default function DailyReportConfirm() {
     }
 
     toast({ title: "✅ 日報を提出しました！", description: "荷主に送る場合は、次の画面でリンクを作れます。" });
-    navigate(inserted?.id ? `/shared-report/${inserted.id}` : "/");
+    navigate(reportId ? `/shared-report/${reportId}` : "/");
   };
 
   const onPointerDown = useCallback(() => {
-    if (submitting || loading || timeline.length === 0 || alreadySubmitted) return;
+    if (submitting || blockReason !== null || alreadySubmitted) return;
     if (navigator.vibrate) navigator.vibrate(50);
     holdStartRef.current = Date.now();
     animFrameRef.current = requestAnimationFrame(updateProgress);
@@ -218,13 +215,13 @@ export default function DailyReportConfirm() {
       if (navigator.vibrate) navigator.vibrate(200);
       handleSubmit();
     }, HOLD_DURATION_MS);
-  }, [submitting, loading, timeline, alreadySubmitted, updateProgress, handleSubmit]);
+  }, [submitting, blockReason, alreadySubmitted, updateProgress, handleSubmit]);
 
   const onPointerUpOrLeave = useCallback(() => {
     cancelHold();
   }, [cancelHold]);
 
-  const isSubmitDisabled = submitting || loading || timeline.length === 0;
+  const isSubmitDisabled = submitting || blockReason !== null;
 
   return (
     <div className="min-h-screen bg-background pb-44">
@@ -264,6 +261,12 @@ export default function DailyReportConfirm() {
               <div className="mt-3 text-sm text-destructive font-semibold">
                 合計待機：{totalWaitMinutes}分 ／ 推定待機料：¥{totalWaitCost.toLocaleString()}
               </div>
+            )}
+            {declaredWaitMinutesExcluded > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                音声などで申告した待機（{declaredWaitMinutesExcluded}分）は、合計に含まれません。
+                提出時は、サーバーに記録された打刻だけで待機時間と待機料が計算されます。
+              </p>
             )}
             {hasDiscrepancy && (
               <div className="mt-2 inline-flex items-center gap-1 text-sm text-destructive">
@@ -582,7 +585,7 @@ export default function DailyReportConfirm() {
             {/* 無効のときは理由を出す（灰色のまま理由が分からない状態を避ける） */}
             {!submitting && isSubmitDisabled && (
               <p className="mt-1 text-center text-xs text-muted-foreground">
-                {loading ? "記録を読み込み中です" : "本日の打刻記録がないため、提出できません"}
+                {blockReason}
               </p>
             )}
             {/* Progress indicator below button */}
