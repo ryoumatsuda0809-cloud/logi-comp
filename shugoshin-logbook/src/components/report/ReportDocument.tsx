@@ -74,6 +74,11 @@ function recordMethodLabel(item: TimelineEntry): string {
 export interface ReportParties {
   carrier: string | null;
   shippers: string[];
+  /**
+   * その日の打刻のうち、施設の位置が運営者に未確認のもの（施設名）。
+   * 運送会社の管理者が自分で登録した施設は、運営者が確認するまで位置が裏付けられていない。
+   */
+  unverifiedFacilities?: string[];
 }
 
 export function ReportDocument({
@@ -94,6 +99,8 @@ export function ReportDocument({
   const selfApprovedCount = report.timeline_snapshot.filter(
     (t) => t.evidenceGrade === "C" && t.eventType === "arrival" && t.selfApproved
   ).length;
+
+  const unverifiedFacilityNames = parties.unverifiedFacilities ?? [];
 
   const cellClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm";
   const thClass = "border border-gray-800 px-3 py-2 print:px-2 print:py-1 text-sm font-bold bg-gray-200 print:bg-gray-200 text-left whitespace-nowrap";
@@ -196,6 +203,19 @@ export function ReportDocument({
         {/*  時刻がサーバー検証されていない記録を等級Aと    */}
         {/*  同じ体裁で提示すると証拠の強さを偽ることになる */}
         {/* ══════════════════════════════════════════════ */}
+        {unverifiedFacilityNames.length > 0 && (
+          <div className="mb-8 print:mb-3 border-l-4 border-gray-500 bg-gray-50 px-4 py-3 break-inside-avoid print:bg-gray-50">
+            <p className="font-bold text-black text-sm">
+              ※ 施設の位置は未確認です（{unverifiedFacilityNames.join("、")}）
+            </p>
+            <p className="mt-1 text-xs text-gray-700 leading-relaxed">
+              この施設は運送会社が登録したもので、位置を運営者がまだ確認していません。
+              打刻時刻と打刻地点のGPS座標はサーバーが記録していますが、
+              <strong>その座標が荷主の敷地であることは確認されていません</strong>。
+            </p>
+          </div>
+        )}
+
         {approvedClaimCount > 0 && (
           <div className="mb-8 print:mb-3 border-l-4 border-gray-500 bg-gray-50 px-4 py-3 break-inside-avoid print:bg-gray-50">
             <p className="font-bold text-black text-sm">

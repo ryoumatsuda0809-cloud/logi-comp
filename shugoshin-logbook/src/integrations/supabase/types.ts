@@ -144,6 +144,9 @@ export type Database = {
           name: string
           notification_number: string | null
           radius: number
+          registered_by: string | null
+          registered_by_organization_id: string | null
+          verification_status: string
         }
         Insert: {
           address?: string | null
@@ -156,6 +159,9 @@ export type Database = {
           name: string
           notification_number?: string | null
           radius?: number
+          registered_by?: string | null
+          registered_by_organization_id?: string | null
+          verification_status?: string
         }
         Update: {
           address?: string | null
@@ -168,11 +174,21 @@ export type Database = {
           name?: string
           notification_number?: string | null
           radius?: number
+          registered_by?: string | null
+          registered_by_organization_id?: string | null
+          verification_status?: string
         }
         Relationships: [
           {
             foreignKeyName: "facilities_client_organization_id_fkey"
             columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facilities_registered_by_organization_id_fkey"
+            columns: ["registered_by_organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -936,6 +952,17 @@ export type Database = {
           punch_id: string
           within_geofence: boolean | null
         }[]
+      }
+      register_facility: {
+        Args: {
+          p_address?: string | null
+          p_client_name: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_notification_number?: string | null
+        }
+        Returns: string
       }
       verify_company_name: {
         Args: { _input: string }

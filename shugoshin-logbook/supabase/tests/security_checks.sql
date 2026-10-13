@@ -139,7 +139,8 @@ BEGIN
       SET LOCAL ROLE anon;
       v_j := public.get_shared_report(v_tok);
       v_res := v_res || CASE WHEN v_j IS NOT NULL AND NOT (v_j ? 'user_id') AND NOT (v_j ? 'organization_id')
-        THEN E'\n[OK] 未ログインで共有リンクを開け、内部IDは含まれない' ELSE E'\n[NG] 共有リンクの取得または項目' END;
+           AND (v_j ? 'unverified_facility_names')
+        THEN E'\n[OK] 未ログインで共有リンクを開け、内部IDは含まれず、未確認の施設の欄がある' ELSE E'\n[NG] 共有リンクの取得または項目' END;
       RESET ROLE;
       PERFORM set_config('request.jwt.claims', json_build_object('sub', v_rep.user_id, 'role', 'authenticated')::text, true);
       SET LOCAL ROLE authenticated;
@@ -149,6 +150,225 @@ BEGIN
       v_res := v_res || CASE WHEN public.get_shared_report(v_tok) IS NULL
         THEN E'\n[OK] 失効後の共有リンクは取得できない' ELSE E'\n[NG] 失効が効かない' END;
       RESET ROLE;
+    END IF;
+  END;
+  -- 施設の登録（20261013100000_register_unverified_facilities.sql）:
+  --   一般メンバー・未ログインは登録できない／自組織の管理者は未確認として登録できる（半径500m固定）／
+  --   不正な座標・長すぎる名前・重複・21件目は拒否／クライアントから verification_status を書き換えられない／
+  --   未確認の施設は他組織に見えず、get_nearest_facility・issue_ticket・queue_offline_punch・
+  --   verify_company_name・wait_logs の INSERT トリガーで使えない／運営者が確認済みにすれば他組織にも見える。
+  -- 前提: admin を持つ組織が2つ以上、かつ片方に admin 以外のメンバーがいること（無ければ省略）。
+  DECLARE
+    v_orgA uuid; v_adminA uuid; v_memberA uuid; v_adminB uuid;
+    v_new uuid; v_n integer; v_i integer;
+    v_row record; v_name text;
+    v_test_lat constant double precision := 0.5;     -- 外洋上（既存の施設から十分に離れた座標）
+    v_test_lng constant double precision := -170.0;
+    v_client constant text := 'ZZ検査用荷主ZZ';
+  BEGIN
+    RESET ROLE;
+    SELECT ur.user_id, ur.organization_id INTO v_adminA, v_orgA
+    FROM public.user_roles ur
+    JOIN public.profiles p ON p.user_id = ur.user_id AND p.organization_id = ur.organization_id
+    WHERE ur.role = 'admin'
+      AND EXISTS (SELECT 1 FROM public.user_roles m JOIN public.profiles pm
+                    ON pm.user_id = m.user_id AND pm.organization_id = m.organization_id
+                  WHERE m.organization_id = ur.organization_id AND m.role <> 'admin')
+      AND EXISTS (SELECT 1 FROM public.user_roles b JOIN public.profiles pb
+                    ON pb.user_id = b.user_id AND pb.organization_id = b.organization_id
+                  WHERE b.role = 'admin' AND b.organization_id <> ur.organization_id)
+    LIMIT 1;
+    SELECT m.user_id INTO v_memberA
+    FROM public.user_roles m JOIN public.profiles pm ON pm.user_id = m.user_id AND pm.organization_id = m.organization_id
+    WHERE m.organization_id = v_orgA AND m.role <> 'admin' LIMIT 1;
+    SELECT b.user_id INTO v_adminB
+    FROM public.user_roles b JOIN public.profiles pb ON pb.user_id = b.user_id AND pb.organization_id = b.organization_id
+    WHERE b.role = 'admin' AND b.organization_id <> v_orgA LIMIT 1;
+
+    IF v_adminA IS NULL OR v_memberA IS NULL OR v_adminB IS NULL THEN
+      v_res := v_res || E'\n[--] 管理者2組織＋一般メンバーがそろわないため、施設登録のテストは省略';
+    ELSE
+      -- 一般メンバーは登録できない
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_memberA, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      BEGIN
+        PERFORM public.register_facility('検査用施設', v_client, v_test_lat, v_test_lng);
+        v_res := v_res || E'\n[NG] 一般メンバーが施設を登録できた';
+      EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] 一般メンバーの施設登録は拒否';
+      WHEN OTHERS THEN v_res := v_res || E'\n[??] 一般メンバーの施設登録: ' || SQLERRM;
+      END;
+      -- 未ログインは登録できない
+      RESET ROLE;
+      SET LOCAL ROLE anon;
+      BEGIN
+        PERFORM public.register_facility('検査用施設', v_client, v_test_lat, v_test_lng);
+        v_res := v_res || E'\n[NG] 未ログインで施設を登録できた';
+      EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] 未ログインの施設登録は拒否';
+      WHEN OTHERS THEN v_res := v_res || E'\n[??] 未ログインの施設登録: ' || SQLERRM;
+      END;
+
+      -- 自組織の管理者は、未確認として登録できる
+      RESET ROLE;
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adminA, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      BEGIN
+        v_new := public.register_facility('検査用施設', v_client, v_test_lat, v_test_lng, '検査用住所', NULL);
+        v_res := v_res || E'\n[OK] 自組織の管理者は施設を登録できる';
+      EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[NG] 管理者の施設登録: ' || SQLERRM;
+      END;
+
+      IF v_new IS NOT NULL THEN
+        RESET ROLE;
+        SELECT * INTO v_row FROM public.facilities WHERE id = v_new;
+        v_res := v_res || CASE
+          WHEN v_row.verification_status = 'unverified' AND v_row.radius = 500
+               AND v_row.registered_by_organization_id = v_orgA AND v_row.registered_by = v_adminA
+               AND v_row.client_organization_id IS NULL
+          THEN E'\n[OK] 登録した施設は未確認・半径500m・登録組織つき・荷主組織は未紐付け'
+          ELSE E'\n[NG] 登録した施設の状態が想定と違う' END;
+
+        -- 不正な入力は拒否（管理者として）
+        PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adminA, 'role', 'authenticated')::text, true);
+        SET LOCAL ROLE authenticated;
+        BEGIN
+          PERFORM public.register_facility('検査用施設', v_client, v_test_lat + 0.0001, v_test_lng);
+          v_res := v_res || E'\n[NG] 同名・50m以内の重複登録が通った';
+        EXCEPTION WHEN unique_violation THEN v_res := v_res || E'\n[OK] 同名・50m以内の重複登録は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 重複登録: ' || SQLERRM;
+        END;
+        BEGIN
+          PERFORM public.register_facility('検査用施設', v_client, 91, v_test_lng);
+          v_res := v_res || E'\n[NG] 緯度91の登録が通った';
+        EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 範囲外の緯度は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 緯度91: ' || SQLERRM;
+        END;
+        BEGIN
+          PERFORM public.register_facility('検査用施設B', v_client, v_test_lat, -181);
+          v_res := v_res || E'\n[NG] 経度-181の登録が通った';
+        EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 範囲外の経度は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 経度-181: ' || SQLERRM;
+        END;
+        BEGIN
+          PERFORM public.register_facility('検査用施設B', v_client, 'NaN'::double precision, v_test_lng);
+          v_res := v_res || E'\n[NG] NaN の座標の登録が通った';
+        EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] NaN の座標は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] NaN: ' || SQLERRM;
+        END;
+        BEGIN
+          PERFORM public.register_facility(repeat('あ', 101), v_client, v_test_lat + 1, v_test_lng);
+          v_res := v_res || E'\n[NG] 101文字の施設名の登録が通った';
+        EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] 長すぎる施設名は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 長い名前: ' || SQLERRM;
+        END;
+
+        -- クライアントから、確認状態・登録組織を書き換えられない／直接 INSERT・DELETE もできない
+        BEGIN
+          UPDATE public.facilities SET verification_status = 'verified' WHERE id = v_new;
+          v_res := v_res || E'\n[NG] クライアントが verification_status を更新できた';
+        EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] verification_status のクライアント更新は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] verification_status 更新: ' || SQLERRM;
+        END;
+        BEGIN
+          UPDATE public.facilities SET registered_by_organization_id = NULL WHERE id = v_new;
+          v_res := v_res || E'\n[NG] クライアントが registered_by_organization_id を更新できた';
+        EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] registered_by_organization_id のクライアント更新は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] registered_by_organization_id 更新: ' || SQLERRM;
+        END;
+        BEGIN
+          INSERT INTO public.facilities (name, client_name, lat, lng, verification_status)
+          VALUES ('直接INSERT', v_client, v_test_lat, v_test_lng, 'verified');
+          v_res := v_res || E'\n[NG] facilities の直接INSERTが通った';
+        EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] facilities の直接INSERTは拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] facilities INSERT: ' || SQLERRM;
+        END;
+        BEGIN
+          DELETE FROM public.facilities WHERE id = v_new;
+          v_res := v_res || E'\n[NG] facilities の直接DELETEが通った';
+        EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] facilities の直接DELETEは拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] facilities DELETE: ' || SQLERRM;
+        END;
+
+        -- 可視性: 自組織のメンバーには見え、他組織の管理者には見えない
+        RESET ROLE;
+        PERFORM set_config('request.jwt.claims', json_build_object('sub', v_memberA, 'role', 'authenticated')::text, true);
+        SET LOCAL ROLE authenticated;
+        SELECT count(*) INTO v_n FROM public.facilities WHERE id = v_new;
+        v_res := v_res || CASE WHEN v_n = 1 THEN E'\n[OK] 未確認の施設は登録組織のメンバーに見える'
+                               ELSE E'\n[NG] 未確認の施設が登録組織のメンバーに見えない' END;
+        v_n := NULL;
+        SELECT count(*) INTO v_n FROM public.get_nearest_facility(v_test_lat, v_test_lng) g WHERE g.id = v_new;
+        v_res := v_res || CASE WHEN v_n = 1 THEN E'\n[OK] get_nearest_facility は登録組織のメンバーに未確認の施設を返す'
+                               ELSE E'\n[NG] get_nearest_facility が登録組織のメンバーに未確認の施設を返さない' END;
+        SELECT count(*) INTO v_n FROM public.verify_company_name(v_client);
+        v_res := v_res || CASE WHEN v_n = 1 THEN E'\n[OK] verify_company_name は登録組織のメンバーに未確認の施設を返す'
+                               ELSE E'\n[NG] verify_company_name が登録組織のメンバーに未確認の施設を返さない' END;
+        BEGIN
+          PERFORM public.issue_ticket(v_new, v_test_lat, v_test_lng);
+          v_res := v_res || E'\n[OK] 登録組織のメンバーは未確認の施設で打刻できる';
+        EXCEPTION WHEN OTHERS THEN v_res := v_res || E'\n[NG] 登録組織のメンバーが未確認の施設で打刻できない: ' || SQLERRM;
+        END;
+
+        RESET ROLE;
+        PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adminB, 'role', 'authenticated')::text, true);
+        SET LOCAL ROLE authenticated;
+        SELECT count(*) INTO v_n FROM public.facilities WHERE id = v_new;
+        v_res := v_res || CASE WHEN v_n = 0 THEN E'\n[OK] 未確認の施設は他組織に見えない'
+                               ELSE E'\n[NG] 未確認の施設が他組織に見える' END;
+        SELECT count(*) INTO v_n FROM public.get_nearest_facility(v_test_lat, v_test_lng) g WHERE g.id = v_new;
+        v_res := v_res || CASE WHEN v_n = 0 THEN E'\n[OK] get_nearest_facility は他組織に未確認の施設を返さない'
+                               ELSE E'\n[NG] get_nearest_facility が他組織に未確認の施設を返した' END;
+        SELECT count(*) INTO v_n FROM public.verify_company_name(v_client);
+        v_res := v_res || CASE WHEN v_n = 0 THEN E'\n[OK] verify_company_name は他組織に未確認の施設を返さない'
+                               ELSE E'\n[NG] verify_company_name が他組織に未確認の施設を返した' END;
+        BEGIN
+          PERFORM public.issue_ticket(v_new, v_test_lat, v_test_lng);
+          v_res := v_res || E'\n[NG] 他組織が未確認の施設で打刻できた';
+        EXCEPTION WHEN insufficient_privilege THEN v_res := v_res || E'\n[OK] 他組織の未確認の施設での打刻は拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 他組織の打刻: ' || SQLERRM;
+        END;
+        v_name := NULL;
+        SELECT q.facility_name INTO v_name
+        FROM public.queue_offline_punch(now(), v_test_lat, v_test_lng, gen_random_uuid(), 'arrival') q;
+        v_res := v_res || CASE WHEN v_name IS DISTINCT FROM '検査用施設'
+                               THEN E'\n[OK] queue_offline_punch は他組織の未確認の施設を最寄りに選ばない'
+                               ELSE E'\n[NG] queue_offline_punch が他組織の未確認の施設を選んだ' END;
+        -- 他組織の管理者は、同じ未確認の施設を登録組織のメンバーとして扱われない（wait_logs の最後の砦）
+        RESET ROLE;
+        BEGIN
+          INSERT INTO public.wait_logs (facility_id, user_id, ticket_number, status, arrival_time, latitude, longitude)
+          VALUES (v_new, v_adminB, 998, 'waiting', now(), v_test_lat, v_test_lng);
+          v_res := v_res || E'\n[NG] 他組織のユーザーの wait_logs が未確認の施設に入った（トリガーが効いていない）';
+        EXCEPTION WHEN check_violation THEN v_res := v_res || E'\n[OK] wait_logs の INSERT トリガーは他組織の未確認施設への記録を拒否';
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] wait_logs トリガー: ' || SQLERRM;
+        END;
+
+        -- 運営者が確認済みにすれば、他組織にも見えて使える（RPC は無く、SQL だけ）
+        UPDATE public.facilities SET verification_status = 'verified' WHERE id = v_new;
+        PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adminB, 'role', 'authenticated')::text, true);
+        SET LOCAL ROLE authenticated;
+        SELECT count(*) INTO v_n FROM public.facilities WHERE id = v_new;
+        v_res := v_res || CASE WHEN v_n = 1 THEN E'\n[OK] 確認済みにした施設は他組織にも見える'
+                               ELSE E'\n[NG] 確認済みにしても他組織に見えない' END;
+        RESET ROLE;
+        UPDATE public.facilities SET verification_status = 'unverified' WHERE id = v_new;
+      END IF;
+
+      -- 未確認は組織ごとに最大20件（20件に達すると次の登録が拒否される。25回試して、件数が20で止まること）
+      RESET ROLE;
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', v_adminA, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+      FOR v_i IN 1..25 LOOP
+        BEGIN
+          PERFORM public.register_facility('上限検査' || v_i, v_client, v_test_lat + 10 + v_i * 0.01, v_test_lng);
+        EXCEPTION WHEN check_violation THEN EXIT;
+        WHEN OTHERS THEN v_res := v_res || E'\n[??] 上限検査: ' || SQLERRM; EXIT;
+        END;
+      END LOOP;
+      RESET ROLE;
+      SELECT count(*) INTO v_n FROM public.facilities
+        WHERE registered_by_organization_id = v_orgA AND verification_status = 'unverified';
+      v_res := v_res || CASE WHEN v_n = 20 THEN E'\n[OK] 未確認の施設は組織ごとに最大20件で止まる'
+                             ELSE E'\n[NG] 未確認の施設の上限が効かない（件数: ' || v_n || E'）' END;
     END IF;
   END;
   RESET ROLE;

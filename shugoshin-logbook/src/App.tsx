@@ -30,6 +30,7 @@ import DailyReportConfirm from "./pages/DailyReportConfirm";
 import SharedReportView from "./pages/SharedReportView";
 import AdminDashboard from "./pages/AdminDashboard";
 import PendingPunches from "./pages/PendingPunches";
+import FacilityRegistration from "./pages/FacilityRegistration";
 
 const queryClient = new QueryClient();
 
@@ -211,6 +212,16 @@ const App = () => {
                 <ProtectedRoute>
                   <AdminRoute>
                     <PendingPunches />
+                  </AdminRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/facility-registration"
+              element={
+                <ProtectedRoute>
+                  <AdminRoute>
+                    <FacilityRegistration />
                   </AdminRoute>
                 </ProtectedRoute>
               }

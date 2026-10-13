@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FieldButton } from "@/components/ui/field-button";
 import {
   LogOut, Truck, ClipboardList, MapPin,
-  Building2, Building, ArrowRight, Plus, FileWarning, LayoutDashboard, ClipboardCheck,
+  Building2, Building, ArrowRight, Plus, FileWarning, LayoutDashboard, ClipboardCheck, Warehouse,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
@@ -280,6 +280,15 @@ export default function Dashboard() {
                 description="圏外で記録された打刻の確認・承認"
                 color="primary"
                 onClick={() => navigate("/pending-punches")}
+              />
+            )}
+            {isAdmin && (
+              <MenuCard
+                icon={<Warehouse className="h-8 w-8" />}
+                title="施設の登録"
+                description="荷主の現場を追加（現在地で登録）"
+                color="primary"
+                onClick={() => navigate("/facility-registration")}
               />
             )}
             {isAdmin && (

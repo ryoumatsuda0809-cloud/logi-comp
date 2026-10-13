@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 import { convertWaitLogsToTimeline, generateFormalReportFromWaitLogs } from "@/lib/waitLogToTimeline";
 import { sumWaitCost } from "@/lib/waitCostCalc";
-import { ReportDocument, type ReportData, type TimelineEntry } from "@/components/report/ReportDocument";
+import { ReportDocument, type ReportData, type ReportParties, type TimelineEntry } from "@/components/report/ReportDocument";
 
 /* ------------------------------------------------------------------ */
 /*  In-App Browser Detection                                          */
@@ -33,9 +33,10 @@ export default function SharedReportView() {
   const { user } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [parties, setParties] = useState<{ carrier: string | null; shippers: string[] }>({
+  const [parties, setParties] = useState<ReportParties>({
     carrier: null,
     shippers: [],
+    unverifiedFacilities: [],
   });
   const inApp = useMemo(() => isInAppBrowser(), []);
 
@@ -51,6 +52,7 @@ export default function SharedReportView() {
           timeline_snapshot: Json;
           carrier_name: string | null;
           shipper_names: string[];
+          unverified_facility_names?: string[];
         }) | null;
         if (!error && r) {
           setReport({
@@ -66,7 +68,11 @@ export default function SharedReportView() {
             organization_id: null,
             user_id: null,
           });
-          setParties({ carrier: r.carrier_name ?? null, shippers: r.shipper_names ?? [] });
+          setParties({
+            carrier: r.carrier_name ?? null,
+            shippers: r.shipper_names ?? [],
+            unverifiedFacilities: r.unverified_facility_names ?? [],
+          });
         } else {
           setReport(null);
         }
@@ -193,12 +199,15 @@ export default function SharedReportView() {
       ]);
       const facilityIds = Array.from(new Set((logRes.data ?? []).map((l) => l.facility_id)));
       const facRes = facilityIds.length
-        ? await supabase.from("facilities").select("client_name").in("id", facilityIds)
-        : { data: [] as { client_name: string | null }[] };
+        ? await supabase.from("facilities").select("client_name, name, verification_status").in("id", facilityIds)
+        : { data: [] as { client_name: string | null; name: string; verification_status: string }[] };
       const shippers = Array.from(
         new Set((facRes.data ?? []).map((f) => f.client_name).filter((n): n is string => !!n)),
       );
-      if (!cancelled) setParties({ carrier: orgRes.data?.name ?? null, shippers });
+      const unverifiedFacilities = Array.from(
+        new Set((facRes.data ?? []).filter((f) => f.verification_status === "unverified").map((f) => f.name)),
+      );
+      if (!cancelled) setParties({ carrier: orgRes.data?.name ?? null, shippers, unverifiedFacilities });
     })();
     return () => {
       cancelled = true;
