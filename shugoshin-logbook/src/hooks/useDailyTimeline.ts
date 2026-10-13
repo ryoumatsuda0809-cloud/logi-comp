@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { calcWaitCost, sumWaitCost } from "@/lib/waitCostCalc";
 import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
 import type { WaitLogRow } from "@/lib/waitLogToTimeline";
-import { isOnJstDay, waitLogsOfJstDayFilter } from "@/lib/waitLogDay";
 
 // ---------- Types ----------
 
@@ -56,6 +55,8 @@ export interface DailyTimelineResult {
   shipperNames: string[];
   /** 音声・旧記録で申告された待機分（合計には入らない。サーバーは証拠の wait_logs だけを数える） */
   declaredWaitMinutesExcluded: number;
+  /** wait_logs（算定の対象になる打刻）由来の記録があるか。無い日は提出できない（サーバーも拒否する） */
+  hasWaitLogRecords: boolean;
 }
 
 // ---------- Event label mapping ----------
@@ -155,12 +156,13 @@ export function useDailyTimeline(): DailyTimelineResult {
         .eq("report_date", todayStr)
         .maybeSingle(),
       // サーバー（submit_daily_report）と同じ基準で「その日」を決める:
-      // COALESCE(claimed_at, arrival_time) が日本時間の今日（waitLogDay.ts）。
+      // arrival_time が日本時間の今日（waitLogDay.ts）。
       supabase
         .from("wait_logs")
         .select("*")
         .eq("user_id", user.id)
-        .or(waitLogsOfJstDayFilter(todayStr))
+        .gte("arrival_time", todayStart)
+        .lte("arrival_time", todayEnd)
         .order("arrival_time", { ascending: true }),
       supabase.from("facilities").select("id, name, client_name"),
     ]);
@@ -237,7 +239,7 @@ export function useDailyTimeline(): DailyTimelineResult {
         claimed_loading_at: wl.claimed_loading_at,
         claimed_end_at: wl.claimed_end_at,
         self_approved: wl.self_approved,
-      })).filter((w) => isOnJstDay(w, todayStr));
+      }));
       const visitedIds = new Set(waitLogRows.map((w) => w.facility_id));
       setShipperNames(
         Array.from(
@@ -308,6 +310,8 @@ export function useDailyTimeline(): DailyTimelineResult {
     .filter((i) => !i.fromWaitLog && (i.eventType === "waiting_start" || i.eventType === "voice_report"))
     .reduce((sum, i) => sum + (i.waitMinutes ?? 0), 0);
 
+  const hasWaitLogRecords = timeline.some((i) => i.fromWaitLog === true);
+
   const hasDiscrepancy = detectDiscrepancies(timeline);
 
   return {
@@ -321,5 +325,6 @@ export function useDailyTimeline(): DailyTimelineResult {
     latestFormalReport,
     shipperNames,
     declaredWaitMinutesExcluded,
+    hasWaitLogRecords,
   };
 }

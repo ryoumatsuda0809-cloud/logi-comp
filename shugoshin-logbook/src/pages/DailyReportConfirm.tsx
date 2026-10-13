@@ -1,6 +1,6 @@
 import { toDisplayMessage } from "@/lib/dbErrors";
-import { jstDateString } from "@/lib/jstDate";
-import { isOnJstDay, waitLogsOfJstDayFilter } from "@/lib/waitLogDay";
+import { jstDateString, jstDayRange } from "@/lib/jstDate";
+import { submitBlockReason } from "@/lib/submitGuard";
 import { MapPin, Clock, Package, Home, Mic, AlertTriangle, Satellite, CheckCircle2, Info, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +74,7 @@ function formatTime(iso: string) {
 export default function DailyReportConfirm() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames, declaredWaitMinutesExcluded } = useDailyTimeline();
+  const { timeline, vehicleClass, totalWaitMinutes, totalWaitCost, hasDiscrepancy, loading, alreadySubmitted, latestFormalReport, shipperNames, declaredWaitMinutesExcluded, hasWaitLogRecords } = useDailyTimeline();
   const [submitting, setSubmitting] = useState(false);
 
   // Dialog & editable parameters
@@ -108,6 +108,8 @@ export default function DailyReportConfirm() {
   const isWaitEdited = editWaitMinutes !== totalWaitMinutes;
   const draftReportText = generateFormalReport(draftWaitMinutes, draftExtraWork, derivedShipper);
   const hasRecords = !loading && timeline.length > 0;
+  // 打刻（wait_logs）が0件の日は提出できない。サーバーも拒否する（音声の申告だけでは提出不可）
+  const blockReason = submitBlockReason({ loading, hasWaitLogRecords, timelineLength: timeline.length });
 
   // ---------- Press-and-hold logic ----------
   const [holdProgress, setHoldProgress] = useState(0);
@@ -148,12 +150,14 @@ export default function DailyReportConfirm() {
     // 注意: ここで組み立てるのは表示用の情報だけ。待機時間・待機料・車格・組織・提出時刻は
     // サーバー（submit_daily_report）が wait_logs とプロフィールから決める。送らない。
     const todayStr = jstDateString();
+    const { start: dayStart, end: dayEnd } = jstDayRange(todayStr);
     const [logsRes, facilitiesRes] = await Promise.all([
       supabase
         .from("wait_logs")
         .select("*")
         .eq("user_id", user.id)
-        .or(waitLogsOfJstDayFilter(todayStr))
+        .gte("arrival_time", dayStart)
+        .lte("arrival_time", dayEnd)
         .order("arrival_time", { ascending: true }),
       supabase.from("facilities").select("id, name"),
     ]);
@@ -165,8 +169,7 @@ export default function DailyReportConfirm() {
       for (const f of facilitiesRes.data ?? []) {
         facilityMap[f.id] = f.name;
       }
-      const todaysLogs = logsRes.data.filter((l) => isOnJstDay(l, todayStr));
-      const { entries } = convertWaitLogsToTimeline(todaysLogs, facilityMap);
+      const { entries } = convertWaitLogsToTimeline(logsRes.data, facilityMap);
       // Merge: existing timeline + wait_logs entries (deduplicated by adding source prefix)
       snapshotData = [...snapshotData, ...entries.map(e => ({ ...e, source: "wait_log" }))];
     }
@@ -202,7 +205,7 @@ export default function DailyReportConfirm() {
   };
 
   const onPointerDown = useCallback(() => {
-    if (submitting || loading || timeline.length === 0 || alreadySubmitted) return;
+    if (submitting || blockReason !== null || alreadySubmitted) return;
     if (navigator.vibrate) navigator.vibrate(50);
     holdStartRef.current = Date.now();
     animFrameRef.current = requestAnimationFrame(updateProgress);
@@ -212,13 +215,13 @@ export default function DailyReportConfirm() {
       if (navigator.vibrate) navigator.vibrate(200);
       handleSubmit();
     }, HOLD_DURATION_MS);
-  }, [submitting, loading, timeline, alreadySubmitted, updateProgress, handleSubmit]);
+  }, [submitting, blockReason, alreadySubmitted, updateProgress, handleSubmit]);
 
   const onPointerUpOrLeave = useCallback(() => {
     cancelHold();
   }, [cancelHold]);
 
-  const isSubmitDisabled = submitting || loading || timeline.length === 0;
+  const isSubmitDisabled = submitting || blockReason !== null;
 
   return (
     <div className="min-h-screen bg-background pb-44">
@@ -582,7 +585,7 @@ export default function DailyReportConfirm() {
             {/* 無効のときは理由を出す（灰色のまま理由が分からない状態を避ける） */}
             {!submitting && isSubmitDisabled && (
               <p className="mt-1 text-center text-xs text-muted-foreground">
-                {loading ? "記録を読み込み中です" : "本日の打刻記録がないため、提出できません"}
+                {blockReason}
               </p>
             )}
             {/* Progress indicator below button */}

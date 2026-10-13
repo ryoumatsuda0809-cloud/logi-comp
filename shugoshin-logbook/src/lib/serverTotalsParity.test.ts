@@ -82,7 +82,7 @@ describe("SQL と TypeScript の待機計算の一致（supabase/tests/server_si
       expect.arrayContaining([
         "normal-72min",
         "within-30min-is-free",
-        "grade-C-uses-claimed-times",
+        "grade-C-approval-day-claimed-minutes",
         "cancelled-is-excluded",
         "unmeasured-and-called-fallback",
         "midnight-boundary-jst",

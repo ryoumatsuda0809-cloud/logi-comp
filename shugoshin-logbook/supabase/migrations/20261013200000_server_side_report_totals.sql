@@ -18,9 +18,15 @@
 --
 -- 【計算規則（src/lib/waitCostCalc.ts / src/lib/waitLogToTimeline.ts と一致させる）】
 --   - 対象: 呼び出したユーザー本人の wait_logs。取消済み（status='cancelled'）は除く。
---   - 日付: COALESCE(claimed_at, arrival_time) を日本時間に直した日（整理券番号の
---     採番と同じ基準。等級C は承認日ではなく申告した到着日に属する）。
---   - 待機1回の分数: COALESCE(claimed_loading_at, work_start_time, called_time) と
+--   - どの日の日報に含めるか: arrival_time を日本時間に直した日。
+--     等級C（圏外承認）の arrival_time は承認処理の時刻なので、等級C の記録は
+--     「承認した日」の日報に入る。申告した日の日報が既に提出済み（変更不可）でも、
+--     承認が翌日以降なら、承認した日の日報に入って証拠が消えない。日付が少しずれる方が、
+--     記録が消えるより安全という判断。共有帳票 get_shared_report、画面の見積もり
+--     （useDailyTimeline / SharedReportView）も arrival_time で日を絞っており、これと一致する。
+--     ※ 整理券番号の一意索引（COALESCE(claimed_at, arrival_time) の日）とは別の基準。
+--   - 待機1回の分数（日の基準とは独立。等級C は申告時刻から計算する）:
+--     COALESCE(claimed_loading_at, work_start_time, called_time) と
 --     COALESCE(claimed_at, arrival_time) の差を分に四捨五入（JS の Math.round と同じく
 --     .5 は切り上げ）。0 未満は 0。荷役開始側が全て NULL なら「算定不能」（分数 NULL）。
 --     work_end_time へフォールバックしてはならない（荷役時間が待機料に混入する）。
@@ -30,6 +36,7 @@
 -- 【既存の挙動との違い（意図したもの）】
 --   画面の合計はこれまで compliance_logs（旧）と音声日報の申告待機分も足していた。
 --   サーバーは証拠（wait_logs）だけを数える。音声の自己申告は合計に入らない。
+--   また、算定の対象になる wait_logs が 0 件の日は提出できない（音声の申告だけでは提出不可）。
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -39,6 +46,8 @@ CREATE TABLE IF NOT EXISTS public.wait_rates (
   vehicle_class  text    PRIMARY KEY,
   yen_per_minute integer NOT NULL CHECK (yen_per_minute > 0),
   -- 該当する車格が無い・未設定のときに使う行。ちょうど1行だけ true にできる。
+  -- 既定行を消す・外すと、該当なしの車格の料率が引けず月次ビューが黙って0円になるため、
+  -- 下のトリガーで拒否する。
   is_default     boolean NOT NULL DEFAULT false
 );
 
@@ -53,6 +62,50 @@ INSERT INTO public.wait_rates (vehicle_class, yen_per_minute, is_default) VALUES
   ('10t', 60, false)
 ON CONFLICT (vehicle_class) DO NOTHING;
 
+-- 既定行の削除・解除を拒否する（月次ビューが既定行を引けず、黙って0円になるのを防ぐ）。
+-- 既定を別の車格に移したいときは、このトリガーを一時的に DISABLE して、同じマイグレーションの
+-- 中で「新しい既定行を作る→旧既定行の is_default を外す」を行い、ENABLE し直す。
+CREATE OR REPLACE FUNCTION public.protect_default_wait_rate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $$
+BEGIN
+  IF TG_OP = 'TRUNCATE' THEN
+    RAISE EXCEPTION '料率表（wait_rates）は空にできません。' USING ERRCODE = 'check_violation';
+  ELSIF TG_OP = 'DELETE' THEN
+    IF OLD.is_default THEN
+      RAISE EXCEPTION '既定の料率（is_default）の行は削除できません。' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN OLD;
+  ELSE
+    IF OLD.is_default AND NOT NEW.is_default THEN
+      RAISE EXCEPTION '既定の料率（is_default）は解除できません。別の行を既定にするには、このトリガーを一時的に無効にしてください。'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END IF;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_default_wait_rate_row ON public.wait_rates;
+CREATE TRIGGER trg_protect_default_wait_rate_row
+  BEFORE UPDATE OR DELETE ON public.wait_rates
+  FOR EACH ROW EXECUTE FUNCTION public.protect_default_wait_rate();
+
+DROP TRIGGER IF EXISTS trg_protect_default_wait_rate_truncate ON public.wait_rates;
+CREATE TRIGGER trg_protect_default_wait_rate_truncate
+  BEFORE TRUNCATE ON public.wait_rates
+  FOR EACH STATEMENT EXECUTE FUNCTION public.protect_default_wait_rate();
+
+-- 既定行が必ず1行あること（無ければここで止める）
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.wait_rates WHERE is_default) <> 1 THEN
+    RAISE EXCEPTION 'wait_rates に既定行（is_default）がちょうど1行ありません。';
+  END IF;
+END $$;
+
 ALTER TABLE public.wait_rates ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "wait_rates readable" ON public.wait_rates;
@@ -61,13 +114,14 @@ CREATE POLICY "wait_rates readable"
   USING (true);
 
 -- 読み取りのみ。料率の変更はマイグレーションで行う。
--- anon に SELECT を残すのは、security_invoker のビューを anon が引いても
--- 従来どおり「空」で返る（権限エラーにならない）ようにするため。料率は秘密ではない。
+-- anon にも SELECT を許可する。料率は秘密ではない（画面のコードにも同じ値がある）。
+-- なお本番の wait_logs には anon の権限が無いので、anon が月次ビュー（security_invoker）を
+-- 引くと、この表とは無関係に、元から権限エラーになる可能性がある（今回の変更による新しい挙動ではない）。
 REVOKE ALL ON public.wait_rates FROM anon, authenticated;
 GRANT SELECT ON public.wait_rates TO anon, authenticated;
 
 COMMENT ON TABLE public.wait_rates IS
-  '待機料の料率（円/分）。料率を持つ唯一の場所。変更はマイグレーションのみ。提出済み日報は submitted_reports.server_calculation に適用した料率を残す。';
+  '待機料の料率（円/分）。サーバー側（提出日報・月次ビュー）の唯一の料率表。画面の見積もり用に src/lib/waitCostCalc.ts にも同じ値があるので、変更時は両方を直すこと（テストが初期値の一致を検査する）。変更はマイグレーションのみ。提出済み日報は submitted_reports.server_calculation に適用した料率を残す。';
 
 -- 車格 → 円/分。該当なし・NULL・空文字は既定行。
 CREATE OR REPLACE FUNCTION public.wait_yen_per_minute(p_vehicle_class text)
@@ -201,8 +255,10 @@ AS $$
     FROM public.wait_logs w
     WHERE w.user_id = p_user_id
       AND w.status IS DISTINCT FROM 'cancelled'
-      AND COALESCE(w.claimed_at, w.arrival_time) >= (p_date::timestamp AT TIME ZONE 'Asia/Tokyo')
-      AND COALESCE(w.claimed_at, w.arrival_time) <  ((p_date + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')
+      -- どの日の日報に入れるかは arrival_time の日本時間の日付（等級C は承認した日）。
+      -- 待機分数の計算（下の arrival_at / loading_at）とは別の基準。
+      AND w.arrival_time >= (p_date::timestamp AT TIME ZONE 'Asia/Tokyo')
+      AND w.arrival_time <  ((p_date + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')
   ), m AS (
     SELECT
       v.*,
@@ -286,7 +342,7 @@ BEGIN
   -- 提出できるのは、サーバー時計で「今日（日本時間）」の分だけ。
   -- 日付をまたいで画面を開いたままにした場合に、別の日の記録で提出してしまうのを防ぐ。
   IF p_report_date IS DISTINCT FROM v_today THEN
-    RAISE EXCEPTION '提出できるのは本日（日本時間）の日報だけです。日付が変わった場合は、画面を開き直してください。'
+    RAISE EXCEPTION '提出できるのは本日（日本時間）の日報だけです。日付が変わった場合は、画面を開き直してください。端末の日時設定がずれている場合も、このメッセージが出ます。'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -331,6 +387,13 @@ BEGIN
       USING ERRCODE = 'unique_violation';
   END IF;
 
+  -- 算定の対象になる打刻（取消済みを除く wait_logs）が 0 件の日は提出できない。
+  -- 音声の申告だけでは、証拠の無い 0 円の日報になってしまう。
+  IF v_calc.visit_count = 0 THEN
+    RAISE EXCEPTION '今日の打刻の記録がないため、日報を提出できません。'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
   -- 手で修正した待機分数がサーバーの計算と違うなら、修正したことを必ず記録する
   v_is_edited := COALESCE(p_is_edited, false)
     OR (p_reported_wait_minutes IS NOT NULL
@@ -350,7 +413,7 @@ BEGIN
       NULLIF(p_original_ai_output, ''), v_is_edited, NULLIF(p_formal_report, ''),
       p_reported_wait_minutes,
       jsonb_build_object(
-        'rule', '待機1回ごとに30分を控除。荷待ちは到着から荷役開始まで（呼出で代替、荷役完了にはしない）。等級Cは申告時刻を使う。',
+        'rule', '待機1回ごとに30分を控除。荷待ちは到着から荷役開始まで（呼出で代替、荷役完了にはしない）。等級Cは申告時刻から計算する（どの日に入るかは arrival_time の日付）。',
         'report_date', v_today,
         'profile_vehicle_class', v_profile_class,
         'yen_per_minute', v_calc.yen_per_minute,
