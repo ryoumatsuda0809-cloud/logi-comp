@@ -273,9 +273,9 @@ export default function DemoOrders() {
 
       <main className="mx-auto max-w-4xl p-4 pb-24">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-4 w-full">
-            <TabsTrigger value="new" className="flex-1">新規発注</TabsTrigger>
-            <TabsTrigger value="list" className="flex-1">発注一覧</TabsTrigger>
+          <TabsList className="mb-4 h-auto w-full">
+            <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>
+            <TabsTrigger value="list" className="min-h-11 flex-1">発注一覧</TabsTrigger>
           </TabsList>
 
           {/* 新規発注タブ */}
@@ -309,7 +309,7 @@ export default function DemoOrders() {
                       aria-pressed={example?.id === ex.id}
                       disabled={locked || isParsing}
                       onClick={() => selectExample(ex)}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                      className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
                         example?.id === ex.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"

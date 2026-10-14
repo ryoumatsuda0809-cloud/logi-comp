@@ -46,6 +46,10 @@
     --success:          160 84% 39%;   /* Teal #10b981 */
     --success-foreground: 0 0% 100%;
 
+    /* 注意（まだ条件を満たしていない・確認が要る）。文字色には使わず、背景・枠・アイコンに使う */
+    --warning:          38 92% 50%;    /* Amber #f59e0b */
+    --warning-foreground: 222 47% 11%;
+
     /* ── Borders & Inputs ── */
     --border:           214 32% 88%;
     --input:            214 32% 88%;
@@ -97,6 +101,9 @@
 
     --success:          160 84% 39%;
     --success-foreground: 0 0% 100%;
+
+    --warning:          38 92% 50%;
+    --warning-foreground: 222 47% 11%;
 
     /* ── Borders & Inputs ── */
     --border:           222 47% 18%;

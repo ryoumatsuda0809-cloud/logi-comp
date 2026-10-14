@@ -155,7 +155,7 @@ function GpsPanel() {
           </div>
         </div>
 
-        <Button className="w-full" disabled={!inFence || stamped} variant={stamped ? "secondary" : "default"}>
+        <Button className="min-h-12 w-full" disabled={!inFence || stamped} variant={stamped ? "secondary" : "default"}>
           {stamped ? (
             <>
               <ShieldCheck className="mr-2 h-4 w-4" />
@@ -170,12 +170,18 @@ function GpsPanel() {
             </>
           )}
         </Button>
+        {!inFence && !stamped && (
+          <p className="flex items-center gap-2 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-sm text-foreground">
+            <MapPin className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+            施設から{DEMO_GEOFENCE_RADIUS_M}m以内に入ると押せます（あと {(distance - DEMO_GEOFENCE_RADIUS_M).toLocaleString()} m）
+          </p>
+        )}
 
         <div className="flex items-center gap-3">
           <Button
             size="sm"
             variant={!playing && index === 0 ? "default" : "outline"}
-            className="shrink-0 gap-2"
+            className="min-h-11 shrink-0 gap-2"
             aria-label={playing ? "一時停止" : "1日の流れを再生"}
             onClick={() => {
               if (!playing && index >= last) setIndex(0);
@@ -201,7 +207,7 @@ function GpsPanel() {
             <button
               key={e.label}
               type="button"
-              className="rounded-full border px-2 py-0.5 hover:bg-muted"
+              className="min-h-11 rounded-full border px-3 hover:bg-muted"
               onClick={() => {
                 const i = DEMO_TRACK.findIndex((p) => new Date(p.t) >= new Date(e.t));
                 setPlaying(false);
@@ -303,7 +309,7 @@ function KanbanPanel() {
                       {col.action && (
                         <Button
                           size="sm"
-                          className="mt-2 w-full"
+                          className="mt-2 min-h-11 w-full"
                           onClick={() => advance(t.no, col.action!.next)}
                         >
                           {col.action.label}
@@ -319,7 +325,7 @@ function KanbanPanel() {
         <p className="text-xs text-muted-foreground">
           荷主が押せるのは「呼出」と「荷役開始」まで。完了はドライバーの打刻だけが確定します。
         </p>
-        <Button variant="outline" size="sm" onClick={() => setTickets(KANBAN_INITIAL)}>
+        <Button variant="outline" size="sm" className="min-h-11" onClick={() => setTickets(KANBAN_INITIAL)}>
           最初の状態に戻す
         </Button>
       </CardContent>
@@ -450,6 +456,50 @@ const INTEGRITY_POINTS = [
   { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
 
+/**
+ * 最初に見える要約。初めて開いた人が、技術の説明より先に「何のアプリで、何が残るか」を読めるようにする。
+ * 数字は待機料タブと同じ計算（convertWaitLogsToTimeline / sumWaitCost）から出す。
+ */
+function DemoHero() {
+  const summary = useMemo(
+    () => convertWaitLogsToTimeline(DEMO_WAIT_LOGS, DEMO_FACILITY_NAMES),
+    [],
+  );
+  const minutes = summary.waitMinutesPerEvent.reduce((a, b) => a + b, 0);
+  const fee = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
+
+  return (
+    <section className="mb-4 rounded-xl border bg-card p-4" aria-labelledby="demo-hero-title">
+      <h2 id="demo-hero-title" className="text-lg font-bold leading-snug">
+        {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
+        <span className="inline-block">荷待ち時間を、</span>
+        <span className="inline-block">書き換えにくい記録に。</span>
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。下は架空のドライバーの1日です。
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-muted p-3">
+          <div className="text-xs text-muted-foreground">この1日の待機</div>
+          <div className="text-2xl font-bold tabular-nums">{minutes.toLocaleString()}分</div>
+        </div>
+        <div className="rounded-lg bg-muted p-3">
+          <div className="text-xs text-muted-foreground">待機料の目安</div>
+          <div className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</div>
+        </div>
+      </div>
+      <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
+        {INTEGRITY_POINTS.map((p) => (
+          <li key={p.title} className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+            {p.title}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
 const KEEP_TAB = "data-[state=inactive]:hidden";
 
@@ -477,11 +527,13 @@ export default function Demo() {
       </div>
 
       <main className="mx-auto max-w-4xl p-4 pb-24">
+        <DemoHero />
         <Tabs defaultValue="punch">
-          <TabsList className="mb-4 w-full">
-            <TabsTrigger value="punch" className="flex-1">打刻</TabsTrigger>
-            <TabsTrigger value="kanban" className="flex-1">荷主</TabsTrigger>
-            <TabsTrigger value="fee" className="flex-1">待機料</TabsTrigger>
+          <p className="mb-2 text-sm font-medium text-muted-foreground">同じ1日を、3つの立場で見る</p>
+          <TabsList className="mb-4 h-auto w-full">
+            <TabsTrigger value="punch" className="min-h-11 flex-1">ドライバー</TabsTrigger>
+            <TabsTrigger value="kanban" className="min-h-11 flex-1">荷主</TabsTrigger>
+            <TabsTrigger value="fee" className="min-h-11 flex-1">待機料</TabsTrigger>
           </TabsList>
 
           <TabsContent value="punch" forceMount className={`space-y-4 ${KEEP_TAB}`}>
