@@ -96,6 +96,11 @@ function GpsPanel() {
   const distance = Math.round(haversineDistance(current.lat, current.lng, origin.lat, origin.lng));
   const inFence = distance <= DEMO_GEOFENCE_RADIUS_M;
   const stamped = new Date(current.t) >= new Date(DEMO_WAIT_LOGS[0].arrival_time);
+  // 到着打刻の時刻に当たる軌跡の位置（「到着打刻」を押したときに、そこまで進める）
+  const arrivalIndex = useMemo(() => {
+    const i = DEMO_TRACK.findIndex((p) => new Date(p.t) >= new Date(DEMO_WAIT_LOGS[0].arrival_time));
+    return i < 0 ? last : i;
+  }, [last]);
 
   const pts = useMemo(
     () => DEMO_TRACK.map((p) => toLocalMeters(p.lat, p.lng)),
@@ -164,21 +169,40 @@ function GpsPanel() {
           </div>
         </div>
 
-        <Button className="min-h-12 w-full" disabled={!inFence || stamped} variant={stamped ? "secondary" : "default"}>
-          {stamped ? (
-            <>
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              打刻済み　整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番（サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}）
-            </>
-          ) : inFence ? (
-            "到着打刻"
-          ) : (
-            <>
-              <Lock className="mr-2 h-4 w-4" />
-              500m超のため打刻できません
-            </>
-          )}
-        </Button>
+        {inFence && !stamped ? (
+          // 施設の範囲に入った瞬間に、押すべきボタンを大きく出す。押すと到着打刻の時点まで進む（デモの中だけの動き）
+          <div className="rounded-xl border-2 border-accent bg-accent/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <MapPin className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+              施設の{DEMO_GEOFENCE_RADIUS_M}m以内に入りました
+            </p>
+            <Button
+              className="mt-2 min-h-14 w-full bg-accent text-lg font-bold text-accent-foreground hover:bg-accent/90"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(15);
+                setPlaying(false);
+                setIndex(arrivalIndex);
+              }}
+            >
+              到着打刻
+            </Button>
+          </div>
+        ) : (
+          // 打刻済みの文は長いので、1行に詰めずに折り返す（狭い画面で右にはみ出していた）
+          <Button className="h-auto min-h-12 w-full whitespace-normal py-2" disabled variant={stamped ? "secondary" : "default"}>
+            {stamped ? (
+              <>
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                打刻済み　整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番（サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}）
+              </>
+            ) : (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                500m超のため打刻できません
+              </>
+            )}
+          </Button>
+        )}
         {!inFence && !stamped && (
           <p className="flex items-center gap-2 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-sm text-foreground">
             <MapPin className="h-4 w-4 shrink-0 text-warning" aria-hidden />
@@ -342,6 +366,18 @@ function KanbanPanel() {
   );
 }
 
+/** 訪問ごとの待機分と待機料（待機料タブと、要約の内訳シートで同じものを使う） */
+function demoFeeRows() {
+  return DEMO_WAIT_LOGS.filter(isBillableWaitLog).map((log) => {
+    const mins = diffMinutes(effectiveArrival(log), loadingStartedAt(log));
+    return {
+      log,
+      mins,
+      fee: mins === null ? null : calcWaitCost(mins, DEMO_VEHICLE_CLASS),
+    };
+  });
+}
+
 function FeePanel() {
   const rate = getRate(DEMO_VEHICLE_CLASS);
   const summary = useMemo(
@@ -350,14 +386,7 @@ function FeePanel() {
   );
   const total = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
 
-  const rows = DEMO_WAIT_LOGS.filter(isBillableWaitLog).map((log) => {
-    const mins = diffMinutes(effectiveArrival(log), loadingStartedAt(log));
-    return {
-      log,
-      mins,
-      fee: mins === null ? null : calcWaitCost(mins, DEMO_VEHICLE_CLASS),
-    };
-  });
+  const rows = demoFeeRows();
 
   return (
     <Card>
@@ -438,7 +467,13 @@ function TimelinePanel() {
                       待機 算定不能
                     </span>
                   ) : (
-                    <span className="rounded bg-muted px-2 py-0.5 text-xs font-semibold">待機 {v.waitMinutes}分</span>
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                        v.waitMinutes > 30 ? "border border-warning bg-warning/15" : "bg-muted"
+                      }`}
+                    >
+                      待機 {v.waitMinutes}分{v.waitMinutes > 30 && "・30分超"}
+                    </span>
                   )}
                 </span>
               </div>
@@ -477,6 +512,8 @@ function DemoHero() {
   const minutes = summary.waitMinutesPerEvent.reduce((a, b) => a + b, 0);
   const fee = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
   const [openPoint, setOpenPoint] = useState<number | null>(null);
+  const [feeOpen, setFeeOpen] = useState(false);
+  const feeRows = useMemo(() => demoFeeRows(), []);
   const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
 
   return (
@@ -490,14 +527,28 @@ function DemoHero() {
         施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。下は架空のドライバーの1日です。
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-muted p-3">
-          <div className="text-xs text-muted-foreground">この1日の待機</div>
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="rounded-lg bg-muted p-3 text-left hover:bg-muted/70"
+          aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
+        >
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            この1日の待機 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </div>
           <div className="text-2xl font-bold tabular-nums">{minutes.toLocaleString()}分</div>
-        </div>
-        <div className="rounded-lg bg-muted p-3">
-          <div className="text-xs text-muted-foreground">待機料の目安</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="rounded-lg bg-muted p-3 text-left hover:bg-muted/70"
+          aria-label={`待機料の目安 ${fee}円。内訳を見る`}
+        >
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            待機料の目安 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </div>
           <div className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</div>
-        </div>
+        </button>
       </div>
       {/* 押すと下から説明が出る（スマホのアプリのボトムシート）。下に引くか外を押すと閉じる */}
       <ul className="mt-3 grid gap-1 sm:grid-cols-2">
@@ -536,6 +587,41 @@ function DemoHero() {
               </DrawerFooter>
             </>
           )}
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={feeOpen} onOpenChange={setFeeOpen}>
+        <DrawerContent>
+          <DrawerHeader className="text-left">
+            <DrawerTitle>待機料の内訳</DrawerTitle>
+            <DrawerDescription>
+              {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{getRate(DEMO_VEHICLE_CLASS)}円/分。待機1回ごとに30分を控除し、超えた分だけ数えます。
+            </DrawerDescription>
+          </DrawerHeader>
+          <ul className="space-y-2 px-4">
+            {feeRows.map(({ log, mins, fee: rowFee }) => (
+              <li key={log.id} className="flex items-baseline justify-between gap-2 rounded-lg border p-3 text-sm">
+                <span className="min-w-0">
+                  <span className="block font-medium">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
+                  <span className="text-muted-foreground tabular-nums">待機 {mins ?? "-"}分</span>
+                </span>
+                <span className="shrink-0 text-base font-semibold tabular-nums">
+                  {rowFee === null ? "算定不能" : rowFee === 0 ? "対象外" : `¥${rowFee.toLocaleString()}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mx-4 mt-3 flex items-baseline justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">合計 {minutes.toLocaleString()}分</span>
+            <span className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</span>
+          </div>
+          <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+            <DrawerClose asChild>
+              <Button variant="outline" className="min-h-12">
+                閉じる
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
         </DrawerContent>
       </Drawer>
     </section>
