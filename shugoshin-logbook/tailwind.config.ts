@@ -14,6 +14,18 @@ export default {
     },
     extend: {
       fontFamily: {
+        // 画面の標準の字体。日本のサイトや Word と同じ日本語ゴシック（iPhone・Mac はヒラギノ、Windows は游ゴシック・メイリオ）。
+        // 日本語の字体を先頭に置くのは、数字や英字も日本語書体の字形で出すため（先に欧文の字体を置くと、
+        // 数字だけ海外のアプリのような字形になる）。どれも無い端末（Android など）は Noto Sans JP を使う。
+        sans: [
+          '"Hiragino Sans"',
+          '"Hiragino Kaku Gothic ProN"',
+          '"Yu Gothic Medium"',
+          '"YuGothic"',
+          "Meiryo",
+          '"Noto Sans JP"',
+          "sans-serif",
+        ],
         "serif-jp": ['"Noto Serif JP"', 'serif'],
       },
       colors: {
@@ -37,6 +49,10 @@ export default {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

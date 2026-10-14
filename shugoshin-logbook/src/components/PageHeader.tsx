@@ -19,7 +19,11 @@ type PageHeaderProps = {
 export function PageHeader({ title, subtitle, backTo = "/", right, children, className }: PageHeaderProps) {
   const navigate = useNavigate();
   return (
-    <header className={cn("sticky top-0 z-30 bg-primary px-4 py-3 shadow-md", className)}>
+    // ホーム画面から開いた iPhone ではステータスバーが透過なので、切り欠きの分だけ上を空ける（他の端末では py-3 と同じ）
+    <header
+      className={cn("sticky top-0 z-30 bg-primary px-4 py-3 shadow-md", className)}
+      style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+    >
       <div className="mx-auto flex max-w-4xl items-center gap-2">
         <button
           type="button"

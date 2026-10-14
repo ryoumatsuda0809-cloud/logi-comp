@@ -46,6 +46,10 @@
     --success:          160 84% 39%;   /* Teal #10b981 */
     --success-foreground: 0 0% 100%;
 
+    /* 注意（まだ条件を満たしていない・確認が要る）。文字色には使わず、背景・枠・アイコンに使う */
+    --warning:          38 92% 50%;    /* Amber #f59e0b */
+    --warning-foreground: 222 47% 11%;
+
     /* ── Borders & Inputs ── */
     --border:           214 32% 88%;
     --input:            214 32% 88%;
@@ -97,6 +101,9 @@
 
     --success:          160 84% 39%;
     --success-foreground: 0 0% 100%;
+
+    --warning:          38 92% 50%;
+    --warning-foreground: 222 47% 11%;
 
     /* ── Borders & Inputs ── */
     --border:           222 47% 18%;
@@ -157,5 +164,39 @@
     font-size: 11pt;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+}
+
+/* ── デモ（/demo 系）だけの、スマホのアプリらしい手触り ──
+   本物の画面には付けない。.demo-app は各デモ画面のいちばん外側に付ける。 */
+@layer components {
+  .demo-app {
+    -webkit-tap-highlight-color: transparent;
+    /* 画面が切り替わったときに、ふっと出す。transform を使わないのは、
+       動いている間に下の固定ナビの位置がずれないようにするため（opacity は位置に影響しない） */
+    animation: demo-fade-in 180ms ease-out both;
+  }
+  /* 押した瞬間に少し沈む（指で押した手応え） */
+  .demo-app button:not(:disabled):active,
+  .demo-app a:active {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .demo-app {
+      animation: none;
+    }
+    .demo-app button:not(:disabled):active,
+    .demo-app a:active {
+      transform: none;
+    }
+  }
+}
+
+@keyframes demo-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

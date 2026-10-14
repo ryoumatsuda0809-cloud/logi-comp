@@ -4,11 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { ChevronDown, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { Check, ChevronRight, Clock, Layers, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -87,6 +96,11 @@ function GpsPanel() {
   const distance = Math.round(haversineDistance(current.lat, current.lng, origin.lat, origin.lng));
   const inFence = distance <= DEMO_GEOFENCE_RADIUS_M;
   const stamped = new Date(current.t) >= new Date(DEMO_WAIT_LOGS[0].arrival_time);
+  // 到着打刻の時刻に当たる軌跡の位置（「到着打刻」を押したときに、そこまで進める）
+  const arrivalIndex = useMemo(() => {
+    const i = DEMO_TRACK.findIndex((p) => new Date(p.t) >= new Date(DEMO_WAIT_LOGS[0].arrival_time));
+    return i < 0 ? last : i;
+  }, [last]);
 
   const pts = useMemo(
     () => DEMO_TRACK.map((p) => toLocalMeters(p.lat, p.lng)),
@@ -105,8 +119,11 @@ function GpsPanel() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <MapPin className="h-4 w-4" /> GPS とジオフェンス
+          <MapPin className="h-4 w-4" /> 到着の判定
         </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          GPSで、施設から{DEMO_GEOFENCE_RADIUS_M}m以内にいるかを確かめます。再生すると1日の動きを追えます。
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <svg
@@ -155,27 +172,58 @@ function GpsPanel() {
           </div>
         </div>
 
-        <Button className="w-full" disabled={!inFence || stamped} variant={stamped ? "secondary" : "default"}>
-          {stamped ? (
-            <>
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              打刻済み　整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番（サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}）
-            </>
-          ) : inFence ? (
-            "到着打刻"
-          ) : (
-            <>
-              <Lock className="mr-2 h-4 w-4" />
-              500m超のため打刻できません
-            </>
-          )}
-        </Button>
+        {inFence && !stamped ? (
+          // 施設の範囲に入った瞬間に、押すべきボタンを大きく出す。押すと到着打刻の時点まで進む（デモの中だけの動き）
+          <div className="rounded-xl border-2 border-accent bg-accent/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <MapPin className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+              施設の{DEMO_GEOFENCE_RADIUS_M}m以内に入りました
+            </p>
+            <Button
+              className="mt-2 min-h-14 w-full bg-accent text-lg font-bold text-accent-foreground hover:bg-accent/90"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(15);
+                setPlaying(false);
+                setIndex(arrivalIndex);
+              }}
+            >
+              到着打刻
+            </Button>
+          </div>
+        ) : stamped ? (
+          // 記録が確定した瞬間の手応え。印が一瞬で大きくなって現れる（動きを減らす設定では出さない）
+          <div
+            role="status"
+            className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-500">
+              <Check className="h-6 w-6" strokeWidth={3} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="font-bold">到着を記録しました</p>
+              <p className="text-sm text-muted-foreground tabular-nums">
+                整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番・サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <Button className="min-h-12 w-full" disabled>
+            <Lock className="mr-2 h-4 w-4" />
+            500m超のため打刻できません
+          </Button>
+        )}
+        {!inFence && !stamped && (
+          <p className="flex items-center gap-2 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-sm text-foreground">
+            <MapPin className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+            施設から{DEMO_GEOFENCE_RADIUS_M}m以内に入ると押せます（あと {(distance - DEMO_GEOFENCE_RADIUS_M).toLocaleString()} m）
+          </p>
+        )}
 
         <div className="flex items-center gap-3">
           <Button
             size="sm"
             variant={!playing && index === 0 ? "default" : "outline"}
-            className="shrink-0 gap-2"
+            className="min-h-11 shrink-0 gap-2"
             aria-label={playing ? "一時停止" : "1日の流れを再生"}
             onClick={() => {
               if (!playing && index >= last) setIndex(0);
@@ -201,7 +249,7 @@ function GpsPanel() {
             <button
               key={e.label}
               type="button"
-              className="rounded-full border px-2 py-0.5 hover:bg-muted"
+              className="min-h-11 rounded-full border px-3 hover:bg-muted"
               onClick={() => {
                 const i = DEMO_TRACK.findIndex((p) => new Date(p.t) >= new Date(e.t));
                 setPlaying(false);
@@ -303,7 +351,7 @@ function KanbanPanel() {
                       {col.action && (
                         <Button
                           size="sm"
-                          className="mt-2 w-full"
+                          className="mt-2 min-h-11 w-full"
                           onClick={() => advance(t.no, col.action!.next)}
                         >
                           {col.action.label}
@@ -319,12 +367,24 @@ function KanbanPanel() {
         <p className="text-xs text-muted-foreground">
           荷主が押せるのは「呼出」と「荷役開始」まで。完了はドライバーの打刻だけが確定します。
         </p>
-        <Button variant="outline" size="sm" onClick={() => setTickets(KANBAN_INITIAL)}>
+        <Button variant="outline" size="sm" className="min-h-11" onClick={() => setTickets(KANBAN_INITIAL)}>
           最初の状態に戻す
         </Button>
       </CardContent>
     </Card>
   );
+}
+
+/** 訪問ごとの待機分と待機料（待機料タブと、要約の内訳シートで同じものを使う） */
+function demoFeeRows() {
+  return DEMO_WAIT_LOGS.filter(isBillableWaitLog).map((log) => {
+    const mins = diffMinutes(effectiveArrival(log), loadingStartedAt(log));
+    return {
+      log,
+      mins,
+      fee: mins === null ? null : calcWaitCost(mins, DEMO_VEHICLE_CLASS),
+    };
+  });
 }
 
 function FeePanel() {
@@ -335,14 +395,7 @@ function FeePanel() {
   );
   const total = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
 
-  const rows = DEMO_WAIT_LOGS.filter(isBillableWaitLog).map((log) => {
-    const mins = diffMinutes(effectiveArrival(log), loadingStartedAt(log));
-    return {
-      log,
-      mins,
-      fee: mins === null ? null : calcWaitCost(mins, DEMO_VEHICLE_CLASS),
-    };
-  });
+  const rows = demoFeeRows();
 
   return (
     <Card>
@@ -423,7 +476,13 @@ function TimelinePanel() {
                       待機 算定不能
                     </span>
                   ) : (
-                    <span className="rounded bg-muted px-2 py-0.5 text-xs font-semibold">待機 {v.waitMinutes}分</span>
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                        v.waitMinutes > 30 ? "border border-warning bg-warning/15" : "bg-muted"
+                      }`}
+                    >
+                      待機 {v.waitMinutes}分{v.waitMinutes > 30 && "・30分超"}
+                    </span>
                   )}
                 </span>
               </div>
@@ -443,12 +502,173 @@ function TimelinePanel() {
   );
 }
 
+// lines はタイルで語の途中で折れないように、折り返してよい位置で分けたもの（つなげると title と同じ）
 const INTEGRITY_POINTS = [
-  { title: "時刻はサーバーが決める", body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
-  { title: "500m超では打刻できない", body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
-  { title: "確定した証拠は書き換え不可", body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
-  { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
+  { title: "時刻はサーバーが決める", lines: ["時刻は", "サーバーが決める"], body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
+  { title: "500m超では打刻できない", lines: ["500m超では", "打刻できない"], body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
+  { title: "確定した証拠は書き換え不可", lines: ["確定した証拠は", "書き換え不可"], body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
+  { title: "例外は等級で区別", lines: ["例外は", "等級で区別"], body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
+
+/**
+ * 最初に見える要約。初めて開いた人が、技術の説明より先に「何のアプリで、何が残るか」を読めるようにする。
+ * 数字は待機料タブと同じ計算（convertWaitLogsToTimeline / sumWaitCost）から出す。
+ */
+function DemoHero() {
+  const summary = useMemo(
+    () => convertWaitLogsToTimeline(DEMO_WAIT_LOGS, DEMO_FACILITY_NAMES),
+    [],
+  );
+  const minutes = summary.waitMinutesPerEvent.reduce((a, b) => a + b, 0);
+  const fee = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
+  const [openPoint, setOpenPoint] = useState<number | null>(null);
+  const [feeOpen, setFeeOpen] = useState(false);
+  const feeRows = useMemo(() => demoFeeRows(), []);
+  const overThirty = feeRows.filter((r) => r.mins !== null && r.mins > 30).length;
+  const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
+
+  return (
+    <section className="mb-5" aria-labelledby="demo-hero-title">
+      <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight">
+        {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
+        <span className="inline-block">荷待ち時間を、</span>
+        <span className="inline-block">書き換えにくい記録に。</span>
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。
+      </p>
+
+      {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="col-span-2 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm"
+          aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
+        >
+          <div className="flex items-center justify-between text-sm text-primary-foreground/70">
+            この1日の待機料（目安）
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </div>
+          <div className="mt-1 text-5xl font-extrabold tracking-tight tabular-nums">¥{fee.toLocaleString()}</div>
+          <div className="mt-1 text-sm text-primary-foreground/70">
+            30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
+          aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
+        >
+          <div className="text-sm text-muted-foreground">待機</div>
+          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+            {minutes.toLocaleString()}
+            <span className="ml-0.5 text-base font-bold">分</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
+          aria-label={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
+        >
+          <div className="text-sm text-muted-foreground">訪問</div>
+          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+            {feeRows.length}
+            <span className="ml-0.5 text-base font-bold">件</span>
+          </div>
+          <div className="text-xs text-muted-foreground">うち30分超 {overThirty}件</div>
+        </button>
+
+        {INTEGRITY_POINTS.map((p, i) => {
+          const Icon = POINT_ICONS[i] ?? ShieldCheck;
+          return (
+            <button
+              key={p.title}
+              type="button"
+              onClick={() => setOpenPoint(i)}
+              className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success">
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="text-sm font-semibold leading-snug">
+                {p.lines.map((l) => (
+                  <span key={l} className="inline-block">
+                    {l}
+                  </span>
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
+        <DrawerContent>
+          {point && (
+            <>
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-success" aria-hidden />
+                  {point.title}
+                </DrawerTitle>
+                <DrawerDescription className="text-base text-foreground">{point.body}</DrawerDescription>
+              </DrawerHeader>
+              <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+                <DrawerClose asChild>
+                  <Button variant="outline" className="min-h-12">
+                    閉じる
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={feeOpen} onOpenChange={setFeeOpen}>
+        <DrawerContent>
+          <DrawerHeader className="text-left">
+            <DrawerTitle>待機料の内訳</DrawerTitle>
+            <DrawerDescription>
+              {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{getRate(DEMO_VEHICLE_CLASS)}円/分。待機1回ごとに30分を控除し、超えた分だけ数えます。
+            </DrawerDescription>
+          </DrawerHeader>
+          <ul className="space-y-2 px-4">
+            {feeRows.map(({ log, mins, fee: rowFee }) => (
+              <li key={log.id} className="flex items-baseline justify-between gap-2 rounded-lg border p-3 text-sm">
+                <span className="min-w-0">
+                  <span className="block font-medium">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
+                  <span className="text-muted-foreground tabular-nums">待機 {mins ?? "-"}分</span>
+                </span>
+                <span className="shrink-0 text-base font-semibold tabular-nums">
+                  {rowFee === null ? "算定不能" : rowFee === 0 ? "対象外" : `¥${rowFee.toLocaleString()}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mx-4 mt-3 flex items-baseline justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">合計 {minutes.toLocaleString()}分</span>
+            <span className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</span>
+          </div>
+          <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+            <DrawerClose asChild>
+              <Button variant="outline" className="min-h-12">
+                閉じる
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </section>
+  );
+}
+
+/** 「改ざんされにくい理由」のタイルの印（INTEGRITY_POINTS と同じ順） */
+const POINT_ICONS = [Clock, MapPin, Lock, Layers];
 
 /** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
 const KEEP_TAB = "data-[state=inactive]:hidden";
@@ -459,8 +679,8 @@ const KEEP_TAB = "data-[state=inactive]:hidden";
  */
 export default function Demo() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md">
+    <div className="demo-app min-h-screen bg-background">
+      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent">
             <img src="/icon-192.png" alt="" className="h-8 w-8 rounded-md" />
@@ -473,34 +693,22 @@ export default function Demo() {
       </header>
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
-        表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
+        架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-24">
+      <main className="mx-auto max-w-4xl p-4 pb-28">
+        <DemoHero />
         <Tabs defaultValue="punch">
-          <TabsList className="mb-4 w-full">
-            <TabsTrigger value="punch" className="flex-1">打刻</TabsTrigger>
-            <TabsTrigger value="kanban" className="flex-1">荷主</TabsTrigger>
-            <TabsTrigger value="fee" className="flex-1">待機料</TabsTrigger>
+          <p className="mb-2 text-sm font-medium text-muted-foreground">同じ1日を、3つの立場で見る</p>
+          <TabsList className="mb-4 h-auto w-full">
+            <TabsTrigger value="punch" className="min-h-11 flex-1">ドライバー</TabsTrigger>
+            <TabsTrigger value="kanban" className="min-h-11 flex-1">荷主</TabsTrigger>
+            <TabsTrigger value="fee" className="min-h-11 flex-1">待機料</TabsTrigger>
           </TabsList>
 
           <TabsContent value="punch" forceMount className={`space-y-4 ${KEEP_TAB}`}>
             <GpsPanel />
             <TimelinePanel />
-            <details className="group rounded-xl border bg-card">
-              <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
-                記録が改ざんされにくい理由
-                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
-              </summary>
-              <ul className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
-                {INTEGRITY_POINTS.map((p) => (
-                  <li key={p.title} className="rounded-lg border p-3 text-sm">
-                    <div className="font-medium">{p.title}</div>
-                    <p className="mt-1 text-muted-foreground">{p.body}</p>
-                  </li>
-                ))}
-              </ul>
-            </details>
           </TabsContent>
 
           <TabsContent value="kanban" forceMount className={`space-y-4 ${KEEP_TAB}`}>

@@ -71,7 +71,7 @@ export default function Auth() {
           <img src="/icon-192.png" alt="守護神" className="h-10 w-10 rounded-lg" />
         </div>
         <h1 className="text-3xl font-bold text-primary-foreground">守護神</h1>
-        <p className="text-sm text-primary-foreground/70">下関水産物流・法適合管理</p>
+        <p className="text-sm text-primary-foreground/70">荷待ち時間を、書き換えにくい記録に</p>
       </div>
 
       <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-2xl">
@@ -161,14 +161,18 @@ export default function Auth() {
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
             {isLogin ? "アカウントをお持ちでない方はこちら" : "既にアカウントをお持ちの方はこちら"}
           </button>
         </div>
 
         <div className="mt-4 border-t pt-4 text-center">
-          <Link to="/demo" className="text-sm font-bold text-primary underline-offset-4 hover:underline">
+          {/* 初めて来た人の入口なので、文字リンクではなく押しやすい大きさのボタンにする */}
+          <Link
+            to="/demo"
+            className="flex min-h-12 w-full items-center justify-center rounded-lg border-2 border-primary text-base font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+          >
             ログインなしでデモを見る
           </Link>
         </div>

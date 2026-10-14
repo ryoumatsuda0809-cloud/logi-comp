@@ -249,7 +249,7 @@ export default function DemoOrders() {
   const approvedDeadline = approved ? latestPaymentDate(approved.deliveryDate) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="demo-app min-h-screen bg-background">
       <PageHeader
         title="発注管理"
         subtitle="デモ"
@@ -268,14 +268,14 @@ export default function DemoOrders() {
       />
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
-        表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
+        架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-24">
+      <main className="mx-auto max-w-4xl p-4 pb-28">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-4 w-full">
-            <TabsTrigger value="new" className="flex-1">新規発注</TabsTrigger>
-            <TabsTrigger value="list" className="flex-1">発注一覧</TabsTrigger>
+          <TabsList className="mb-4 h-auto w-full">
+            <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>
+            <TabsTrigger value="list" className="min-h-11 flex-1">発注一覧</TabsTrigger>
           </TabsList>
 
           {/* 新規発注タブ */}
@@ -309,7 +309,7 @@ export default function DemoOrders() {
                       aria-pressed={example?.id === ex.id}
                       disabled={locked || isParsing}
                       onClick={() => selectExample(ex)}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                      className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
                         example?.id === ex.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
