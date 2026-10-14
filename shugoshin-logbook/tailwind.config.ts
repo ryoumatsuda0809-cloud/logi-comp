@@ -14,6 +14,16 @@ export default {
     },
     extend: {
       fontFamily: {
+        // 画面の標準の字体。読み込めないとき（圏外など）は端末の日本語ゴシックで表示する
+        sans: [
+          '"BIZ UDPGothic"',
+          '"Hiragino Sans"',
+          '"Hiragino Kaku Gothic ProN"',
+          '"Yu Gothic UI"',
+          "Meiryo",
+          "system-ui",
+          "sans-serif",
+        ],
         "serif-jp": ['"Noto Serif JP"', 'serif'],
       },
       colors: {
