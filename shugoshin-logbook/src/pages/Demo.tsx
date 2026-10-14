@@ -17,7 +17,7 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { ChevronRight, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { Check, ChevronRight, Clock, Layers, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -119,8 +119,11 @@ function GpsPanel() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <MapPin className="h-4 w-4" /> GPS とジオフェンス
+          <MapPin className="h-4 w-4" /> 到着の判定
         </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          GPSで、施設から{DEMO_GEOFENCE_RADIUS_M}m以内にいるかを確かめます。再生すると1日の動きを追えます。
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <svg
@@ -187,20 +190,26 @@ function GpsPanel() {
               到着打刻
             </Button>
           </div>
+        ) : stamped ? (
+          // 記録が確定した瞬間の手応え。印が一瞬で大きくなって現れる（動きを減らす設定では出さない）
+          <div
+            role="status"
+            className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-500">
+              <Check className="h-6 w-6" strokeWidth={3} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="font-bold">到着を記録しました</p>
+              <p className="text-sm text-muted-foreground tabular-nums">
+                整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番・サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}
+              </p>
+            </div>
+          </div>
         ) : (
-          // 打刻済みの文は長いので、1行に詰めずに折り返す（狭い画面で右にはみ出していた）
-          <Button className="h-auto min-h-12 w-full whitespace-normal py-2" disabled variant={stamped ? "secondary" : "default"}>
-            {stamped ? (
-              <>
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                打刻済み　整理券 {DEMO_WAIT_LOGS[0].ticket_number} 番（サーバー時刻 {formatTimeOrNull(DEMO_WAIT_LOGS[0].arrival_time)}）
-              </>
-            ) : (
-              <>
-                <Lock className="mr-2 h-4 w-4" />
-                500m超のため打刻できません
-              </>
-            )}
+          <Button className="min-h-12 w-full" disabled>
+            <Lock className="mr-2 h-4 w-4" />
+            500m超のため打刻できません
           </Button>
         )}
         {!inFence && !stamped && (
@@ -493,11 +502,12 @@ function TimelinePanel() {
   );
 }
 
+// lines はタイルで語の途中で折れないように、折り返してよい位置で分けたもの（つなげると title と同じ）
 const INTEGRITY_POINTS = [
-  { title: "時刻はサーバーが決める", body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
-  { title: "500m超では打刻できない", body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
-  { title: "確定した証拠は書き換え不可", body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
-  { title: "例外は等級で区別", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
+  { title: "時刻はサーバーが決める", lines: ["時刻は", "サーバーが決める"], body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
+  { title: "500m超では打刻できない", lines: ["500m超では", "打刻できない"], body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
+  { title: "確定した証拠は書き換え不可", lines: ["確定した証拠は", "書き換え不可"], body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
+  { title: "例外は等級で区別", lines: ["例外は", "等級で区別"], body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
 
 /**
@@ -514,58 +524,87 @@ function DemoHero() {
   const [openPoint, setOpenPoint] = useState<number | null>(null);
   const [feeOpen, setFeeOpen] = useState(false);
   const feeRows = useMemo(() => demoFeeRows(), []);
+  const overThirty = feeRows.filter((r) => r.mins !== null && r.mins > 30).length;
   const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
 
   return (
-    <section className="mb-4 rounded-xl border bg-card p-4" aria-labelledby="demo-hero-title">
-      <h2 id="demo-hero-title" className="text-lg font-bold leading-snug">
+    <section className="mb-5" aria-labelledby="demo-hero-title">
+      <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight">
         {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
         <span className="inline-block">荷待ち時間を、</span>
         <span className="inline-block">書き換えにくい記録に。</span>
       </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。下は架空のドライバーの1日です。
+      <p className="mt-2 text-sm text-muted-foreground">
+        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+
+      {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
         <button
           type="button"
           onClick={() => setFeeOpen(true)}
-          className="rounded-lg bg-muted p-3 text-left hover:bg-muted/70"
+          className="col-span-2 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm"
+          aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
+        >
+          <div className="flex items-center justify-between text-sm text-primary-foreground/70">
+            この1日の待機料（目安）
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </div>
+          <div className="mt-1 text-5xl font-extrabold tracking-tight tabular-nums">¥{fee.toLocaleString()}</div>
+          <div className="mt-1 text-sm text-primary-foreground/70">
+            30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFeeOpen(true)}
+          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
           aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
         >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            この1日の待機 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          <div className="text-sm text-muted-foreground">待機</div>
+          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+            {minutes.toLocaleString()}
+            <span className="ml-0.5 text-base font-bold">分</span>
           </div>
-          <div className="text-2xl font-bold tabular-nums">{minutes.toLocaleString()}分</div>
         </button>
         <button
           type="button"
           onClick={() => setFeeOpen(true)}
-          className="rounded-lg bg-muted p-3 text-left hover:bg-muted/70"
-          aria-label={`待機料の目安 ${fee}円。内訳を見る`}
+          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
+          aria-label={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
         >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            待機料の目安 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          <div className="text-sm text-muted-foreground">訪問</div>
+          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+            {feeRows.length}
+            <span className="ml-0.5 text-base font-bold">件</span>
           </div>
-          <div className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">うち30分超 {overThirty}件</div>
         </button>
-      </div>
-      {/* 押すと下から説明が出る（スマホのアプリのボトムシート）。下に引くか外を押すと閉じる */}
-      <ul className="mt-3 grid gap-1 sm:grid-cols-2">
-        {INTEGRITY_POINTS.map((p, i) => (
-          <li key={p.title}>
+
+        {INTEGRITY_POINTS.map((p, i) => {
+          const Icon = POINT_ICONS[i] ?? ShieldCheck;
+          return (
             <button
+              key={p.title}
               type="button"
               onClick={() => setOpenPoint(i)}
-              className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted"
+              className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm"
             >
-              <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden />
-              <span className="flex-1">{p.title}</span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success">
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="text-sm font-semibold leading-snug">
+                {p.lines.map((l) => (
+                  <span key={l} className="inline-block">
+                    {l}
+                  </span>
+                ))}
+              </span>
             </button>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
 
       <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
         <DrawerContent>
@@ -628,6 +667,9 @@ function DemoHero() {
   );
 }
 
+/** 「改ざんされにくい理由」のタイルの印（INTEGRITY_POINTS と同じ順） */
+const POINT_ICONS = [Clock, MapPin, Lock, Layers];
+
 /** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
 const KEEP_TAB = "data-[state=inactive]:hidden";
 
@@ -651,7 +693,7 @@ export default function Demo() {
       </header>
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
-        表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
+        架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
       <main className="mx-auto max-w-4xl p-4 pb-28">

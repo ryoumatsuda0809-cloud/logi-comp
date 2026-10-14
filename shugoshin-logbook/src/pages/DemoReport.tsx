@@ -52,7 +52,7 @@ export default function DemoReport() {
       <PageHeader title="報告書" subtitle="荷主に届く報告書（デモ）" backTo="/demo" className="print:hidden" />
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground print:hidden">
-        表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
+        架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
       <div className="mx-auto flex max-w-4xl flex-col gap-3 px-4 pt-4 print:hidden">
