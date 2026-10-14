@@ -249,7 +249,7 @@ export default function DemoOrders() {
   const approvedDeadline = approved ? latestPaymentDate(approved.deliveryDate) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="demo-app min-h-screen bg-background">
       <PageHeader
         title="発注管理"
         subtitle="デモ"
@@ -271,7 +271,7 @@ export default function DemoOrders() {
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-24">
+      <main className="mx-auto max-w-4xl p-4 pb-28">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4 h-auto w-full">
             <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>

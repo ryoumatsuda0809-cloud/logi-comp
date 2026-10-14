@@ -166,3 +166,37 @@
     print-color-adjust: exact;
   }
 }
+
+/* ── デモ（/demo 系）だけの、スマホのアプリらしい手触り ──
+   本物の画面には付けない。.demo-app は各デモ画面のいちばん外側に付ける。 */
+@layer components {
+  .demo-app {
+    -webkit-tap-highlight-color: transparent;
+    /* 画面が切り替わったときに、ふっと出す。transform を使わないのは、
+       動いている間に下の固定ナビの位置がずれないようにするため（opacity は位置に影響しない） */
+    animation: demo-fade-in 180ms ease-out both;
+  }
+  /* 押した瞬間に少し沈む（指で押した手応え） */
+  .demo-app button:not(:disabled):active,
+  .demo-app a:active {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .demo-app {
+      animation: none;
+    }
+    .demo-app button:not(:disabled):active,
+    .demo-app a:active {
+      transform: none;
+    }
+  }
+}
+
+@keyframes demo-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

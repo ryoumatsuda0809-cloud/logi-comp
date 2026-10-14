@@ -22,7 +22,7 @@ export default function DemoWarningReport() {
 
   return (
     <div
-      className="min-h-screen bg-background print:bg-white print:text-black"
+      className="demo-app min-h-screen bg-background print:bg-white print:text-black"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
       <PageHeader title="警告レポート" subtitle="デモ" backTo="/demo" className="print:hidden" />

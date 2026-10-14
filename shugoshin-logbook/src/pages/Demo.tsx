@@ -4,11 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { ChevronDown, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { ChevronRight, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -467,6 +476,8 @@ function DemoHero() {
   );
   const minutes = summary.waitMinutesPerEvent.reduce((a, b) => a + b, 0);
   const fee = sumWaitCost(summary.waitMinutesPerEvent, DEMO_VEHICLE_CLASS);
+  const [openPoint, setOpenPoint] = useState<number | null>(null);
+  const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
 
   return (
     <section className="mb-4 rounded-xl border bg-card p-4" aria-labelledby="demo-hero-title">
@@ -488,14 +499,45 @@ function DemoHero() {
           <div className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</div>
         </div>
       </div>
-      <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
-        {INTEGRITY_POINTS.map((p) => (
-          <li key={p.title} className="flex items-start gap-2">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
-            {p.title}
+      {/* 押すと下から説明が出る（スマホのアプリのボトムシート）。下に引くか外を押すと閉じる */}
+      <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+        {INTEGRITY_POINTS.map((p, i) => (
+          <li key={p.title}>
+            <button
+              type="button"
+              onClick={() => setOpenPoint(i)}
+              className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted"
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden />
+              <span className="flex-1">{p.title}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
           </li>
         ))}
       </ul>
+
+      <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
+        <DrawerContent>
+          {point && (
+            <>
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-success" aria-hidden />
+                  {point.title}
+                </DrawerTitle>
+                <DrawerDescription className="text-base text-foreground">{point.body}</DrawerDescription>
+              </DrawerHeader>
+              <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+                <DrawerClose asChild>
+                  <Button variant="outline" className="min-h-12">
+                    閉じる
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
     </section>
   );
 }
@@ -509,8 +551,8 @@ const KEEP_TAB = "data-[state=inactive]:hidden";
  */
 export default function Demo() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md">
+    <div className="demo-app min-h-screen bg-background">
+      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent">
             <img src="/icon-192.png" alt="" className="h-8 w-8 rounded-md" />
@@ -526,7 +568,7 @@ export default function Demo() {
         表示しているのは架空のデータです。実在の施設・人物・取引とは関係ありません。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-24">
+      <main className="mx-auto max-w-4xl p-4 pb-28">
         <DemoHero />
         <Tabs defaultValue="punch">
           <p className="mb-2 text-sm font-medium text-muted-foreground">同じ1日を、3つの立場で見る</p>
@@ -539,20 +581,6 @@ export default function Demo() {
           <TabsContent value="punch" forceMount className={`space-y-4 ${KEEP_TAB}`}>
             <GpsPanel />
             <TimelinePanel />
-            <details className="group rounded-xl border bg-card">
-              <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
-                記録が改ざんされにくい理由
-                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
-              </summary>
-              <ul className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
-                {INTEGRITY_POINTS.map((p) => (
-                  <li key={p.title} className="rounded-lg border p-3 text-sm">
-                    <div className="font-medium">{p.title}</div>
-                    <p className="mt-1 text-muted-foreground">{p.body}</p>
-                  </li>
-                ))}
-              </ul>
-            </details>
           </TabsContent>
 
           <TabsContent value="kanban" forceMount className={`space-y-4 ${KEEP_TAB}`}>

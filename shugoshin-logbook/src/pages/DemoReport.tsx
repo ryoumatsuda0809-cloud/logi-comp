@@ -46,7 +46,7 @@ export default function DemoReport() {
 
   return (
     <div
-      className="min-h-screen bg-gray-100 pb-24 print:bg-white print:pb-0"
+      className="demo-app min-h-screen bg-gray-100 pb-28 print:bg-white print:pb-0"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
       <PageHeader title="報告書" subtitle="荷主に届く報告書（デモ）" backTo="/demo" className="print:hidden" />
