@@ -181,6 +181,17 @@
   .demo-app a:active {
     transform: scale(0.97);
   }
+  /* PC（lg 以上）では左に固定のサイドバー（DemoBottomNav）が出るので、その幅だけ中身を右に寄せる */
+  @media (min-width: 1024px) {
+    .demo-app {
+      padding-left: 15rem;
+    }
+  }
+  @media print {
+    .demo-app {
+      padding-left: 0;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .demo-app {
       animation: none;
