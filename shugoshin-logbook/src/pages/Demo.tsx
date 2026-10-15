@@ -284,10 +284,42 @@ const KANBAN_INITIAL: KanbanTicket[] = [
   { no: 16, arrival: "2026-10-03T09:02:00+09:00", status: "waiting" },
 ];
 
-const KANBAN_COLUMNS: { status: KanbanStatus; label: string; action?: { label: string; next: KanbanStatus } }[] = [
-  { status: "waiting", label: "待機中", action: { label: "呼出", next: "called" } },
-  { status: "called", label: "呼出済", action: { label: "荷役開始", next: "working" } },
-  { status: "working", label: "荷役中" },
+// 列ごとの色（待機=橙、呼出=青、荷役=緑）。色だけに頼らず、列の名前・件数・文字も残す
+const KANBAN_COLUMNS: {
+  status: KanbanStatus;
+  label: string;
+  action?: { label: string; next: KanbanStatus };
+  column: string;
+  badge: string;
+  card: string;
+  dot: string;
+}[] = [
+  {
+    status: "waiting",
+    label: "待機中",
+    action: { label: "呼出", next: "called" },
+    column: "border-warning/50 bg-warning/10",
+    badge: "bg-warning text-black",
+    card: "border-l-warning",
+    dot: "bg-warning",
+  },
+  {
+    status: "called",
+    label: "呼出済",
+    action: { label: "荷役開始", next: "working" },
+    column: "border-sky-500/50 bg-sky-500/10",
+    badge: "bg-sky-600 text-white",
+    card: "border-l-sky-500",
+    dot: "bg-sky-500",
+  },
+  {
+    status: "working",
+    label: "荷役中",
+    column: "border-success/50 bg-success/10",
+    badge: "bg-success text-success-foreground",
+    card: "border-l-success",
+    dot: "bg-success",
+  },
 ];
 
 function elapsedMinutes(from: string) {
@@ -324,17 +356,22 @@ function KanbanPanel() {
           {KANBAN_COLUMNS.map((col) => {
             const items = tickets.filter((t) => t.status === col.status);
             return (
-              <div key={col.status} className="rounded-lg border bg-muted/30 p-2">
-                <div className="mb-2 flex items-center justify-between text-sm font-medium">
-                  <span>{col.label}</span>
-                  <Badge variant="secondary">{items.length}</Badge>
+              <div key={col.status} className={`rounded-lg border p-2 ${col.column}`}>
+                <div className="mb-2 flex items-center justify-between text-sm font-bold">
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} aria-hidden />
+                    {col.label}
+                  </span>
+                  <span className={`min-w-7 rounded-full px-2 py-0.5 text-center text-xs font-bold tabular-nums ${col.badge}`}>
+                    {items.length}
+                  </span>
                 </div>
                 <div className="space-y-2">
                   {items.length === 0 && (
                     <p className="py-3 text-center text-xs text-muted-foreground">なし</p>
                   )}
                   {items.map((t) => (
-                    <div key={t.no} className="rounded-md border bg-background p-3 text-sm">
+                    <div key={t.no} className={`rounded-md border border-l-4 bg-background p-3 text-sm shadow-sm ${col.card}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-xl font-bold tabular-nums">#{String(t.no).padStart(3, "0")}</span>
                         {col.status === "waiting" && (
