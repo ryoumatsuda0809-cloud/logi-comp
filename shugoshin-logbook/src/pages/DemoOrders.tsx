@@ -271,7 +271,7 @@ export default function DemoOrders() {
         架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-28">
+      <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-3xl lg:pb-12 lg:pt-8">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4 h-auto w-full">
             <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>

@@ -529,7 +529,7 @@ function DemoHero() {
 
   return (
     <section className="mb-5" aria-labelledby="demo-hero-title">
-      <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight">
+      <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-4xl">
         {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
         <span className="inline-block">荷待ち時間を、</span>
         <span className="inline-block">書き換えにくい記録に。</span>
@@ -539,7 +539,7 @@ function DemoHero() {
       </p>
 
       {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
-      <div className="mt-4 grid grid-cols-2 gap-2.5">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 lg:mt-6 lg:grid-cols-4 lg:gap-4">
         <button
           type="button"
           onClick={() => setFeeOpen(true)}
@@ -589,7 +589,7 @@ function DemoHero() {
               key={p.title}
               type="button"
               onClick={() => setOpenPoint(i)}
-              className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm"
+              className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm lg:min-h-[120px] lg:p-4"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success">
                 <Icon className="h-4 w-4" aria-hidden />
@@ -680,7 +680,7 @@ const KEEP_TAB = "data-[state=inactive]:hidden";
 export default function Demo() {
   return (
     <div className="demo-app min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md lg:hidden" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent">
             <img src="/icon-192.png" alt="" className="h-8 w-8 rounded-md" />
@@ -696,17 +696,17 @@ export default function Demo() {
         架空のデータです。実在の施設・人物・取引とは無関係です。
       </div>
 
-      <main className="mx-auto max-w-4xl p-4 pb-28">
+      <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
         <DemoHero />
         <Tabs defaultValue="punch">
           <p className="mb-2 text-sm font-medium text-muted-foreground">同じ1日を、3つの立場で見る</p>
-          <TabsList className="mb-4 h-auto w-full">
+          <TabsList className="mb-4 h-auto w-full lg:max-w-lg">
             <TabsTrigger value="punch" className="min-h-11 flex-1">ドライバー</TabsTrigger>
             <TabsTrigger value="kanban" className="min-h-11 flex-1">荷主</TabsTrigger>
             <TabsTrigger value="fee" className="min-h-11 flex-1">待機料</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="punch" forceMount className={`space-y-4 ${KEEP_TAB}`}>
+          <TabsContent value="punch" forceMount className={`space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 ${KEEP_TAB}`}>
             <GpsPanel />
             <TimelinePanel />
           </TabsContent>
@@ -715,7 +715,7 @@ export default function Demo() {
             <KanbanPanel />
           </TabsContent>
 
-          <TabsContent value="fee" forceMount className={`space-y-4 ${KEEP_TAB}`}>
+          <TabsContent value="fee" forceMount className={`space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 ${KEEP_TAB}`}>
             <FeePanel />
             <DemoSubmitPanel />
           </TabsContent>
