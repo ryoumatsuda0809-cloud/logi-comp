@@ -59,6 +59,32 @@ function RiskBadge({ level }: { level: string | null }) {
 }
 
 /**
+ * 判定のもとになる、訪問1回あたりの平均待機（分）。算定できた訪問だけの平均で、DBビューの
+ * avg(wait_minutes) と同じ対象。列の合計は整数に丸められているので、判定の境目で食い違わないよう切り捨てる。
+ * 算定できた訪問が1件も無ければ null。表示専用で、判定そのものはビュー側で行われる。
+ */
+function averageMeasuredWait(row: RiskReportRow): number | null {
+  const measured = (row.total_visits ?? 0) - (row.unmeasured_visits ?? 0);
+  if (measured <= 0) return null;
+  return Math.floor((row.total_wait_minutes ?? 0) / measured);
+}
+
+/** リスク判定のバッジと、その根拠になった平均待機を並べる。表とカードの両方で使う。 */
+function RiskCell({ row, align }: { row: RiskReportRow; align: "end" | "center" }) {
+  const avg = averageMeasuredWait(row);
+  return (
+    <div className={`flex flex-col gap-1 ${align === "center" ? "items-center" : "items-end"}`}>
+      <RiskBadge level={row.gmen_risk_level} />
+      {row.gmen_risk_level && (
+        <span className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
+          {avg === null ? "平均 —" : `平均 ${avg}分`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * 算定不能・等級Cが混ざっていることを帳票上で明示する。
  * 注記がないと「0円＝待機がなかった」と誤読される。表とカードの両方で使う。
  */
@@ -117,6 +143,43 @@ export function RiskReportDocument({
   const totalUnmeasured = rows.reduce((s, r) => s + (r.unmeasured_visits ?? 0), 0);
   const totalApprovedClaims = rows.reduce((s, r) => s + (r.approved_claim_visits ?? 0), 0);
 
+  // 折りたたみの見出し。中身にある注記の種類だけを挙げる
+  const notesLabel = [
+    "注記：金額の算定方法",
+    "遅延利息の目安",
+    totalUnmeasured > 0 && "算定不可",
+    totalApprovedClaims > 0 && "圏外承認",
+  ].filter(Boolean).join("・");
+
+  const notes = (
+    <div className="space-y-1">
+      <p>
+        ※ 推定逸失利益は、待機料の考え方にもとづき、待機1回ごとに30分を差し引いた時間に車格別の単価を乗じて算定した額です。
+      </p>
+      <p>
+        ※ 遅延利息の目安は、推定逸失利益が未払のままのとき、1日遅れるごとに加わる額（推定逸失利益 × 年率14.6% ÷ 365日）です。実際の額は、未払額と遅れた日数で決まります。
+      </p>
+      {totalUnmeasured > 0 && (
+        <p className="flex items-start gap-1">
+          <NoticeMark className="mt-0.5" />
+          <span>
+            ※「算定不可」は荷役開始が記録されておらず、荷待ち時間を確定できなかった訪問です（{totalUnmeasured}件）。
+          </span>
+        </p>
+      )}
+      {totalApprovedClaims > 0 && (
+        <p className="flex items-start gap-1">
+          <NoticeMark className="mt-0.5" />
+          <span>
+            ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
+            {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
+            時刻についてはサーバーによる自動検証が行われていません。
+          </span>
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <main className="mx-auto max-w-4xl p-4 pb-28 print:max-w-none print:p-0 print:pb-0 print:font-serif-jp">
       {/* Report Title */}
@@ -155,6 +218,13 @@ export function RiskReportDocument({
 
       {!loading && rows.length > 0 && <RiskReportSummary rows={rows} monthLabel={monthLabel} />}
 
+      {!loading && rows.length > 0 && (
+        <p className="mb-3 text-xs leading-relaxed text-muted-foreground print:text-gray-700">
+          リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
+          <strong className="font-semibold text-foreground print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
+        </p>
+      )}
+
       {/* Data Table */}
       {loading ? (
         <div className="space-y-3">
@@ -186,7 +256,7 @@ export function RiskReportDocument({
                       </span>
                     )}
                   </p>
-                  <RiskBadge level={row.gmen_risk_level} />
+                  <RiskCell row={row} align="end" />
                 </div>
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                   <div>
@@ -257,8 +327,8 @@ export function RiskReportDocument({
                   <TableCell className="text-right font-bold text-destructive print:text-black">
                     {formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}
                   </TableCell>
-                  <TableCell className="text-center">
-                    <RiskBadge level={row.gmen_risk_level} />
+                  <TableCell>
+                    <RiskCell row={row} align="center" />
                   </TableCell>
                 </TableRow>
               ))}
@@ -268,33 +338,20 @@ export function RiskReportDocument({
       )}
 
       {rows.length > 0 && (
-        <div className="mt-3 space-y-1 text-xs text-muted-foreground print:text-gray-600">
-          <p>
-            ※ 待機料は待機1回ごとに30分を控除して算定しています。
-          </p>
-          <p>
-            ※ 遅延利息の目安は、推定逸失利益が未払のままのとき、1日遅れるごとに加わる額（推定逸失利益 × 年率14.6% ÷ 365日）です。実際の額は、未払額と遅れた日数で決まります。
-          </p>
-          {totalUnmeasured > 0 && (
-            <p className="flex items-start gap-1">
-              <NoticeMark className="mt-0.5" />
-              <span>
-                ※「算定不可」は荷役開始が記録されておらず荷待ち時間を確定できなかった訪問です。
-                待機が無かったことを意味しません（{totalUnmeasured}件）。
-              </span>
-            </p>
-          )}
-          {totalApprovedClaims > 0 && (
-            <p className="flex items-start gap-1">
-              <NoticeMark className="mt-0.5" />
-              <span>
-                ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
-                {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
-                時刻についてはサーバーによる自動検証が行われていません。
-              </span>
-            </p>
-          )}
-        </div>
+        <>
+          {/* 長い注記は画面では折りたたむ。<details> は閉じていると印刷に出ないので、
+              紙・PDF には同じ内容を展開した形で別に出す（注記を紙から落とさないため）。 */}
+          <details className="mt-3 rounded-lg border border-border bg-card text-xs text-muted-foreground print:hidden">
+            <summary className="cursor-pointer select-none px-3 py-2 font-semibold text-foreground">
+              {notesLabel}
+            </summary>
+            <div className="border-t border-border px-3 py-2">{notes}</div>
+          </details>
+          <div className="mt-3 hidden text-xs text-muted-foreground print:block print:text-gray-600">
+            <p className="mb-1 font-semibold print:text-black">注記</p>
+            {notes}
+          </div>
+        </>
       )}
 
       {/* Legal Disclaimer Footer */}
