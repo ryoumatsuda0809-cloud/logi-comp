@@ -37,7 +37,6 @@ import {
   DEMO_ORDER_TODAY,
   DEMO_ORDER_TODAY_ISO,
   DEMO_PARSE_DELAY_MS,
-  DEMO_PARSE_NOTE,
   type DemoAiOrderResult,
   type DemoOrderExample,
 } from "@/demo/demoOrders";
@@ -328,9 +327,6 @@ export default function DemoOrders() {
                   {isParsing ? <Loader2 className="animate-spin" /> : <Sparkles />}
                   {isParsing ? "解析中..." : "AI解析"}
                 </FieldButton>
-                {source === "example" && textIsExample && (
-                  <p className="text-xs text-muted-foreground">{DEMO_PARSE_NOTE}</p>
-                )}
                 {source === "ai" && (
                   <p role="status" className="text-xs font-medium text-muted-foreground">
                     {DEMO_AI_NOTE}
