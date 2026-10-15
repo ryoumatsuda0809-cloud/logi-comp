@@ -25,7 +25,8 @@ export default function DemoWarningReport() {
       className="demo-app min-h-screen bg-background print:bg-white print:text-black"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
-      <PageHeader title="警告レポート" subtitle="デモ" backTo="/demo" className="print:hidden" />
+      {/* PC では左のサイドバーで移動できるので、上のヘッダーは出さない（その分、表まで1画面に収める） */}
+      <PageHeader title="警告レポート" subtitle="デモ" backTo="/demo" className="print:hidden lg:hidden" />
 
       <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground print:hidden">
         架空のデータです。実在の施設・人物・取引とは無関係です。
@@ -37,7 +38,7 @@ export default function DemoWarningReport() {
         issueDate={DEMO_REPORT_ISSUE_DATE}
         monthLabel={DEMO_REPORT_MONTH_LABEL}
         controls={
-          <div className="mb-6 flex flex-col items-center gap-3 print:hidden">
+          <div className="mb-6 flex flex-col items-center gap-3 print:hidden lg:mb-4 lg:flex-row lg:justify-center lg:gap-4">
             <p className="text-sm font-semibold text-foreground">対象月: {DEMO_REPORT_MONTH_LABEL}</p>
             <FieldButton fullWidth={false} className="gap-3" onClick={() => window.print()}>
               <Printer />
@@ -46,7 +47,8 @@ export default function DemoWarningReport() {
             <DemoPdfLink href={DEMO_SAMPLE_PDF.warning} fullWidth={false}>
               PDFの見本を開く
             </DemoPdfLink>
-            <p className="text-center text-xs text-muted-foreground">
+            {/* PC では印刷が動くので、この説明は出さない */}
+            <p className="text-center text-xs text-muted-foreground lg:hidden">
               印刷が動かない端末（ホーム画面から開いたアプリなど）では、PDFの見本を開いてください。
             </p>
           </div>
