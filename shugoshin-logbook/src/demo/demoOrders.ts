@@ -83,9 +83,6 @@ export const DEMO_ORDER_EXAMPLES: DemoOrderExample[] = [
   },
 ];
 
-/** 「AI解析」のふりをする待ち時間（ミリ秒） */
-export const DEMO_PARSE_DELAY_MS = 800;
-
 /** 自由入力欄の下に、常に出す注記 */
 export const DEMO_FREE_TEXT_DISCLOSURE =
   "自由入力の文は、解析のため外部のAI（Google Gemini）に送信されます。個人情報や実在の取引は入力しないでください。回数に上限があります。";

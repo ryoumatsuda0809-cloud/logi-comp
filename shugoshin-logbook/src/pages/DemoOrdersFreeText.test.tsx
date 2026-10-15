@@ -90,14 +90,24 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     expect(screen.getByRole("status").textContent).toContain(DEMO_AI_FALLBACK_NOTE);
   });
 
-  it("例文を選ぶと入力欄にその文が入る。書き換えずに解析するときは AI を呼ばない", async () => {
+  it("例文を選ぶと入力欄にその文が入る。書き換えずに解析しても、AI に送って解析する", async () => {
+    parseMock.mockResolvedValue({
+      item_name: "タイ",
+      quantity: "15箱",
+      price: "50000",
+      origin: "A",
+      destination: "B",
+      payment_date: null,
+    });
     renderPage();
     fireEvent.change(freeInput(), { target: { value: "途中まで打った文" } });
     fireEvent.click(screen.getByRole("button", { name: /例2/ }));
     expect(freeInput().value).toContain("冷蔵のタイ15箱");
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
     await act(async () => {});
-    expect(parseMock).not.toHaveBeenCalled();
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(parseMock.mock.calls[0][0]).toContain("冷蔵のタイ15箱");
+    expect(screen.getByText(DEMO_AI_NOTE)).toBeTruthy();
   });
 
   it("例文を書き換えたら自由入力として扱い、本物の AI に送る", async () => {
