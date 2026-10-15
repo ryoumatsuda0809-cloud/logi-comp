@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -539,21 +539,20 @@ function DemoHero() {
       </p>
 
       {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
-      <div className="mt-4 grid grid-cols-2 gap-2.5 lg:mt-6 lg:grid-cols-4 lg:gap-4">
+      <p className="mt-4 text-sm font-semibold lg:mt-6">架空のドライバーの1日（3施設を訪問）</p>
+      <div className="mt-2 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4">
         <button
           type="button"
           onClick={() => setFeeOpen(true)}
           className="col-span-2 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm"
           aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
         >
-          <div className="flex items-center justify-between text-sm text-primary-foreground/70">
-            この1日の待機料（目安）
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </div>
+          <div className="text-sm text-primary-foreground/70">この1日の待機料（目安）</div>
           <div className="mt-1 text-5xl font-extrabold tracking-tight tabular-nums">¥{fee.toLocaleString()}</div>
           <div className="mt-1 text-sm text-primary-foreground/70">
             30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
           </div>
+          <TapHint tone="onDark">施設ごとの内訳を見る</TapHint>
         </button>
 
         <button
@@ -562,11 +561,12 @@ function DemoHero() {
           className="rounded-2xl border bg-card p-4 text-left shadow-sm"
           aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
         >
-          <div className="text-sm text-muted-foreground">待機</div>
+          <div className="text-sm text-muted-foreground">待たされた時間の合計</div>
           <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
             {minutes.toLocaleString()}
             <span className="ml-0.5 text-base font-bold">分</span>
           </div>
+          <TapHint>内訳</TapHint>
         </button>
         <button
           type="button"
@@ -574,13 +574,17 @@ function DemoHero() {
           className="rounded-2xl border bg-card p-4 text-left shadow-sm"
           aria-label={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
         >
-          <div className="text-sm text-muted-foreground">訪問</div>
+          <div className="text-sm text-muted-foreground">訪問した施設</div>
           <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
             {feeRows.length}
             <span className="ml-0.5 text-base font-bold">件</span>
           </div>
           <div className="text-xs text-muted-foreground">うち30分超 {overThirty}件</div>
+          <TapHint>内訳</TapHint>
         </button>
+
+        {/* 下の4枚が何の話かを先に言う */}
+        <p className="col-span-2 mt-2 text-sm font-semibold lg:col-span-4 lg:mt-1">記録が書き換えにくい理由</p>
 
         {INTEGRITY_POINTS.map((p, i) => {
           const Icon = POINT_ICONS[i] ?? ShieldCheck;
@@ -590,6 +594,7 @@ function DemoHero() {
               type="button"
               onClick={() => setOpenPoint(i)}
               className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm lg:min-h-[120px] lg:p-4"
+              aria-label={`${p.title}。詳しく見る`}
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success">
                 <Icon className="h-4 w-4" aria-hidden />
@@ -601,13 +606,14 @@ function DemoHero() {
                   </span>
                 ))}
               </span>
+              <TapHint>詳しく</TapHint>
             </button>
           );
         })}
       </div>
 
       <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
-        <DrawerContent>
+        <DrawerContent className={SHEET_PC}>
           {point && (
             <>
               <DrawerHeader className="text-left">
@@ -630,7 +636,7 @@ function DemoHero() {
       </Drawer>
 
       <Drawer open={feeOpen} onOpenChange={setFeeOpen}>
-        <DrawerContent>
+        <DrawerContent className={SHEET_PC}>
           <DrawerHeader className="text-left">
             <DrawerTitle>待機料の内訳</DrawerTitle>
             <DrawerDescription>
@@ -666,6 +672,29 @@ function DemoHero() {
     </section>
   );
 }
+
+/**
+ * タイルが押せることを文字で示す（押さないと何かわからない、を防ぐ）。
+ * 色だけに頼らず「›」と言葉を添える。読み上げはボタンの aria-label に任せる。
+ */
+function TapHint({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "onDark" }) {
+  return (
+    <span
+      aria-hidden
+      className={`mt-2 inline-flex items-center gap-0.5 text-xs font-semibold ${tone === "onDark" ? "text-accent" : "text-primary"}`}
+    >
+      {children}
+      <ChevronRight className="h-3.5 w-3.5" />
+    </span>
+  );
+}
+
+/**
+ * PC では下から出るシートを画面いっぱいに広げず、本文（左のサイドバーを除いた幅）の中央に浮いたカードとして出す。
+ * スマホは今までどおり画面下いっぱいのシート。
+ */
+// after:hidden は vaul がシートの下に伸ばす背景（引っぱったときの隙間埋め）を消す。浮かせると下に白い帯として見えるため
+const SHEET_PC = "lg:left-60 lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl lg:after:hidden";
 
 /** 「改ざんされにくい理由」のタイルの印（INTEGRITY_POINTS と同じ順） */
 const POINT_ICONS = [Clock, MapPin, Lock, Layers];
