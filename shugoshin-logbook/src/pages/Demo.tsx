@@ -17,7 +17,7 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { Check, ChevronRight, Clock, Layers, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { Building2, Check, ChevronRight, Clock, Coins, Layers, Lock, MapPin, Pause, Play, ShieldCheck, Truck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -736,6 +736,13 @@ const SHEET_PC = "lg:left-60 lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl l
 /** 「改ざんされにくい理由」のタイルの印（INTEGRITY_POINTS と同じ順） */
 const POINT_ICONS = [Clock, MapPin, Lock, Layers];
 
+/** 「3つの立場」のタブ */
+const DEMO_TABS = [
+  { value: "punch", label: "ドライバー", Icon: Truck },
+  { value: "kanban", label: "荷主", Icon: Building2 },
+  { value: "fee", label: "待機料", Icon: Coins },
+] as const;
+
 /** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
 const KEEP_TAB = "data-[state=inactive]:hidden";
 
@@ -765,12 +772,21 @@ export default function Demo() {
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
         <DemoHero />
         <Tabs defaultValue="punch">
-          <p className="mb-2 text-sm font-medium text-muted-foreground">同じ1日を、3つの立場で見る</p>
-          <TabsList className="mb-4 h-auto w-full lg:max-w-lg">
-            <TabsTrigger value="punch" className="min-h-11 flex-1">ドライバー</TabsTrigger>
-            <TabsTrigger value="kanban" className="min-h-11 flex-1">荷主</TabsTrigger>
-            <TabsTrigger value="fee" className="min-h-11 flex-1">待機料</TabsTrigger>
+          <p className="mb-2 text-sm font-semibold">同じ1日を、3つの立場で見る</p>
+          {/* 3つあることが分かるよう、枠・アイコン・濃い文字にする。今開いている画面だけ色を塗る */}
+          <TabsList className="mb-4 h-auto w-full gap-1 border bg-card p-1 text-foreground lg:max-w-xl">
+            {DEMO_TABS.map(({ value, label, Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="min-h-12 flex-1 gap-1.5 text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm lg:text-base"
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                {label}
+              </TabsTrigger>
+            ))}
           </TabsList>
+          <p className="-mt-2 mb-3 text-xs text-muted-foreground">タップで切り替え。ドライバー・荷主・待機料で、同じデータの見え方が変わります。</p>
 
           <TabsContent value="punch" forceMount className={`space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 ${KEEP_TAB}`}>
             <GpsPanel />
