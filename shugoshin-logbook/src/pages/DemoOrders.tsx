@@ -36,7 +36,6 @@ import {
   DEMO_ORDER_EXAMPLES,
   DEMO_ORDER_TODAY,
   DEMO_ORDER_TODAY_ISO,
-  DEMO_PARSE_DELAY_MS,
   type DemoAiOrderResult,
   type DemoOrderExample,
 } from "@/demo/demoOrders";
@@ -59,9 +58,8 @@ type ParseSource = "example" | "ai" | "fallback";
  * /demo/orders の「発注管理」。実際の発注画面（/orders）と同じ並び（共通ヘッダー・「新規発注」「発注一覧」の
  * タブ・下のナビ）で、入力 → AI解析 → 内容を確認・入力 → 承認（取り消せない）→ 一覧に承認済みで載り、
  * 発注書が出る、の流れを見せる。
- * 入力欄は1つ。例文のボタンを押すと、その文が入力欄に入る。文を書き換えずに解析すると固定の結果が返る
- * （AI は呼ばない）。書き換えた文・自由に打った文は、公開デモ専用の Edge Function（demoParseApi.ts）で
- * 本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
+ * 入力欄は1つ。例文のボタンを押すと、その文が入力欄に入る。例文のままでも、書き換えた文・自由に打った文でも、
+ * 公開デモ専用の Edge Function（demoParseApi.ts）で本物の AI に解析させ、失敗したら固定の例の結果に切り替える。
  * 実際の発注画面（/orders）と同じ判定関数（orderContent.ts）を使う。状態はこの画面の中だけ。
  * DB には書かない。Supabase のクライアントも使わない。
  */
@@ -81,28 +79,20 @@ export default function DemoOrders() {
   const [tab, setTab] = useState("new");
   const [showDocument, setShowDocument] = useState(true);
   const { toast } = useToast();
-  const timerRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const clearTimer = () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = null;
-  };
   const abortAi = () => {
     abortRef.current?.abort();
     abortRef.current = null;
   };
   useEffect(
     () => () => {
-      clearTimer();
       abortAi();
     },
     [],
   );
 
   const locked = approved !== null;
-  // 入力欄の文が、選んだ例文のまま（書き換えていない）か。そのままなら固定の結果、書き換えたら本物の AI
-  const textIsExample = example !== null && freeText === example.sentence;
 
   const selectExample = (ex: DemoOrderExample) => {
     if (locked || isParsing) return;
@@ -142,7 +132,7 @@ export default function DemoOrders() {
     else setDeliveryDate("");
   };
 
-  /** 自由入力: 公開デモ専用の AI に解析させる。失敗したら、固定の例の結果に切り替える */
+  /** 公開デモ専用の AI に解析させる。失敗したら、固定の例の結果に切り替える */
   const parseFreeText = async (text: string) => {
     setIsParsing(true);
     setForm(null);
@@ -156,7 +146,7 @@ export default function DemoOrders() {
       applyResult(data, text);
     } catch {
       if (controller.signal.aborted) return;
-      const fallback = DEMO_ORDER_EXAMPLES[0];
+      const fallback = example ?? DEMO_ORDER_EXAMPLES[0];
       setSource("fallback");
       setFallbackExample(fallback);
       applyResult(fallback.aiResult, fallback.sentence);
@@ -168,24 +158,12 @@ export default function DemoOrders() {
     }
   };
 
-  /** 実際の handleParse と同じ流れ。例文のままのときは、AI を呼ばず固定の結果を返す */
+  /** 例文のままでも、書き換えた文でも、公開デモ専用の AI に解析させる（失敗したときだけ固定の結果） */
   const handleParse = () => {
     if (isParsing || locked) return;
     const text = freeText.trim();
     if (!text) return;
-    if (!example || !textIsExample) {
-      void parseFreeText(text);
-      return;
-    }
-    setIsParsing(true);
-    setForm(null);
-    setRefusal(null);
-    setSource("example");
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      applyResult(example.aiResult, example.sentence);
-      setIsParsing(false);
-    }, DEMO_PARSE_DELAY_MS);
+    void parseFreeText(text);
   };
 
   const updateField = (key: keyof OrderForm, value: string) => {
@@ -223,7 +201,6 @@ export default function DemoOrders() {
   };
 
   const reset = () => {
-    clearTimer();
     abortAi();
     setExample(null);
     setFreeText("");

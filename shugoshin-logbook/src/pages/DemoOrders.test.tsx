@@ -1,8 +1,15 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import DemoOrders from "./DemoOrders";
-import { DEMO_PARSE_DELAY_MS } from "@/demo/demoOrders";
+import { DemoAiError } from "@/demo/demoParseApi";
+
+// 本物の AI は呼ばない。ここでは「AI が使えないとき、例の結果に切り替わる」流れで、承認までの動きを確かめる
+const parseMock = vi.hoisted(() => vi.fn());
+vi.mock("@/demo/demoParseApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/demo/demoParseApi")>()),
+  parseDemoOrderWithAi: parseMock,
+}));
 
 const renderPage = () =>
   render(
@@ -11,13 +18,11 @@ const renderPage = () =>
     </MemoryRouter>,
   );
 
-/** 例文を選び、「AI解析」を押して、擬似の待ち時間が過ぎるまで進める */
-const parseExample = (label: RegExp) => {
+/** 例文を選び、「AI解析」を押して、AI の応答（ここでは失敗して例の結果に切り替わる）が反映されるまで待つ */
+const parseExample = async (label: RegExp) => {
   fireEvent.click(screen.getByRole("button", { name: label }));
   fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
-  act(() => {
-    vi.advanceTimersByTime(DEMO_PARSE_DELAY_MS);
-  });
+  await act(async () => {});
 };
 
 /** Radix のタブは mousedown で切り替わる（click では切り替わらない） */
@@ -35,10 +40,8 @@ const approveWithConfirm = () => {
 
 describe("DemoOrders", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
+    parseMock.mockReset();
+    parseMock.mockRejectedValue(new DemoAiError("AI解析に失敗しました（503）", false));
   });
 
   it("架空データの帯がある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
@@ -66,7 +69,7 @@ describe("DemoOrders", () => {
     expect(screen.getByRole("button", { name: /例2/ }).getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("例文を選んでAI解析すると、解析中を経て結果が出る。温度帯と納品日は入力文から読み取る", () => {
+  it("例文を選んでAI解析すると、解析中を経て結果が出る。温度帯と納品日は入力文から読み取る", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /例1/ }));
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
@@ -75,9 +78,7 @@ describe("DemoOrders", () => {
     expect(screen.getByRole("button", { name: /解析中/ })).toBeTruthy();
     expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
 
-    act(() => {
-      vi.advanceTimersByTime(DEMO_PARSE_DELAY_MS);
-    });
+    await act(async () => {});
     expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
     expect(field("品名").value).toBe("ブリ");
     // 「20箱」は、数字の欄と単位の選択に自動で振り分けられる
@@ -91,9 +92,9 @@ describe("DemoOrders", () => {
     expect(screen.getByText("支払期限（納品日を含めて60日以内）: 2026-12-02")).toBeTruthy();
   });
 
-  it("AI が埋めた「不明」は空欄に戻し、必須項目が空のまま承認しようとすると拒否される", () => {
+  it("AI が埋めた「不明」は空欄に戻し、必須項目が空のまま承認しようとすると拒否される", async () => {
     renderPage();
-    parseExample(/例2/);
+    await parseExample(/例2/);
     expect(field("運賃（円）").value).toBe("");
     expect(field("納品日").value).toBe("2026-10-08");
 
@@ -112,14 +113,14 @@ describe("DemoOrders", () => {
     expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
   });
 
-  it("解析結果に欠けがあれば、承認ボタンを押す前から「承認の前に確認してください」が出て、直すと消える。承認の可否は変えない", () => {
+  it("解析結果に欠けがあれば、承認ボタンを押す前から「承認の前に確認してください」が出て、直すと消える。承認の可否は変えない", async () => {
     renderPage();
     // そろっている例1では出ない
-    parseExample(/例1/);
+    await parseExample(/例1/);
     expect(screen.queryByText("承認の前に確認してください")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "最初の状態に戻す" }));
-    parseExample(/例2/);
+    await parseExample(/例2/);
     expect(screen.getByText("承認の前に確認してください")).toBeTruthy();
     expect(screen.getByText("運賃が入っていません")).toBeTruthy();
     // 表示だけ。まだ承認は試していないので、拒否の表示は出ていない
@@ -136,26 +137,26 @@ describe("DemoOrders", () => {
     expect(screen.queryByText("承認の前に確認してください")).toBeNull();
   });
 
-  it("入力を直している途中でも、事前表示が追従する（運賃を消すと出て、入れると消える）", () => {
+  it("入力を直している途中でも、事前表示が追従する（運賃を消すと出て、入れると消える）", async () => {
     renderPage();
-    parseExample(/例1/);
+    await parseExample(/例1/);
     fireEvent.change(field("運賃（円）"), { target: { value: "" } });
     expect(screen.getByText("運賃が入っていません")).toBeTruthy();
     fireEvent.change(field("運賃（円）"), { target: { value: "60000" } });
     expect(screen.queryByText("承認の前に確認してください")).toBeNull();
   });
 
-  it("納品日が空のときも、その項目名を挙げて拒否される", () => {
+  it("納品日が空のときも、その項目名を挙げて拒否される", async () => {
     renderPage();
-    parseExample(/例3/);
+    await parseExample(/例3/);
     expect(field("納品日").value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
     expect(screen.getByRole("alert").textContent).toContain("納品日が入っていません");
   });
 
-  it("単位が空だと、理由を出して承認を拒否する。単位を選ぶと承認できる", () => {
+  it("単位が空だと、理由を出して承認を拒否する。単位を選ぶと承認できる", async () => {
     renderPage();
-    parseExample(/例1/);
+    await parseExample(/例1/);
     fireEvent.change(unitSelect(), { target: { value: "" } });
     expect(screen.getByText("単位を選んでください")).toBeTruthy();
 
@@ -171,9 +172,9 @@ describe("DemoOrders", () => {
     expect(screen.getByText(/数量: 20kg/)).toBeTruthy();
   });
 
-  it("確認ダイアログで「やめる」と承認されない", () => {
+  it("確認ダイアログで「やめる」と承認されない", async () => {
     renderPage();
-    parseExample(/例1/);
+    await parseExample(/例1/);
     fireEvent.click(screen.getByRole("button", { name: /承認・保存/ }));
     const dialog = screen.getByRole("alertdialog");
     expect(dialog.textContent).toContain("承認すると発注書として確定し、内容は後から変更・削除できません。");
@@ -182,9 +183,9 @@ describe("DemoOrders", () => {
     expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
   });
 
-  it("承認すると編集不可になり、修正を試しても拒否される。発注書が出る", () => {
+  it("承認すると編集不可になり、修正を試しても拒否される。発注書が出る", async () => {
     renderPage();
-    parseExample(/例1/);
+    await parseExample(/例1/);
     approveWithConfirm();
 
     expect(screen.getByText("承認済み（編集不可）")).toBeTruthy();
@@ -222,9 +223,9 @@ describe("DemoOrders", () => {
     expect(doc.textContent).not.toContain("禁止");
   });
 
-  it("「最初の状態に戻す」で最初に戻り、もう一度やり直せる", () => {
+  it("「最初の状態に戻す」で最初に戻り、もう一度やり直せる", async () => {
     renderPage();
-    parseExample(/例1/);
+    await parseExample(/例1/);
     approveWithConfirm();
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));
 
@@ -236,18 +237,16 @@ describe("DemoOrders", () => {
     expect((screen.getByLabelText(/自由入力/) as HTMLTextAreaElement).value).toBe("");
     expect((screen.getByRole("button", { name: "AI解析" }) as HTMLButtonElement).disabled).toBe(true);
 
-    parseExample(/例2/);
+    await parseExample(/例2/);
     expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
   });
 
-  it("解析の待ち時間のあいだに戻すと、あとから結果が現れない", () => {
+  it("解析のあいだに戻すと、あとから結果が現れない", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /例1/ }));
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
     fireEvent.click(screen.getByRole("button", { name: "最初の状態に戻す" }));
-    act(() => {
-      vi.advanceTimersByTime(DEMO_PARSE_DELAY_MS * 2);
-    });
+    await act(async () => {});
     expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
   });
 });
