@@ -17,7 +17,7 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { Building2, Check, ChevronRight, Clock, Coins, Layers, Lock, MapPin, Pause, Play, ShieldCheck, Truck } from "lucide-react";
+import { Building2, Check, ChevronRight, Clock, Coins, Layers, Lock, MapPin, MousePointerClick, Pause, Play, ShieldCheck, Truck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -772,14 +772,20 @@ export default function Demo() {
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
         <DemoHero />
         <Tabs defaultValue="punch">
-          <p className="mb-2 text-sm font-semibold">同じ1日を、3つの立場で見る</p>
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+            同じ1日を、3つの立場で見る
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent/25 px-2 py-0.5 text-xs font-bold text-foreground">
+              <MousePointerClick className="h-3.5 w-3.5" aria-hidden />
+              押して切り替え
+            </span>
+          </p>
           {/* 3つあることが分かるよう、枠・アイコン・濃い文字にする。今開いている画面だけ色を塗る */}
-          <TabsList className="mb-4 h-auto w-full gap-1 border bg-card p-1 text-foreground lg:max-w-xl">
+          <TabsList className="mb-4 h-auto w-full gap-2 bg-transparent p-0 text-foreground lg:max-w-xl">
             {DEMO_TABS.map(({ value, label, Icon }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="min-h-12 flex-1 gap-1.5 text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm lg:text-base"
+                className="min-h-12 flex-1 gap-1.5 border border-border bg-background text-sm font-semibold shadow-sm data-[state=inactive]:hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm lg:text-base"
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
