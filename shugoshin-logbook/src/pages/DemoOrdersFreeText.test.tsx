@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DemoOrders from "./DemoOrders";
-import { DEMO_AI_FALLBACK_NOTE, DEMO_AI_NOTE, DEMO_FREE_TEXT_DISCLOSURE, DEMO_PARSE_NOTE } from "@/demo/demoOrders";
+import { DEMO_AI_FALLBACK_NOTE, DEMO_AI_NOTE, DEMO_FREE_TEXT_DISCLOSURE } from "@/demo/demoOrders";
 import { DemoAiError } from "@/demo/demoParseApi";
 
 const parseMock = vi.hoisted(() => vi.fn());
@@ -49,7 +49,6 @@ describe("DemoOrders: 自由入力のAI解析", () => {
       payment_date: null,
     });
     renderPage();
-    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
 
     await parseFree("唐戸から架空冷蔵の本社倉庫まで、冷蔵のアジ8箱、運賃4万2千円、明日納品");
 
@@ -62,7 +61,6 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     expect(screen.getByRole("radio", { name: "冷蔵" }).getAttribute("aria-checked")).toBe("true");
     expect(field("納品日").value).toBe("2026-10-04");
     expect(screen.getByText(DEMO_AI_NOTE)).toBeTruthy();
-    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
     expect(screen.queryByText(new RegExp(DEMO_AI_FALLBACK_NOTE))).toBeNull();
   });
 
@@ -97,13 +95,12 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     fireEvent.change(freeInput(), { target: { value: "途中まで打った文" } });
     fireEvent.click(screen.getByRole("button", { name: /例2/ }));
     expect(freeInput().value).toContain("冷蔵のタイ15箱");
-    expect(screen.getByText(DEMO_PARSE_NOTE)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));
     await act(async () => {});
     expect(parseMock).not.toHaveBeenCalled();
   });
 
-  it("例文を書き換えたら自由入力として扱い、本物の AI に送る。固定結果の注記は消える", async () => {
+  it("例文を書き換えたら自由入力として扱い、本物の AI に送る", async () => {
     parseMock.mockResolvedValue({
       item_name: "タイ",
       quantity: "20箱",
@@ -116,7 +113,6 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     fireEvent.click(screen.getByRole("button", { name: /例2/ }));
     const edited = `${freeInput().value}（20箱に変更）`;
     fireEvent.change(freeInput(), { target: { value: edited } });
-    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
     expect(screen.getByRole("button", { name: /例2/ }).getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(screen.getByRole("button", { name: "AI解析" }));

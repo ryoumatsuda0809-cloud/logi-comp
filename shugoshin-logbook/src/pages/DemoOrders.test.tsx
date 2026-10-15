@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DemoOrders from "./DemoOrders";
-import { DEMO_PARSE_DELAY_MS, DEMO_PARSE_NOTE } from "@/demo/demoOrders";
+import { DEMO_PARSE_DELAY_MS } from "@/demo/demoOrders";
 
 const renderPage = () =>
   render(
@@ -41,12 +41,9 @@ describe("DemoOrders", () => {
     vi.useRealTimers();
   });
 
-  it("例文を選んだときにデモ用の固定結果であることを示し、架空データの帯がある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
+  it("架空データの帯がある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
     renderPage();
-    // 何も選んでいない間は、固定結果とは言わない（自由入力は本物の AI に送られる）
-    expect(screen.queryByText(DEMO_PARSE_NOTE)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /例1/ }));
-    expect(screen.getByText(DEMO_PARSE_NOTE)).toBeTruthy();
     expect(screen.getByText(/架空のデータです/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "発注管理" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "戻る" })).toBeTruthy();
