@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import UnassignedAlert from "@/components/UnassignedAlert";
 import OfflineBanner from "@/components/OfflineBanner";
+import ScrollToTop from "@/components/ScrollToTop";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -116,6 +117,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
