@@ -568,8 +568,8 @@ function DemoHero() {
     <section className="mb-5" aria-labelledby="demo-hero-title">
       <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-4xl">
         {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
-        <span className="inline-block">荷待ち時間を、</span>
-        <span className="inline-block">書き換えにくい記録に。</span>
+        <span className="inline-block">荷捌き場で待った時間を、</span>
+        <span className="inline-block">あとから揉めない記録に。</span>
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
         施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。

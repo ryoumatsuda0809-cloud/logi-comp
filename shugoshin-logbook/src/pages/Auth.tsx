@@ -71,7 +71,6 @@ export default function Auth() {
           <img src="/icon-192.png" alt="守護神" className="h-10 w-10 rounded-lg" />
         </div>
         <h1 className="text-3xl font-bold text-primary-foreground">守護神</h1>
-        <p className="text-sm text-primary-foreground/70">荷待ち時間を、書き換えにくい記録に</p>
       </div>
 
       <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-2xl">
