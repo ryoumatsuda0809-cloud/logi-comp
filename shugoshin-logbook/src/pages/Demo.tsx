@@ -572,7 +572,7 @@ function DemoHero() {
         <span className="inline-block">あとから揉めない記録に。</span>
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。
+        荷捌き場や冷蔵倉庫で待った時間を記録して、荷主に出す報告書と待機料の根拠にします。
       </p>
 
       {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
@@ -598,7 +598,7 @@ function DemoHero() {
           className="rounded-2xl border bg-card p-4 text-left shadow-sm"
           aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
         >
-          <div className="text-sm text-muted-foreground">待たされた時間の合計</div>
+          <div className="text-sm text-muted-foreground">待った時間の合計</div>
           <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
             {minutes.toLocaleString()}
             <span className="ml-0.5 text-base font-bold">分</span>
@@ -621,7 +621,7 @@ function DemoHero() {
         </button>
 
         {/* 下の4枚が何の話かを先に言う */}
-        <p className="col-span-2 mt-2 text-sm font-semibold lg:col-span-4 lg:mt-1">記録が書き換えにくい理由</p>
+        <p className="col-span-2 mt-2 text-sm font-semibold lg:col-span-4 lg:mt-1">あとから揉めないしくみ</p>
 
         {INTEGRITY_POINTS.map((p, i) => {
           const Icon = POINT_ICONS[i] ?? ShieldCheck;

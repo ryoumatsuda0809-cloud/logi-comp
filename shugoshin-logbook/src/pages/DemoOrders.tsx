@@ -427,7 +427,13 @@ export default function DemoOrders() {
           {/* 発注一覧タブ */}
           <TabsContent value="list" className="space-y-4">
             {!approved ? (
-              <p className="py-8 text-center text-muted-foreground">発注データがありません</p>
+              <div className="space-y-1 py-8 text-center text-muted-foreground">
+                <p>まだ発注がありません</p>
+                <p className="text-sm">
+                  <span className="inline-block">「新規発注」で例を選んで承認すると、</span>
+                  <span className="inline-block">ここに並びます。</span>
+                </p>
+              </div>
             ) : (
               <Card className="cursor-default">
                 <CardContent className="space-y-3 p-4">

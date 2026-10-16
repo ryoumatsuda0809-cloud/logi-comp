@@ -54,7 +54,7 @@ describe("DemoOrders", () => {
     expect(screen.getByRole("tab", { name: "発注一覧" })).toBeTruthy();
     // 一覧は最初は空
     openTab("発注一覧");
-    expect(screen.getByText("発注データがありません")).toBeTruthy();
+    expect(screen.getByText("まだ発注がありません")).toBeTruthy();
     // 下のナビ。デモの画面だけを並べ、今の画面を示す
     const nav = screen.getByRole("navigation");
     expect(within(nav).getByRole("button", { name: "打刻" })).toBeTruthy();
