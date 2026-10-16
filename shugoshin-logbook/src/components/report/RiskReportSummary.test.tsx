@@ -49,13 +49,13 @@ describe("summarizeRiskRows", () => {
     expect(summarizeRiskRows([row({ estimated_loss_jpy: 0 })]).top).toBeNull();
   });
 
-  it("デモの警告レポートでは、表の合計と一致する（751分・¥15,300）", () => {
+  it("デモの警告レポートでは、表の合計と一致する（6,485分・¥153,900）", () => {
     const rows = buildMonthlyRiskRows();
     const s = summarizeRiskRows(rows);
     expect(s.totalWaitMinutes).toBe(rows.reduce((t, r) => t + (r.total_wait_minutes ?? 0), 0));
-    expect(s.totalWaitMinutes).toBe(751);
-    expect(s.totalLossJpy).toBe(15300);
-    expect(s.shipperCount).toBe(3);
+    expect(s.totalWaitMinutes).toBe(6485);
+    expect(s.totalLossJpy).toBe(153900);
+    expect(s.shipperCount).toBe(6);
     expect(s.top?.client_organization_name).toBe("架空水産");
   });
 });
@@ -64,8 +64,8 @@ describe("RiskReportDocument の要約", () => {
   it("対象月・荷主数・合計と、最も大きい荷主を文にして表の上に出す", () => {
     renderDoc(buildMonthlyRiskRows());
     const section = screen.getByRole("region", { name: "要約" });
-    expect(section.textContent).toContain("2026年9月：3荷主で待機は計 751分、推定逸失利益は計 ¥15,300 です。");
-    expect(section.textContent).toContain("最も大きいのは 架空水産（451分・¥12,300・リスク高）です。");
+    expect(section.textContent).toContain("2026年9月：6荷主で待機は計 6485分、推定逸失利益は計 ¥153,900 です。");
+    expect(section.textContent).toContain("最も大きいのは 架空水産（2389分・¥77,450・リスク高）です。");
   });
 
   it("算定不可・圏外承認があるときだけ、注意マーク付きの注記を出す", () => {
