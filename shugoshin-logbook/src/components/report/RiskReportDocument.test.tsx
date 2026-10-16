@@ -48,10 +48,12 @@ describe("RiskReportDocument", () => {
 
   it("遅延利息の列は「1日あたりの目安」と分かる見出しにし、年率を仮定した参考値であると書く", () => {
     renderDoc([row()]);
-    // 表の見出し・カードの見出し・注記の3か所に出る
+    // 表の見出し・カードの見出しに出る
     expect(screen.getAllByText(/遅延利息の目安（1日あたり）/).length).toBeGreaterThanOrEqual(BOTH);
     expect(screen.queryByText(/遅延損害金/)).toBeNull();
     expect(screen.getByText(/遅延利息の目安は、年率14\.6%を仮定して計算した参考値です。法的助言ではありません。/)).toBeTruthy();
+    // 計算式の注記は画面用（折りたたみ）と印刷用の2か所に出る
+    expect(screen.getAllByText(/推定逸失利益 × 年率14\.6% ÷ 365日/)).toHaveLength(2);
     expect(screen.queryByText(/取適法|中小受託|国土交通省|支払う義務/)).toBeNull();
   });
 
@@ -66,7 +68,10 @@ describe("RiskReportDocument", () => {
     renderDoc([row({ unmeasured_visits: 2, approved_claim_visits: 1 })]);
     expect(screen.getAllByText("うち算定不可 2")).toHaveLength(BOTH);
     expect(screen.getAllByText("うち圏外承認 1")).toHaveLength(BOTH);
-    expect(screen.getByText(/待機が無かったことを意味しません（2件）/)).toBeTruthy();
+    // 「待機が無かったことを意味しません」は表の上の要約に1度だけ。定義と件数は注記（画面用・印刷用）に出る
+    expect(screen.getAllByText(/待機が無かったことを意味しません/)).toHaveLength(1);
+    expect(screen.getAllByText(/荷待ち時間を確定できなかった訪問です（2件）/)).toHaveLength(2);
+    expect(screen.getAllByText(/運行管理者が承認した訪問です/)).toHaveLength(2);
     // 「時刻の自動検証なし」は要約・注記にも出るので、フッターの文だけを指して確かめる
     expect(screen.getByText(/本資料は.*時刻の自動検証なし/)).toBeTruthy();
   });
@@ -82,8 +87,8 @@ describe("RiskReportDocument", () => {
         monthLabel="2026年9月"
       />,
     );
-    // 表とカードの内訳で 2 種 × 2、注記で 2 つ、表の上の要約で 1 つ
-    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2 + 1);
+    // 表とカードの内訳で 2 種 × 2、注記（画面用・印刷用）で 2 つ × 2、表の上の要約で 1 つ
+    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2 * 2 + 1);
     // マークは飾りなので読み上げない。意味は隣の文が持つ
     container.querySelectorAll("svg").forEach((svg) => {
       expect(svg.getAttribute("aria-hidden")).toBe("true");
@@ -111,6 +116,53 @@ describe("RiskReportDocument", () => {
     expect(within(cards!).getByText("¥1,750")).toBeTruthy();
     expect(within(cards!).getByText("¥1")).toBeTruthy();
     expect(within(cards!).getByText("中")).toBeTruthy();
+  });
+
+  it("リスク判定の基準（60分以上＝高、30分以上＝中、30分未満＝低）を表の前に出す", () => {
+    renderDoc([row()]);
+    expect(screen.getByText(/リスク判定の見かた/).textContent).toContain("60分以上＝高、30分以上＝中、30分未満＝低");
+    expect(screen.getByText(/待機時間を測れなかった訪問は除く/)).toBeTruthy();
+  });
+
+  it("判定の根拠として、算定できた訪問の平均待機を行ごとに出す（算定不可の訪問は分母に入れない）", () => {
+    const { container } = renderDoc([
+      row({ total_visits: 4, unmeasured_visits: 0, total_wait_minutes: 200, gmen_risk_level: "中" }),
+      row({ client_organization_name: "B", total_visits: 5, unmeasured_visits: 1, total_wait_minutes: 240, gmen_risk_level: "高" }),
+      row({ client_organization_name: "C", total_visits: 2, unmeasured_visits: 2, total_wait_minutes: 0, gmen_risk_level: "低" }),
+    ]);
+    const cards = container.querySelector("ul")!;
+    expect(within(cards).getByText("平均 50分")).toBeTruthy();
+    // (5-1) 件で割る: 240 ÷ 4 = 60
+    expect(within(cards).getByText("平均 60分")).toBeTruthy();
+    // 算定できた訪問が無ければ平均は出せない
+    expect(within(cards).getByText("平均 —")).toBeTruthy();
+  });
+
+  it("平均は切り捨てて出す（59.9分は「中」の行に「60分」と出さない）", () => {
+    const { container } = renderDoc([row({ total_visits: 3, unmeasured_visits: 0, total_wait_minutes: 179, gmen_risk_level: "中" })]);
+    expect(within(container.querySelector("ul")!).getByText("平均 59分")).toBeTruthy();
+  });
+
+  it("注記は画面では折りたたみ、印刷には展開して出す。どちらにも同じ内容が入る", () => {
+    const { container } = renderDoc([row({ unmeasured_visits: 1 })]);
+    const details = container.querySelector("details")!;
+    expect(details.hasAttribute("open")).toBe(false);
+    expect(details.className).toContain("print:hidden");
+    const printed = details.nextElementSibling!;
+    expect(printed.className).toContain("hidden");
+    expect(printed.className).toContain("print:block");
+    expect(printed.textContent).toContain("待機料の考え方");
+    expect(printed.textContent).toContain("年率14.6%");
+    expect(printed.textContent).toContain("算定不可");
+    expect(details.querySelector("summary")!.textContent).toBe("注記：金額の算定方法・遅延利息の目安・算定不可");
+    expect(details.textContent).toContain(printed.textContent!.replace(/^注記/, ""));
+  });
+
+  it("推定逸失利益を見出しの用語にし、待機料は算定の考え方の説明にだけ使う", () => {
+    renderDoc([row()]);
+    expect(screen.getAllByText("推定逸失利益").length).toBeGreaterThanOrEqual(BOTH);
+    expect(screen.getAllByText(/推定逸失利益は、待機料の考え方にもとづき、待機1回ごとに30分を差し引いた/)).toHaveLength(2);
+    expect(screen.queryByText(/待機料は待機1回ごとに30分を控除/)).toBeNull();
   });
 
   it("行が無ければ対象月つきの「データがありません」を出す", () => {
