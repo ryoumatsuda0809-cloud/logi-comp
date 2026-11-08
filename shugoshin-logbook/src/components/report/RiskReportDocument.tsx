@@ -254,12 +254,12 @@ export function RiskReportDocument({
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-transparent bg-card print:border-black print:bg-white print:shadow-none">
+        <div className="border-y border-border bg-card print:rounded-xl print:border print:border-black print:bg-white print:shadow-none">
           {/* 狭い画面（md 未満）は、7列の表を横にスクロールさせず、1行ずつのカードにする。
               印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
           <ul className="divide-y divide-border/70 md:hidden print:hidden">
             {rows.map((row, i) => (
-              <li key={i} className="space-y-1.5 px-4 py-3.5">
+              <li key={i} className="space-y-1.5 py-3.5">
                 {/* iPhone の一覧のように、左に名前、右に金額。判定は小さな点と文字 */}
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 text-base font-semibold">

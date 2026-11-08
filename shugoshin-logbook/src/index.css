@@ -171,18 +171,37 @@
    本物の画面には付けない。.demo-app は各デモ画面のいちばん外側に付ける。 */
 @layer components {
   .demo-app {
-    /* iPhone の「設定」のように、ごく薄い灰色の地に、白い箱を置く。枠線と影で囲まない */
-    --background: 240 14% 96%;
+    /* 白い地に、細い線だけで区切る（箱で囲まない）。Public や talabat のような、平らな画面 */
+    --background: 0 0% 100%;
     -webkit-tap-highlight-color: transparent;
     /* 画面が切り替わったときに、ふっと出す。transform を使わないのは、
        動いている間に下の固定ナビの位置がずれないようにするため（opacity は位置に影響しない） */
     animation: demo-fade-in 180ms ease-out both;
   }
-  /* パネル（Card）は、枠線と影をやめて、白い角丸の箱にする */
+  /* パネル（Card）は、箱をやめて、上に細い線を引くだけにする */
   .demo-app .bg-card.rounded-lg.border {
-    border-color: transparent;
-    border-radius: 1rem;
+    background: transparent;
+    border-width: 1px 0 0 0;
+    border-color: hsl(var(--border));
+    border-radius: 0;
     box-shadow: none;
+  }
+  /* タブの線のすぐ下では、二重にならないよう、最初のパネルの上の線は引かない（PC は横並びなので両方） */
+  .demo-app [role="tabpanel"] > .bg-card.rounded-lg.border:first-child {
+    border-top-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .demo-app [role="tabpanel"] > .bg-card.rounded-lg.border {
+      border-top-width: 0;
+    }
+  }
+  .demo-app .bg-card.rounded-lg.border > .p-6 {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  /* 下から出るシートの中の絵が、ぽんっと弾んで出る */
+  .demo-pop {
+    animation: demo-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
   /* 押した瞬間に少し沈む（指で押した手応え） */
   .demo-app button:not(:disabled):active,
@@ -201,6 +220,9 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
+    .demo-pop {
+      animation: none;
+    }
     .demo-app {
       animation: none;
     }
@@ -208,6 +230,17 @@
     .demo-app a:active {
       transform: none;
     }
+  }
+}
+
+@keyframes demo-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 

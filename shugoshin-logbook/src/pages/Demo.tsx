@@ -17,7 +17,9 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { Check, ChevronRight, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
+import { Check, ChevronRight, Lock, MapPin, Pause, Play } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { DriverMark, type DriverGlyph } from "@/components/demo/DriverMark";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -449,6 +451,44 @@ function FeePanel() {
   );
 }
 
+/**
+ * 1回の訪問の進み具合を、「到着 → 荷役開始 → 完了」の3つの丸と線で見せる（配達アプリの進み具合と同じ形）。
+ * 荷役開始までが荷待ち時間。記録が無い段階は、灰色の丸のまま。
+ */
+function VisitSteps({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
+  const at = (types: string[]) => entries.find((e) => types.includes(e.eventType))?.timestamp ?? null;
+  const steps = [
+    { label: "到着", ts: at(["arrival"]) },
+    { label: "荷役開始", ts: at(["waiting_start"]) },
+    { label: "完了", ts: at(["departure", "work_end"]) },
+  ];
+  return (
+    <ol className="mt-3 flex items-start">
+      {steps.map((st, i) => {
+        const done = st.ts !== null;
+        return (
+          <li key={st.label} className={`flex items-start ${i < steps.length - 1 ? "flex-1" : ""}`}>
+            <div className="flex w-14 shrink-0 flex-col items-center text-center">
+              <span
+                className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                  done ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {done && <Check className="h-4 w-4" strokeWidth={3} aria-hidden />}
+              </span>
+              <span className="mt-1 text-xs text-muted-foreground">{st.label}</span>
+              <span className="text-sm font-semibold tabular-nums">{formatTimeOrNull(st.ts)}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <span aria-hidden className={`mt-3 h-1 flex-1 rounded-full ${done && steps[i + 1].ts ? "bg-accent" : "bg-muted"}`} />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function TimelinePanel() {
   const summary = useMemo(
     () => convertWaitLogsToTimeline(DEMO_WAIT_LOGS, DEMO_FACILITY_NAMES),
@@ -487,14 +527,7 @@ function TimelinePanel() {
                   )}
                 </span>
               </div>
-              <ol className="mt-2 space-y-1 text-muted-foreground">
-                {v.entries.map((e, i) => (
-                  <li key={i}>
-                    <span className="font-medium tabular-nums text-foreground">{formatTimeOrNull(e.timestamp)}</span>{" "}
-                    {EVENT_LABEL[e.eventType] ?? e.eventType}
-                  </li>
-                ))}
-              </ol>
+              <VisitSteps entries={v.entries} />
             </li>
           ))}
         </ol>
@@ -503,12 +536,12 @@ function TimelinePanel() {
   );
 }
 
-/** iPhone の「設定」のような、白い角丸の箱。小さな灰色の見出しを上に付け、行は細い線で分ける */
+/** 白い地に、細い線で区切った一覧。小さな灰色の見出しを上に付ける（箱では囲まない） */
 function ListGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="mt-6">
-      {title && <h3 className="mb-1.5 px-4 text-[13px] text-muted-foreground">{title}</h3>}
-      <ul className="divide-y divide-border/70 overflow-hidden rounded-2xl bg-card">{children}</ul>
+      {title && <h3 className="mb-1 text-[13px] text-muted-foreground">{title}</h3>}
+      <ul className="divide-y divide-border border-y border-border">{children}</ul>
     </section>
   );
 }
@@ -531,7 +564,7 @@ function ListRow({
         type="button"
         onClick={onClick}
         aria-label={ariaLabel}
-        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left"
       >
         <span className="text-[17px]">{label}</span>
         <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
@@ -543,19 +576,31 @@ function ListRow({
   );
 }
 
-// lines はタイルで語の途中で折れないように、折り返してよい位置で分けたもの（つなげると title と同じ）
-const INTEGRITY_POINTS = [
-  { title: "時刻はサーバーが決める", lines: ["時刻は", "サーバーが決める"], body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
-  { title: "500m超では打刻できない", lines: ["500m超では", "打刻できない"], body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
-  { title: "確定した証拠は書き換え不可", lines: ["確定した証拠は", "書き換え不可"], body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
-  { title: "例外は等級で区別", lines: ["例外は", "等級で区別"], body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
+const INTEGRITY_POINTS: { title: string; body: string; glyph: DriverGlyph }[] = [
+  { title: "時刻はサーバーが決める", glyph: "clock", body: "到着時刻は端末の時計ではなく DB サーバー時刻で記録。端末の時計を変えても打刻時刻は変わりません。" },
+  { title: "500m超では打刻できない", glyph: "pin", body: "施設から500m超ではボタンが無効になり、画面を回避してもサーバー側が拒否します。" },
+  { title: "確定した証拠は書き換え不可", glyph: "lock", body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
+  { title: "例外は等級で区別", glyph: "layers", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
+
+/** シートの上の絵の場所。ほんのりオレンジの地に、絵が弾んで出る */
+function SheetArt({ glyph }: { glyph: DriverGlyph }) {
+  return (
+    <div className="mx-4 mt-3 flex h-36 items-center justify-center rounded-3xl bg-accent/10">
+      <DriverMark glyph={glyph} className="demo-pop h-28 w-auto" />
+    </div>
+  );
+}
+
+/** シートの下の、丸いボタン2つ（左は枠だけ、右はオレンジで塗る） */
+const PILL = "h-12 flex-1 rounded-full text-base font-bold";
 
 /**
  * 最初に見える要約。初めて開いた人が、技術の説明より先に「何のアプリで、何が残るか」を読めるようにする。
  * 数字は待機料タブと同じ計算（convertWaitLogsToTimeline / sumWaitCost）から出す。
  */
 function DemoHero() {
+  const navigate = useNavigate();
   const summary = useMemo(
     () => convertWaitLogsToTimeline(DEMO_WAIT_LOGS, DEMO_FACILITY_NAMES),
     [],
@@ -577,39 +622,41 @@ function DemoHero() {
         荷捌き場で待たされた時間を、位置とサーバー時刻で記録します。荷主に出す報告書と、待機料の根拠になります。
       </p>
 
-      {/* iPhone の「設定」のように、白い箱に1行ずつ並べる。押せる行には右に「›」。押すと下から詳しく出る */}
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
-        <ListGroup title="架空のドライバーの1日（3施設を訪問）">
-          <li>
-            <button
-              type="button"
-              onClick={() => setFeeOpen(true)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
-              aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
-            >
-              <span className="min-w-0">
-                <span className="block text-sm text-muted-foreground">待機料（目安）</span>
-                <span className="block text-5xl font-bold tracking-tight tabular-nums">¥{fee.toLocaleString()}</span>
-                <span className="block text-xs text-muted-foreground">
-                  30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
-                </span>
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-10">
+        <div>
+          {/* いちばん大きい数字を、箱に入れず、左上にそのまま置く（証券アプリの残高と同じ置き方） */}
+          <p className="mt-6 text-[13px] text-muted-foreground">架空のドライバーの1日（3施設を訪問）</p>
+          <button
+            type="button"
+            onClick={() => setFeeOpen(true)}
+            className="mt-1 flex w-full items-end justify-between gap-3 text-left"
+            aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
+          >
+            <span className="min-w-0">
+              <span className="block text-[3.5rem] font-bold leading-none tracking-tight tabular-nums">
+                ¥{fee.toLocaleString()}
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden />
-            </button>
-          </li>
-          <ListRow
-            label="待たされた時間の合計"
-            value={`${minutes.toLocaleString()}分`}
-            onClick={() => setFeeOpen(true)}
-            ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
-          />
-          <ListRow
-            label="訪問した施設"
-            value={`${feeRows.length}件（うち30分超 ${overThirty}件）`}
-            onClick={() => setFeeOpen(true)}
-            ariaLabel={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
-          />
-        </ListGroup>
+              <span className="mt-2 block text-sm text-muted-foreground">
+                待機料（目安）・30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
+              </span>
+            </span>
+            <ChevronRight className="mb-1 h-6 w-6 shrink-0 text-muted-foreground/60" aria-hidden />
+          </button>
+          <ListGroup>
+            <ListRow
+              label="待たされた時間の合計"
+              value={`${minutes.toLocaleString()}分`}
+              onClick={() => setFeeOpen(true)}
+              ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
+            />
+            <ListRow
+              label="訪問した施設"
+              value={`${feeRows.length}件（うち30分超 ${overThirty}件）`}
+              onClick={() => setFeeOpen(true)}
+              ariaLabel={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
+            />
+          </ListGroup>
+        </div>
 
         <ListGroup title="記録が書き換えにくい理由">
           {INTEGRITY_POINTS.map((p, i) => (
@@ -622,18 +669,14 @@ function DemoHero() {
         <DrawerContent className={SHEET_PC}>
           {point && (
             <>
+              <SheetArt glyph={point.glyph} />
               <DrawerHeader className="text-left">
-                <DrawerTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-success" aria-hidden />
-                  {point.title}
-                </DrawerTitle>
+                <DrawerTitle className="text-xl font-bold">{point.title}</DrawerTitle>
                 <DrawerDescription className="text-base text-foreground">{point.body}</DrawerDescription>
               </DrawerHeader>
-              <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+              <DrawerFooter className="flex-row" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
                 <DrawerClose asChild>
-                  <Button variant="outline" className="min-h-12">
-                    閉じる
-                  </Button>
+                  <Button className={`${PILL} bg-accent text-accent-foreground hover:bg-accent/90`}>閉じる</Button>
                 </DrawerClose>
               </DrawerFooter>
             </>
@@ -643,35 +686,39 @@ function DemoHero() {
 
       <Drawer open={feeOpen} onOpenChange={setFeeOpen}>
         <DrawerContent className={SHEET_PC}>
+          <SheetArt glyph="clock" />
           <DrawerHeader className="text-left">
-            <DrawerTitle>待機料の内訳</DrawerTitle>
+            <DrawerTitle className="text-xl font-bold">待機料の内訳</DrawerTitle>
             <DrawerDescription>
-              {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{getRate(DEMO_VEHICLE_CLASS)}円/分。待機1回ごとに30分を控除し、超えた分だけ数えます。
+              {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{getRate(DEMO_VEHICLE_CLASS)}円/分。30分を超えた分だけ数えます。
             </DrawerDescription>
           </DrawerHeader>
-          <ul className="space-y-2 px-4">
+          <ul className="divide-y divide-border px-4">
             {feeRows.map(({ log, mins, fee: rowFee }) => (
-              <li key={log.id} className="flex items-baseline justify-between gap-2 rounded-lg border p-3 text-sm">
+              <li key={log.id} className="flex items-baseline justify-between gap-2 py-3">
                 <span className="min-w-0">
-                  <span className="block font-medium">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
-                  <span className="text-muted-foreground tabular-nums">待機 {mins ?? "-"}分</span>
+                  <span className="block font-semibold">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">待機 {mins ?? "-"}分</span>
                 </span>
-                <span className="shrink-0 text-base font-semibold tabular-nums">
+                <span className="shrink-0 text-lg font-bold tabular-nums">
                   {rowFee === null ? "算定不能" : rowFee === 0 ? "対象外" : `¥${rowFee.toLocaleString()}`}
                 </span>
               </li>
             ))}
           </ul>
-          <div className="mx-4 mt-3 flex items-baseline justify-between border-t pt-3">
+          <div className="mx-4 flex items-baseline justify-between border-t border-border pt-3">
             <span className="text-sm text-muted-foreground">合計 {minutes.toLocaleString()}分</span>
-            <span className="text-2xl font-bold tabular-nums">¥{fee.toLocaleString()}</span>
+            <span className="text-3xl font-bold tabular-nums">¥{fee.toLocaleString()}</span>
           </div>
-          <DrawerFooter style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+          <DrawerFooter className="flex-row" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <DrawerClose asChild>
-              <Button variant="outline" className="min-h-12">
+              <Button variant="outline" className={`${PILL} border-2 border-foreground/80`}>
                 閉じる
               </Button>
             </DrawerClose>
+            <Button className={`${PILL} bg-accent text-accent-foreground hover:bg-accent/90`} onClick={() => navigate("/demo/report")}>
+              報告書を見る
+            </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
@@ -722,14 +769,13 @@ export default function Demo() {
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
         <DemoHero />
         <Tabs defaultValue="punch">
-          <h3 className="mb-1.5 px-1 text-[13px] text-muted-foreground">見る立場を選ぶ</h3>
-          {/* iPhone の切り替え（セグメント）と同じ形。灰色の溝に、選んだ側だけ白い札が乗る */}
-          <TabsList className="mb-4 h-11 w-full rounded-xl bg-muted-foreground/15 p-1 lg:max-w-md">
+          {/* 証券アプリのように、文字だけのタブ。今開いている画面の下に太い線が引かれる */}
+          <TabsList className="mb-4 h-12 w-full justify-start gap-7 rounded-none border-b border-border bg-transparent p-0">
             {DEMO_TABS.map(({ value, label }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="h-full flex-1 rounded-lg text-[15px] font-medium text-foreground/70 data-[state=active]:bg-card data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow"
+                className="h-full rounded-none border-b-[3px] border-transparent bg-transparent px-1 text-[17px] font-medium text-muted-foreground shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 {label}
               </TabsTrigger>
