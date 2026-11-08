@@ -458,76 +458,45 @@ function minutesBetween(a: string | null, b: string | null): number | null {
 }
 
 /**
- * 待ち時間の輪。時計やタイマーのアプリのように、1周=60分で、待った分だけ色が伸びる。
- * 下の小さな印が30分（ここから先が待機料の対象）。30分を超えたらオレンジ、以内は灰色。真ん中に分数。
+ * 1回の訪問を、1本の帯で見せる。帯の長さ＝時間の長さ。左のオレンジが「待機」、右の濃紺が「作業」で、
+ * それぞれの帯の中に分数を直接書く（凡例や説明を別に置かない）。時刻は、帯の切れ目の真下に出す。
  */
-function WaitRing({ minutes }: { minutes: number | null }) {
-  const R = 27;
-  const C = 2 * Math.PI * R;
-  const frac = minutes === null ? 0 : Math.min(minutes, 60) / 60;
-  const over = minutes !== null && minutes > 30;
-  return (
-    <div className="flex w-[88px] shrink-0 flex-col items-center">
-      <div className="relative h-[88px] w-[88px]">
-        <svg viewBox="0 0 88 88" className="h-full w-full" aria-hidden>
-          {/* 輪は、上から時計回りに伸びるよう、-90度回す */}
-          <g transform="rotate(-90 44 44)">
-            <circle cx="44" cy="44" r={R} fill="none" strokeWidth="8" className="stroke-muted" />
-            <circle
-              cx="44"
-              cy="44"
-              r={R}
-              fill="none"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={`${frac * C} ${C}`}
-              className={over ? "stroke-accent" : "stroke-foreground/45"}
-            />
-            {/* 30分の印（1周=60分の半分＝円の下。回転後の左の端が、下に出る） */}
-            <line x1={44 - R - 6} y1="44" x2={44 - R + 6} y2="44" strokeWidth="2.5" className="stroke-foreground" />
-          </g>
-          <text x="44" y="85" textAnchor="middle" className="fill-foreground text-[11px] font-bold">
-            30分
-          </text>
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center leading-none" style={{ paddingBottom: 4 }}>
-          <span className="text-xl font-bold tabular-nums">
-            {minutes === null ? "—" : minutes}
-            <span className="text-xs">分</span>
-          </span>
-        </div>
-      </div>
-      <span className={`text-xs font-bold ${over ? "text-foreground" : "text-muted-foreground"}`}>
-        {over ? "待機（30分超）" : "待機"}
-      </span>
-    </div>
-  );
-}
-
-/** 1回の訪問: 左に待ち時間の輪、右に「いつ着いて、いつ荷役が始まり、いつ終わったか」 */
-function VisitTimeline({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
+function VisitBar({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
   const at = (types: string[]) => entries.find((e) => types.includes(e.eventType))?.timestamp ?? null;
   const arrival = at(["arrival"]);
   const start = at(["waiting_start"]);
   const end = at(["departure", "work_end"]);
+  const wait = minutesBetween(arrival, start);
   const work = minutesBetween(start, end);
+  // 長さは時間に比例させる。ただし、中の文字が読めるよう、片方が全体の3割より短くならないようにする
+  const total = (wait ?? 0) + (work ?? 0);
+  const waitPct = wait === null || work === null || total === 0 ? 100 : Math.min(70, Math.max(30, (wait / total) * 100));
+  const over = wait !== null && wait > 30;
   return (
-    <div className="mt-3 flex items-center gap-4">
-      <WaitRing minutes={minutesBetween(arrival, start)} />
-      <dl className="min-w-0 flex-1 space-y-1.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-sm text-muted-foreground">到着</dt>
-          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(arrival)}</dd>
+    <div className="mt-3">
+      <div className="flex h-11 overflow-hidden rounded-full text-sm font-bold">
+        <div
+          className={`flex items-center justify-center whitespace-nowrap ${
+            wait === null ? "bg-muted text-muted-foreground" : over ? "bg-accent text-accent-foreground" : "bg-foreground/15 text-foreground"
+          }`}
+          style={{ width: `${waitPct}%` }}
+        >
+          {wait === null ? "待機 算定不能" : `待機 ${wait}分`}
         </div>
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-sm text-muted-foreground">荷役開始（待機おわり）</dt>
-          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(start)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-sm text-muted-foreground">作業完了{work !== null && `（作業 ${work}分）`}</dt>
-          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(end)}</dd>
-        </div>
-      </dl>
+        {waitPct < 100 && (
+          <div className="flex items-center justify-center whitespace-nowrap bg-primary text-primary-foreground" style={{ width: `${100 - waitPct}%` }}>
+            作業 {work}分
+          </div>
+        )}
+      </div>
+      {/* 時刻は、帯の左端・切れ目・右端の真下 */}
+      <div className="relative mt-1.5 h-6 text-base font-bold tabular-nums">
+        <span className="absolute left-0">{formatTimeOrNull(arrival)}</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${waitPct}%` }}>
+          {formatTimeOrNull(start)}
+        </span>
+        {waitPct < 100 && <span className="absolute right-0">{formatTimeOrNull(end)}</span>}
+      </div>
     </div>
   );
 }
@@ -549,14 +518,18 @@ function TimelinePanel() {
             <li key={v.key} className="py-5 first:pt-1 last:pb-1">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-lg font-bold">{v.locationName}</p>
-                {v.evidenceGrade === "C" && (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-sm text-foreground">
-                    <NoticeMark />
-                    等級C
+                <span className="inline-flex shrink-0 items-center gap-2">
+                  {v.evidenceGrade === "C" && <NoticeMark />}
+                  <span className={`text-lg font-bold tabular-nums ${v.waitMinutes === null || v.waitMinutes <= 30 ? "text-muted-foreground" : ""}`}>
+                    {v.waitMinutes === null
+                      ? "算定不能"
+                      : v.waitMinutes <= 30
+                        ? "対象外"
+                        : `${calcWaitCost(v.waitMinutes, DEMO_VEHICLE_CLASS).toLocaleString()}円`}
                   </span>
-                )}
+                </span>
               </div>
-              <VisitTimeline entries={v.entries} />
+              <VisitBar entries={v.entries} />
             </li>
           ))}
         </ol>
