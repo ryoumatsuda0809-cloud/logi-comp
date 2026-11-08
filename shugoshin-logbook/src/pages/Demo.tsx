@@ -17,7 +17,7 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { Building2, Check, ChevronRight, Coins, Lock, MapPin, MousePointerClick, Pause, Play, ShieldCheck, Truck } from "lucide-react";
+import { Check, ChevronRight, Lock, MapPin, Pause, Play, ShieldCheck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -286,41 +286,16 @@ const KANBAN_INITIAL: KanbanTicket[] = [
 ];
 
 // 列ごとの色（待機=橙、呼出=青、荷役=緑）。色だけに頼らず、列の名前・件数・文字も残す
+// 列の色は、見出しの小さな点だけ（待機=橙、呼出=青、荷役=緑）。色だけに頼らず、列の名前と件数も出す
 const KANBAN_COLUMNS: {
   status: KanbanStatus;
   label: string;
   action?: { label: string; next: KanbanStatus };
-  column: string;
-  badge: string;
-  card: string;
   dot: string;
 }[] = [
-  {
-    status: "waiting",
-    label: "待機中",
-    action: { label: "呼出", next: "called" },
-    column: "border-warning/50 bg-warning/10",
-    badge: "bg-warning text-black",
-    card: "border-l-warning",
-    dot: "bg-warning",
-  },
-  {
-    status: "called",
-    label: "呼出済",
-    action: { label: "荷役開始", next: "working" },
-    column: "border-sky-500/50 bg-sky-500/10",
-    badge: "bg-sky-600 text-white",
-    card: "border-l-sky-500",
-    dot: "bg-sky-500",
-  },
-  {
-    status: "working",
-    label: "荷役中",
-    column: "border-success/50 bg-success/10",
-    badge: "bg-success text-success-foreground",
-    card: "border-l-success",
-    dot: "bg-success",
-  },
+  { status: "waiting", label: "待機中", action: { label: "呼出", next: "called" }, dot: "bg-amber-500" },
+  { status: "called", label: "呼出済", action: { label: "荷役開始", next: "working" }, dot: "bg-blue-500" },
+  { status: "working", label: "荷役中", dot: "bg-emerald-500" },
 ];
 
 function elapsedMinutes(from: string) {
@@ -357,13 +332,13 @@ function KanbanPanel() {
           {KANBAN_COLUMNS.map((col) => {
             const items = tickets.filter((t) => t.status === col.status);
             return (
-              <div key={col.status} className={`rounded-lg border p-2 ${col.column}`}>
+              <div key={col.status} className="rounded-xl bg-muted/60 p-2">
                 <div className="mb-2 flex items-center justify-between text-sm font-bold">
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} aria-hidden />
                     {col.label}
                   </span>
-                  <span className={`min-w-7 rounded-full px-2 py-0.5 text-center text-xs font-bold tabular-nums ${col.badge}`}>
+                  <span className="min-w-7 rounded-full bg-card px-2 py-0.5 text-center text-xs font-bold tabular-nums">
                     {items.length}
                   </span>
                 </div>
@@ -372,7 +347,7 @@ function KanbanPanel() {
                     <p className="py-3 text-center text-xs text-muted-foreground">なし</p>
                   )}
                   {items.map((t) => (
-                    <div key={t.no} className={`rounded-md border border-l-4 bg-background p-3 text-sm shadow-sm ${col.card}`}>
+                    <div key={t.no} className="rounded-lg bg-card p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-xl font-bold tabular-nums">#{String(t.no).padStart(3, "0")}</span>
                         {col.status === "waiting" && (
@@ -443,57 +418,32 @@ function FeePanel() {
           {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{rate}円/分・30分を超えた分だけ
         </p>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <ul className="space-y-2">
-          {rows.map(({ log, mins, fee }) => {
-            const over = mins !== null && mins > 30;
-            return (
-              <li key={log.id} className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                      log.evidence_grade === "C" ? "bg-blue-200 text-blue-900" : "bg-white text-blue-700"
-                    }`}
-                  >
-                    {log.evidence_grade === "C" ? "等級C" : "等級A"}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-end justify-between gap-2 tabular-nums">
-                  <div>
-                    <p className={`text-2xl font-extrabold ${over ? "text-blue-800" : "text-slate-500"}`}>
-                      {mins ?? "-"}
-                      <span className="ml-0.5 text-sm font-bold">分</span>
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatTimeOrNull(effectiveArrival(log))} → {formatTimeOrNull(loadingStartedAt(log))}
-                    </p>
-                  </div>
-                  <span
-                    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-base font-bold ${
-                      fee === null || fee === 0 ? "bg-white text-slate-500" : "bg-blue-700 text-white"
-                    }`}
-                  >
-                    {fee === null && <NoticeMark />}
-                    {fee === null ? "算定不能" : fee === 0 ? "対象外" : `${fee.toLocaleString()}円`}
-                  </span>
-                </div>
-                {log.evidence_grade === "C" && (
-                  <p className="mt-2 flex items-start gap-1 text-xs text-slate-500">
-                    <NoticeMark className="mt-0.5" />
-                    電波圏外のため、あとから申告した記録
-                  </p>
-                )}
-              </li>
-            );
-          })}
+      <CardContent>
+        <ul className="divide-y divide-border/70">
+          {rows.map(({ log, mins, fee }) => (
+            <li key={log.id} className="flex items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <p className="font-semibold">{DEMO_FACILITY_NAMES[log.facility_id]}</p>
+                <p className="text-sm text-muted-foreground tabular-nums">
+                  {formatTimeOrNull(effectiveArrival(log))} → {formatTimeOrNull(loadingStartedAt(log))}・{mins ?? "-"}分
+                  {log.evidence_grade === "C" && "・等級C（圏外の申告）"}
+                </p>
+              </div>
+              <span
+                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xl font-bold tabular-nums ${
+                  fee === 0 ? "text-muted-foreground" : ""
+                }`}
+              >
+                {fee === null && <NoticeMark />}
+                {fee === null ? "算定不能" : fee === 0 ? "対象外" : `${fee.toLocaleString()}円`}
+              </span>
+            </li>
+          ))}
+          <li className="flex items-baseline justify-between gap-3 pt-3">
+            <span className="text-sm text-muted-foreground">合計</span>
+            <span className="shrink-0 whitespace-nowrap text-4xl font-bold tabular-nums">{total.toLocaleString()}円</span>
+          </li>
         </ul>
-        <div className="flex items-baseline justify-between rounded-xl bg-blue-100 px-4 py-3">
-          <span className="text-sm font-bold text-blue-900">合計</span>
-          <span className="shrink-0 whitespace-nowrap text-3xl font-extrabold tabular-nums text-blue-900">
-            {total.toLocaleString()}円
-          </span>
-        </div>
       </CardContent>
     </Card>
   );
@@ -511,38 +461,36 @@ function TimelinePanel() {
         <CardTitle className="text-base">打刻タイムライン</CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="space-y-3">
+        <ol className="divide-y divide-border/70">
           {visits.map((v) => (
-            <li key={v.key} className="rounded-lg border p-3 text-sm">
+            <li key={v.key} className="py-3 text-sm first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{v.locationName}</span>
+                <span className="text-base font-semibold">{v.locationName}</span>
                 <span className="flex flex-wrap items-center gap-2">
                   {v.evidenceGrade === "C" && (
-                    <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <NoticeMark />
                       等級C
                     </span>
                   )}
                   {v.waitMinutes === null ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold">
+                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
                       <NoticeMark />
                       待機 算定不能
                     </span>
                   ) : (
                     <span
-                      className={`rounded px-2 py-0.5 text-xs font-semibold ${
-                        v.waitMinutes > 30 ? "border border-warning bg-warning/15" : "bg-muted"
-                      }`}
+                      className={`text-sm font-bold tabular-nums ${v.waitMinutes > 30 ? "" : "text-muted-foreground"}`}
                     >
                       待機 {v.waitMinutes}分{v.waitMinutes > 30 && "・30分超"}
                     </span>
                   )}
                 </span>
               </div>
-              <ol className="mt-2 space-y-1 border-l pl-3">
+              <ol className="mt-2 space-y-1 text-muted-foreground">
                 {v.entries.map((e, i) => (
                   <li key={i}>
-                    <span className="tabular-nums font-medium">{formatTimeOrNull(e.timestamp)}</span>{" "}
+                    <span className="font-medium tabular-nums text-foreground">{formatTimeOrNull(e.timestamp)}</span>{" "}
                     {EVENT_LABEL[e.eventType] ?? e.eventType}
                   </li>
                 ))}
@@ -552,6 +500,46 @@ function TimelinePanel() {
         </ol>
       </CardContent>
     </Card>
+  );
+}
+
+/** iPhone の「設定」のような、白い角丸の箱。小さな灰色の見出しを上に付け、行は細い線で分ける */
+function ListGroup({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="mt-6">
+      {title && <h3 className="mb-1.5 px-4 text-[13px] text-muted-foreground">{title}</h3>}
+      <ul className="divide-y divide-border/70 overflow-hidden rounded-2xl bg-card">{children}</ul>
+    </section>
+  );
+}
+
+/** 1行。押せる行は、右に値と「›」を出す（押すと詳しく出ることを、文字ではなく形で示す） */
+function ListRow({
+  label,
+  value,
+  onClick,
+  ariaLabel,
+}: {
+  label: string;
+  value?: string;
+  onClick: () => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel}
+        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="text-[17px]">{label}</span>
+        <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+          {value && <span className="text-[17px] font-semibold tabular-nums text-foreground">{value}</span>}
+          <ChevronRight className="h-5 w-5 text-muted-foreground/60" aria-hidden />
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -589,74 +577,45 @@ function DemoHero() {
         荷捌き場で待たされた時間を、位置とサーバー時刻で記録します。荷主に出す報告書と、待機料の根拠になります。
       </p>
 
-      {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
-      <p className="mt-4 text-sm font-semibold lg:mt-6">架空のドライバーの1日（3施設を訪問）</p>
-      <div className="mt-2 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4">
-        <button
-          type="button"
-          onClick={() => setFeeOpen(true)}
-          className="col-span-2 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm"
-          aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
-        >
-          <div className="text-sm text-primary-foreground/70">この1日の待機料（目安）</div>
-          <div className="mt-1 text-5xl font-extrabold tracking-tight tabular-nums">¥{fee.toLocaleString()}</div>
-          <div className="mt-1 text-sm text-primary-foreground/70">
-            30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
-          </div>
-          <TapHint tone="onDark">施設ごとの内訳を見る</TapHint>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFeeOpen(true)}
-          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
-          aria-label={`この1日の待機 ${minutes}分。内訳を見る`}
-        >
-          <div className="text-sm text-muted-foreground">待たされた時間の合計</div>
-          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
-            {minutes.toLocaleString()}
-            <span className="ml-0.5 text-base font-bold">分</span>
-          </div>
-          <TapHint>内訳</TapHint>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFeeOpen(true)}
-          className="rounded-2xl border bg-card p-4 text-left shadow-sm"
-          aria-label={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
-        >
-          <div className="text-sm text-muted-foreground">訪問した施設</div>
-          <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
-            {feeRows.length}
-            <span className="ml-0.5 text-base font-bold">件</span>
-          </div>
-          <div className="text-xs text-muted-foreground">うち30分超 {overThirty}件</div>
-          <TapHint>内訳</TapHint>
-        </button>
-
-        {/* 下の4枚が何の話かを先に言う */}
-        <p className="col-span-2 mt-2 text-sm font-semibold lg:col-span-4 lg:mt-1">記録が書き換えにくい理由</p>
-
-        {INTEGRITY_POINTS.map((p, i) => {
-                    return (
+      {/* iPhone の「設定」のように、白い箱に1行ずつ並べる。押せる行には右に「›」。押すと下から詳しく出る */}
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+        <ListGroup title="架空のドライバーの1日（3施設を訪問）">
+          <li>
             <button
-              key={p.title}
               type="button"
-              onClick={() => setOpenPoint(i)}
-              className="flex min-h-[88px] flex-col justify-between gap-2 rounded-xl border border-l-4 border-sky-100 border-l-blue-400 bg-sky-50 p-3 text-left lg:min-h-[100px] lg:p-4"
-              aria-label={`${p.title}。詳しく見る`}
+              onClick={() => setFeeOpen(true)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+              aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
             >
-              <span className="text-sm font-semibold leading-snug">
-                {p.lines.map((l) => (
-                  <span key={l} className="inline-block">
-                    {l}
-                  </span>
-                ))}
+              <span className="min-w-0">
+                <span className="block text-sm text-muted-foreground">待機料（目安）</span>
+                <span className="block text-5xl font-bold tracking-tight tabular-nums">¥{fee.toLocaleString()}</span>
+                <span className="block text-xs text-muted-foreground">
+                  30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
+                </span>
               </span>
-              <TapHint>詳しく</TapHint>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden />
             </button>
-          );
-        })}
+          </li>
+          <ListRow
+            label="待たされた時間の合計"
+            value={`${minutes.toLocaleString()}分`}
+            onClick={() => setFeeOpen(true)}
+            ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
+          />
+          <ListRow
+            label="訪問した施設"
+            value={`${feeRows.length}件（うち30分超 ${overThirty}件）`}
+            onClick={() => setFeeOpen(true)}
+            ariaLabel={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
+          />
+        </ListGroup>
+
+        <ListGroup title="記録が書き換えにくい理由">
+          {INTEGRITY_POINTS.map((p, i) => (
+            <ListRow key={p.title} label={p.title} onClick={() => setOpenPoint(i)} ariaLabel={`${p.title}。詳しく見る`} />
+          ))}
+        </ListGroup>
       </div>
 
       <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
@@ -721,22 +680,6 @@ function DemoHero() {
 }
 
 /**
- * タイルが押せることを文字で示す（押さないと何かわからない、を防ぐ）。
- * 色だけに頼らず「›」と言葉を添える。読み上げはボタンの aria-label に任せる。
- */
-function TapHint({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "onDark" }) {
-  return (
-    <span
-      aria-hidden
-      className={`mt-2 inline-flex items-center gap-0.5 text-xs font-semibold ${tone === "onDark" ? "text-accent" : "text-primary"}`}
-    >
-      {children}
-      <ChevronRight className="h-3.5 w-3.5" />
-    </span>
-  );
-}
-
-/**
  * PC では下から出るシートを画面いっぱいに広げず、本文（左のサイドバーを除いた幅）の中央に浮いたカードとして出す。
  * スマホは今までどおり画面下いっぱいのシート。
  */
@@ -745,9 +688,9 @@ const SHEET_PC = "lg:left-60 lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl l
 
 /** 「3つの立場」のタブ */
 const DEMO_TABS = [
-  { value: "punch", label: "ドライバー", Icon: Truck },
-  { value: "kanban", label: "荷主", Icon: Building2 },
-  { value: "fee", label: "待機料", Icon: Coins },
+  { value: "punch", label: "ドライバー" },
+  { value: "kanban", label: "荷主" },
+  { value: "fee", label: "待機料" },
 ] as const;
 
 /** 切り替えても、再生位置・押したボタン・提出の状態を失わないよう、使っていないタブも残して隠す */
@@ -779,22 +722,15 @@ export default function Demo() {
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
         <DemoHero />
         <Tabs defaultValue="punch">
-          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
-            見る立場を選ぶ
-            <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-blue-800">
-              <MousePointerClick className="h-3.5 w-3.5" aria-hidden />
-              押して切り替え
-            </span>
-          </p>
-          {/* 3つあることが分かるよう、枠・アイコン・濃い文字にする。今開いている画面だけ色を塗る */}
-          <TabsList className="mb-4 h-auto w-full gap-2 bg-transparent p-0 text-foreground lg:max-w-xl">
-            {DEMO_TABS.map(({ value, label, Icon }) => (
+          <h3 className="mb-1.5 px-1 text-[13px] text-muted-foreground">見る立場を選ぶ</h3>
+          {/* iPhone の切り替え（セグメント）と同じ形。灰色の溝に、選んだ側だけ白い札が乗る */}
+          <TabsList className="mb-4 h-11 w-full rounded-xl bg-muted-foreground/15 p-1 lg:max-w-md">
+            {DEMO_TABS.map(({ value, label }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="min-h-12 flex-1 gap-1.5 border border-border bg-background text-sm font-semibold shadow-sm data-[state=inactive]:hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm lg:text-base"
+                className="h-full flex-1 rounded-lg text-[15px] font-medium text-foreground/70 data-[state=active]:bg-card data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow"
               >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
               </TabsTrigger>
             ))}

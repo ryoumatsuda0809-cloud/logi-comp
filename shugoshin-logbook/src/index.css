@@ -171,10 +171,18 @@
    本物の画面には付けない。.demo-app は各デモ画面のいちばん外側に付ける。 */
 @layer components {
   .demo-app {
+    /* iPhone の「設定」のように、ごく薄い灰色の地に、白い箱を置く。枠線と影で囲まない */
+    --background: 240 14% 96%;
     -webkit-tap-highlight-color: transparent;
     /* 画面が切り替わったときに、ふっと出す。transform を使わないのは、
        動いている間に下の固定ナビの位置がずれないようにするため（opacity は位置に影響しない） */
     animation: demo-fade-in 180ms ease-out both;
+  }
+  /* パネル（Card）は、枠線と影をやめて、白い角丸の箱にする */
+  .demo-app .bg-card.rounded-lg.border {
+    border-color: transparent;
+    border-radius: 1rem;
+    box-shadow: none;
   }
   /* 押した瞬間に少し沈む（指で押した手応え） */
   .demo-app button:not(:disabled):active,
