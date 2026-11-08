@@ -451,41 +451,53 @@ function FeePanel() {
   );
 }
 
+/** 2つの時刻の差（分）。どちらかが無ければ null */
+function minutesBetween(a: string | null, b: string | null): number | null {
+  if (!a || !b) return null;
+  return Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
+}
+
 /**
- * 1回の訪問の進み具合を、「到着 → 荷役開始 → 完了」の3つの丸と線で見せる（配達アプリの進み具合と同じ形）。
- * 荷役開始までが荷待ち時間。記録が無い段階は、灰色の丸のまま。
+ * 1回の訪問を、1本の帯で見せる。帯の長さ＝時間の長さ。左のオレンジが「待機」、右の濃紺が「作業」で、
+ * それぞれの帯の中に分数を直接書く（凡例や説明を別に置かない）。時刻は、帯の切れ目の真下に出す。
  */
-function VisitSteps({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
+function VisitBar({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
   const at = (types: string[]) => entries.find((e) => types.includes(e.eventType))?.timestamp ?? null;
-  const steps = [
-    { label: "到着", ts: at(["arrival"]) },
-    { label: "荷役開始", ts: at(["waiting_start"]) },
-    { label: "完了", ts: at(["departure", "work_end"]) },
-  ];
+  const arrival = at(["arrival"]);
+  const start = at(["waiting_start"]);
+  const end = at(["departure", "work_end"]);
+  const wait = minutesBetween(arrival, start);
+  const work = minutesBetween(start, end);
+  // 長さは時間に比例させる。ただし、中の文字が読めるよう、片方が全体の3割より短くならないようにする
+  const total = (wait ?? 0) + (work ?? 0);
+  const waitPct = wait === null || work === null || total === 0 ? 100 : Math.min(70, Math.max(30, (wait / total) * 100));
+  const over = wait !== null && wait > 30;
   return (
-    <ol className="mt-3 flex items-start">
-      {steps.map((st, i) => {
-        const done = st.ts !== null;
-        return (
-          <li key={st.label} className={`flex items-start ${i < steps.length - 1 ? "flex-1" : ""}`}>
-            <div className="flex w-14 shrink-0 flex-col items-center text-center">
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                  done ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {done && <Check className="h-4 w-4" strokeWidth={3} aria-hidden />}
-              </span>
-              <span className="mt-1 text-xs text-muted-foreground">{st.label}</span>
-              <span className="text-sm font-semibold tabular-nums">{formatTimeOrNull(st.ts)}</span>
-            </div>
-            {i < steps.length - 1 && (
-              <span aria-hidden className={`mt-3 h-1 flex-1 rounded-full ${done && steps[i + 1].ts ? "bg-accent" : "bg-muted"}`} />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="mt-3">
+      <div className="flex h-11 overflow-hidden rounded-full text-sm font-bold">
+        <div
+          className={`flex items-center justify-center whitespace-nowrap ${
+            wait === null ? "bg-muted text-muted-foreground" : over ? "bg-accent text-accent-foreground" : "bg-foreground/15 text-foreground"
+          }`}
+          style={{ width: `${waitPct}%` }}
+        >
+          {wait === null ? "待機 算定不能" : `待機 ${wait}分`}
+        </div>
+        {waitPct < 100 && (
+          <div className="flex items-center justify-center whitespace-nowrap bg-primary text-primary-foreground" style={{ width: `${100 - waitPct}%` }}>
+            作業 {work}分
+          </div>
+        )}
+      </div>
+      {/* 時刻は、帯の左端・切れ目・右端の真下 */}
+      <div className="relative mt-1.5 h-6 text-base font-bold tabular-nums">
+        <span className="absolute left-0">{formatTimeOrNull(arrival)}</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${waitPct}%` }}>
+          {formatTimeOrNull(start)}
+        </span>
+        {waitPct < 100 && <span className="absolute right-0">{formatTimeOrNull(end)}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -503,31 +515,21 @@ function TimelinePanel() {
       <CardContent>
         <ol className="divide-y divide-border/70">
           {visits.map((v) => (
-            <li key={v.key} className="py-3 text-sm first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-base font-semibold">{v.locationName}</span>
-                <span className="flex flex-wrap items-center gap-2">
-                  {v.evidenceGrade === "C" && (
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <NoticeMark />
-                      等級C
-                    </span>
-                  )}
-                  {v.waitMinutes === null ? (
-                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
-                      <NoticeMark />
-                      待機 算定不能
-                    </span>
-                  ) : (
-                    <span
-                      className={`text-sm font-bold tabular-nums ${v.waitMinutes > 30 ? "" : "text-muted-foreground"}`}
-                    >
-                      待機 {v.waitMinutes}分{v.waitMinutes > 30 && "・30分超"}
-                    </span>
-                  )}
+            <li key={v.key} className="py-5 first:pt-1 last:pb-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-lg font-bold">{v.locationName}</p>
+                <span className="inline-flex shrink-0 items-center gap-2">
+                  {v.evidenceGrade === "C" && <NoticeMark />}
+                  <span className={`text-lg font-bold tabular-nums ${v.waitMinutes === null || v.waitMinutes <= 30 ? "text-muted-foreground" : ""}`}>
+                    {v.waitMinutes === null
+                      ? "算定不能"
+                      : v.waitMinutes <= 30
+                        ? "対象外"
+                        : `${calcWaitCost(v.waitMinutes, DEMO_VEHICLE_CLASS).toLocaleString()}円`}
+                  </span>
                 </span>
               </div>
-              <VisitSteps entries={v.entries} />
+              <VisitBar entries={v.entries} />
             </li>
           ))}
         </ol>
