@@ -567,12 +567,10 @@ function DemoHero() {
   return (
     <section className="mb-5" aria-labelledby="demo-hero-title">
       <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-4xl">
-        {/* 読点で折り返す（語の途中で切れないように、句ごとにまとめる） */}
-        <span className="inline-block">荷捌き場で待った時間を、</span>
-        <span className="inline-block">あとから揉めない記録に。</span>
+        荷待ち時間の記録アプリ
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        施設で待たされた時間を記録し、荷主に出せる報告書と待機料の根拠にします。
+        荷捌き場で待たされた時間を、位置とサーバー時刻で記録します。荷主に出す報告書と、待機料の根拠になります。
       </p>
 
       {/* 大小のタイルで並べる（Bento）。いちばん伝えたい金額を大きく、根拠を小さく並べる。どれも押すと下から詳しく出る */}
