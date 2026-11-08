@@ -33,7 +33,7 @@ describe.each([
 
   it("印刷が動かない端末でも開けるよう、PDFの見本へのリンクがある（新しいタブで開く）", () => {
     renderAt(path);
-    const link = screen.getByRole("link", { name: "PDFの見本を開く" });
+    const link = screen.getByRole("link", { name: "PDF見本" });
     expect(link).toHaveAttribute("href", path === "/demo/report" ? "/samples/demo-report.pdf" : "/samples/demo-warning.pdf");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));

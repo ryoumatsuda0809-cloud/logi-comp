@@ -52,7 +52,7 @@ export function RiskReportSummary({ rows, monthLabel }: { rows: RiskReportRow[];
   return (
     <section
       aria-label="要約"
-      className="mb-4 space-y-1 rounded-xl border border-border bg-card p-4 text-sm leading-relaxed print:mb-4 print:border-black print:bg-white print:text-black"
+      className="mb-4 space-y-1 border-y border-border px-1 py-4 text-sm leading-relaxed print:mb-4 print:rounded-xl print:border print:border-black print:bg-white print:p-4 print:text-black"
     >
       <p className="font-semibold">
         {monthLabel}：{s.shipperCount}荷主で待機は計 {s.totalWaitMinutes}分、推定逸失利益は計 {yen(s.totalLossJpy)} です。

@@ -26,6 +26,9 @@ export interface RiskReportRow {
 
 function formatMonth(val: string | null): string {
   if (!val) return "—";
+  // "2026-09-01" を new Date に通すと端末のタイムゾーンで前月にずれることがあるので、文字から読む
+  const m = /^(\d{4})-(\d{2})/.exec(val);
+  if (m) return `${m[1]}年${Number(m[2])}月`;
   const d = new Date(val);
   return `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
@@ -47,14 +50,13 @@ function calcDailyLateInterest(unpaidJpy: number | null): number {
 function RiskBadge({ level }: { level: string | null }) {
   if (!level) return <span>—</span>;
   const styles: Record<string, string> = {
-    高: "bg-destructive text-destructive-foreground print:bg-transparent print:text-black print:border-2 print:border-black print:font-bold",
-    中: "bg-amber-500 text-white print:bg-transparent print:text-black print:border-2 print:border-black",
-    低: "bg-emerald-500 text-white print:bg-transparent print:text-black print:border-2 print:border-black",
+    // 画面は青の濃さで3段階（濃い=高、中くらい=中、うすい=低）。文字の「高・中・低」も必ず出す。印刷は白黒
+    高: "border-blue-700 bg-blue-700 text-white hover:bg-blue-700 print:bg-transparent print:text-black print:border-2 print:border-black print:font-bold",
+    中: "border-blue-200 bg-blue-200 text-blue-900 hover:bg-blue-200 print:bg-transparent print:text-black print:border-2 print:border-black",
+    低: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50 print:bg-transparent print:text-black print:border-2 print:border-black",
   };
   return (
-    <Badge className={`text-sm px-3 py-1 ${styles[level] || ""}`}>
-      <span className="print:hidden">{level === "高" ? "🔴 " : level === "中" ? "🟡 " : "🟢 "}</span>{level}
-    </Badge>
+    <Badge className={`px-3 py-1 text-sm ${styles[level] || ""}`}>{level}</Badge>
   );
 }
 
@@ -70,8 +72,19 @@ function averageMeasuredWait(row: RiskReportRow): number | null {
 }
 
 /** リスク判定のバッジと、その根拠になった平均待機を並べる。表とカードの両方で使う。 */
-function RiskCell({ row, align }: { row: RiskReportRow; align: "end" | "center" }) {
+function RiskCell({ row, align, dot = false }: { row: RiskReportRow; align: "end" | "center"; dot?: boolean }) {
   const avg = averageMeasuredWait(row);
+  if (dot && row.gmen_risk_level) {
+    // 一覧の行用: 小さな点（濃さで高・中・低）と文字。平均は括弧で添える
+    const dotColor = { 高: "bg-blue-700", 中: "bg-blue-400", 低: "bg-blue-200" }[row.gmen_risk_level] ?? "bg-muted";
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+        <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} aria-hidden />
+        <span className="font-bold text-foreground">{row.gmen_risk_level}</span>
+        <span className="text-xs text-muted-foreground">{avg === null ? "平均 —" : `平均 ${avg}分`}</span>
+      </span>
+    );
+  }
   return (
     <div className={`flex flex-col gap-1 ${align === "center" ? "items-center" : "items-end"}`}>
       <RiskBadge level={row.gmen_risk_level} />
@@ -219,7 +232,7 @@ export function RiskReportDocument({
       {!loading && rows.length > 0 && <RiskReportSummary rows={rows} monthLabel={monthLabel} />}
 
       {!loading && rows.length > 0 && (
-        <p className="mb-3 text-xs leading-relaxed text-muted-foreground print:text-gray-700">
+        <p className="mb-3 px-1 text-xs leading-relaxed text-muted-foreground print:p-0 print:text-gray-700">
           リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
           <strong className="font-semibold text-foreground print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
         </p>
@@ -241,63 +254,55 @@ export function RiskReportDocument({
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card shadow-sm print:border-black print:bg-white print:shadow-none">
+        <div className="border-y border-border bg-card print:rounded-xl print:border print:border-black print:bg-white print:shadow-none">
           {/* 狭い画面（md 未満）は、7列の表を横にスクロールさせず、1行ずつのカードにする。
               印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
-          <ul className="divide-y divide-border md:hidden print:hidden">
+          <ul className="divide-y divide-border/70 md:hidden print:hidden">
             {rows.map((row, i) => (
-              <li key={i} className="space-y-2 p-3">
+              <li key={i} className="space-y-1.5 py-3.5">
+                {/* iPhone の一覧のように、左に名前、右に金額。判定は小さな点と文字 */}
                 <div className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 font-semibold">
+                  <p className="min-w-0 text-base font-semibold">
                     {row.client_organization_name || "不明な荷主"}
                     {row.location_name && (
-                      <span className="block text-xs font-normal text-muted-foreground">
+                      <span className="block text-sm font-normal text-muted-foreground">
                         ＠ {row.location_name}
                       </span>
                     )}
                   </p>
-                  <RiskCell row={row} align="end" />
+                  <span className="shrink-0 text-right">
+                    <span className="block text-xl font-bold tabular-nums text-blue-900">
+                      {formatJpy(row.estimated_loss_jpy)}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">推定逸失利益</span>
+                  </span>
                 </div>
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">対象月</dt>
-                    <dd>{formatMonth(row.report_month)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">訪問回数</dt>
-                    <dd>
-                      {row.total_visits ?? 0}
-                      <VisitBreakdown row={row} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">総待機時間</dt>
-                    <dd className="font-semibold">{row.total_wait_minutes ?? 0}分</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">推定逸失利益</dt>
-                    <dd className="font-bold text-destructive">{formatJpy(row.estimated_loss_jpy)}</dd>
-                  </div>
-                  <div className="col-span-2">
-                    <dt className="text-xs text-muted-foreground">遅延利息の目安（1日あたり）</dt>
-                    <dd className="font-bold text-destructive">
-                      {formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}
-                    </dd>
-                  </div>
-                </dl>
+                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground tabular-nums">
+                  <span>
+                    待機 <span className="font-semibold text-foreground">{row.total_wait_minutes ?? 0}分</span>
+                    <span className="mx-1.5">・</span>
+                    訪問 <span className="font-semibold text-foreground">{row.total_visits ?? 0}</span>
+                  </span>
+                  <RiskCell row={row} align="end" dot />
+                </div>
+                <VisitBreakdown row={row} />
+                <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                  <span>遅延利息の目安（1日あたり）</span>
+                  <span className="font-semibold">{formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}</span>
+                </p>
               </li>
             ))}
           </ul>
           <Table className="hidden min-w-[40rem] md:table print:table print:min-w-0">
             <TableHeader>
               <TableRow className="print:border-black">
-                <TableHead className="font-bold print:text-black">荷主名 / 拠点</TableHead>
-                <TableHead className="font-bold print:text-black">対象月</TableHead>
-                <TableHead className="text-right font-bold print:text-black">訪問回数</TableHead>
-                <TableHead className="text-right font-bold print:text-black">総待機時間</TableHead>
-                <TableHead className="text-right font-bold print:text-black">推定逸失利益</TableHead>
+                <TableHead className="whitespace-nowrap font-bold print:text-black">荷主名 / 拠点</TableHead>
+                <TableHead className="whitespace-nowrap font-bold print:text-black">対象月</TableHead>
+                <TableHead className="whitespace-nowrap text-right font-bold print:text-black">訪問回数</TableHead>
+                <TableHead className="whitespace-nowrap text-right font-bold print:text-black">総待機時間</TableHead>
+                <TableHead className="whitespace-nowrap text-right font-bold print:text-black">推定逸失利益</TableHead>
                 <TableHead className="text-right font-bold print:text-black">遅延利息の目安（1日あたり）</TableHead>
-                <TableHead className="text-center font-bold print:text-black">リスク判定</TableHead>
+                <TableHead className="whitespace-nowrap text-center font-bold print:text-black">リスク判定</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -308,7 +313,7 @@ export function RiskReportDocument({
                       {row.client_organization_name || "不明な荷主"}
                     </span>
                     {row.location_name && (
-                      <span className="ml-1 text-xs text-muted-foreground print:text-gray-500">
+                      <span className="block text-xs text-muted-foreground print:text-gray-500">
                         ＠ {row.location_name}
                       </span>
                     )}
@@ -321,10 +326,10 @@ export function RiskReportDocument({
                   <TableCell className="text-right font-semibold print:text-black">
                     {row.total_wait_minutes ?? 0}分
                   </TableCell>
-                  <TableCell className="text-right font-bold text-destructive print:text-black">
+                  <TableCell className="text-right font-bold text-blue-900 print:text-black">
                     {formatJpy(row.estimated_loss_jpy)}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-destructive print:text-black">
+                  <TableCell className="text-right font-bold text-blue-900 print:text-black">
                     {formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}
                   </TableCell>
                   <TableCell>
@@ -356,7 +361,7 @@ export function RiskReportDocument({
 
       {/* Legal Disclaimer Footer */}
       <footer className="mt-8 border-t border-border pt-4 print:mt-12 print:border-black">
-        <p className="text-sm font-semibold leading-relaxed text-foreground print:text-black">
+        <p className="text-xs font-medium leading-relaxed text-slate-600 print:text-sm print:font-semibold print:text-black">
           本資料は記録データをもとにした参考資料です。
           {totalApprovedClaims > 0
             ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"

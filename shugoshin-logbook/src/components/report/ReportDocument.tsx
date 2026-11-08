@@ -51,7 +51,7 @@ const EVENT_LABELS: Record<string, string> = {
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" });
   } catch {
     return "--:--";
   }
@@ -145,7 +145,7 @@ export function ReportDocument({
             <div className="sm:text-right space-y-1 text-sm shrink-0">
               <div>
                 <span className="text-gray-500">{report.id.startsWith("live-") ? "作成日時: " : "提出日時: "}</span>
-                <span className="font-bold text-black">{new Date(report.submitted_at).toLocaleString("ja-JP")}</span>
+                <span className="font-bold text-black">{new Date(report.submitted_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span>
               </div>
               <div>
                 <span className="text-gray-500">報告書番号: </span>
