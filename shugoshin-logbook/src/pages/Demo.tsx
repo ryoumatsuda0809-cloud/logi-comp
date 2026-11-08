@@ -467,32 +467,38 @@ function WaitRing({ minutes }: { minutes: number | null }) {
   const frac = minutes === null ? 0 : Math.min(minutes, 60) / 60;
   const over = minutes !== null && minutes > 30;
   return (
-    <div className="flex w-[76px] shrink-0 flex-col items-center">
-      <div className="relative h-[76px] w-[76px]">
-        <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden>
-          <circle cx="38" cy="38" r={R} fill="none" strokeWidth="8" className="stroke-muted" />
-          <circle
-            cx="38"
-            cy="38"
-            r={R}
-            fill="none"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={`${frac * C} ${C}`}
-            className={over ? "stroke-accent" : "stroke-foreground/45"}
-          />
-          {/* 30分の印（1周=60分の半分＝円の下。円は左に -90度回してあるので、左の端に描くと下に出る） */}
-          <line x1={38 - R - 6} y1="38" x2={38 - R + 6} y2="38" strokeWidth="2.5" className="stroke-foreground" />
+    <div className="flex w-[88px] shrink-0 flex-col items-center">
+      <div className="relative h-[88px] w-[88px]">
+        <svg viewBox="0 0 88 88" className="h-full w-full" aria-hidden>
+          {/* 輪は、上から時計回りに伸びるよう、-90度回す */}
+          <g transform="rotate(-90 44 44)">
+            <circle cx="44" cy="44" r={R} fill="none" strokeWidth="8" className="stroke-muted" />
+            <circle
+              cx="44"
+              cy="44"
+              r={R}
+              fill="none"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={`${frac * C} ${C}`}
+              className={over ? "stroke-accent" : "stroke-foreground/45"}
+            />
+            {/* 30分の印（1周=60分の半分＝円の下。回転後の左の端が、下に出る） */}
+            <line x1={44 - R - 6} y1="44" x2={44 - R + 6} y2="44" strokeWidth="2.5" className="stroke-foreground" />
+          </g>
+          <text x="44" y="85" textAnchor="middle" className="fill-foreground text-[11px] font-bold">
+            30分
+          </text>
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center leading-none">
+        <div className="absolute inset-0 flex items-center justify-center leading-none" style={{ paddingBottom: 4 }}>
           <span className="text-xl font-bold tabular-nums">
             {minutes === null ? "—" : minutes}
             <span className="text-xs">分</span>
           </span>
         </div>
       </div>
-      <span className={`mt-1 text-xs font-bold ${over ? "text-foreground" : "text-muted-foreground"}`}>
-        {over ? "待機・30分超" : "待機"}
+      <span className={`text-xs font-bold ${over ? "text-foreground" : "text-muted-foreground"}`}>
+        {over ? "待機（30分超）" : "待機"}
       </span>
     </div>
   );
