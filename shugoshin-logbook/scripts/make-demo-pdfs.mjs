@@ -14,12 +14,15 @@ const outDir = process.argv[3];
 if (!outDir) throw new Error("outDir required");
 mkdirSync(outDir, { recursive: true });
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+// macOS の Chrome が既定。別の場所にあるときは CHROME_PATH で指す。作る PDF を絞るときは ONLY=warning（report / warning / order）
+const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const ONLY = process.env.ONLY;
+const want = (name) => !ONLY || ONLY === name;
 const PORT = 9333;
 const profile = join(tmpdir(), `demo-pdf-profile-${process.pid}`);
 const chrome = spawn(
   CHROME,
-  ["--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "--no-first-run", "--hide-scrollbars", "about:blank"],
+  ["--headless=new", ...(process.env.NO_SANDBOX ? ["--no-sandbox"] : []), `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "--no-first-run", "--hide-scrollbars", "about:blank"],
   { stdio: "ignore" },
 );
 
@@ -92,40 +95,46 @@ try {
 
   // 1) 報告書・警告レポート: 本物の印刷用 CSS（print:hidden など）をそのまま使う
   await send("Emulation.setEmulatedMedia", { media: "print" });
-  await goto("/demo/report");
-  await printPdf("demo-report.pdf");
-  await goto("/demo/warning");
-  await printPdf("demo-warning.pdf");
+  if (want("report")) {
+    await goto("/demo/report");
+    await printPdf("demo-report.pdf");
+  }
+  if (want("warning")) {
+    await goto("/demo/warning");
+    await printPdf("demo-warning.pdf");
+  }
 
-  // 2) 発注書: 例1を承認し、出てきた 4 条書面だけを印刷する
-  await send("Emulation.setEmulatedMedia", { media: "screen" });
-  await goto("/demo/orders");
-  if (!(await clickByText("例1"))) throw new Error("example 1 button not found");
-  await sleep(300);
-  if (!(await clickByText("AI解析"))) throw new Error("parse button not found");
-  await sleep(1500);
-  if (!(await clickByText("承認・保存"))) throw new Error("approve button not found");
-  await sleep(500);
-  if (!(await clickByText("承認して確定する"))) throw new Error("confirm button not found");
-  await sleep(1000);
-  const ok = await evaluate(`(() => {
-    const doc = document.querySelector('article[aria-label="発注書（架空）"]');
-    if (!doc) return false;
-    const clone = doc.cloneNode(true);
-    clone.style.border = 'none';
-    clone.style.borderRadius = '0';
-    clone.style.maxWidth = '720px';
-    clone.style.margin = '0 auto';
-    clone.style.background = '#fff';
-    document.body.replaceChildren(clone);
-    document.body.style.background = '#fff';
-    document.documentElement.classList.remove('dark');
-    return true;
-  })()`);
-  if (!ok) throw new Error("order document not found");
-  await sleep(300);
-  await send("Emulation.setEmulatedMedia", { media: "print" });
-  await printPdf("demo-order.pdf");
+  if (want("order")) {
+    // 2) 発注書: 例1を承認し、出てきた 4 条書面だけを印刷する
+    await send("Emulation.setEmulatedMedia", { media: "screen" });
+    await goto("/demo/orders");
+    if (!(await clickByText("例1"))) throw new Error("example 1 button not found");
+    await sleep(300);
+    if (!(await clickByText("AI解析"))) throw new Error("parse button not found");
+    await sleep(1500);
+    if (!(await clickByText("承認・保存"))) throw new Error("approve button not found");
+    await sleep(500);
+    if (!(await clickByText("承認して確定する"))) throw new Error("confirm button not found");
+    await sleep(1000);
+    const ok = await evaluate(`(() => {
+      const doc = document.querySelector('article[aria-label="発注書（架空）"]');
+      if (!doc) return false;
+      const clone = doc.cloneNode(true);
+      clone.style.border = 'none';
+      clone.style.borderRadius = '0';
+      clone.style.maxWidth = '720px';
+      clone.style.margin = '0 auto';
+      clone.style.background = '#fff';
+      document.body.replaceChildren(clone);
+      document.body.style.background = '#fff';
+      document.documentElement.classList.remove('dark');
+      return true;
+    })()`);
+    if (!ok) throw new Error("order document not found");
+    await sleep(300);
+    await send("Emulation.setEmulatedMedia", { media: "print" });
+    await printPdf("demo-order.pdf");
+  }
 } finally {
   ws.close();
   chrome.kill();

@@ -89,7 +89,7 @@ function RiskCell({ row, align, dot = false }: { row: RiskReportRow; align: "end
     <div className={`flex flex-col gap-1 ${align === "center" ? "items-center" : "items-end"}`}>
       <RiskBadge level={row.gmen_risk_level} />
       {row.gmen_risk_level && (
-        <span className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
+        <span className="whitespace-nowrap text-xs text-muted-foreground print:text-[10pt] print:text-black">
           {avg === null ? "平均 —" : `平均 ${avg}分`}
         </span>
       )}
@@ -106,7 +106,7 @@ function VisitBreakdown({ row }: { row: RiskReportRow }) {
   const approved = row.approved_claim_visits ?? 0;
   if (unmeasured <= 0 && approved <= 0) return null;
   return (
-    <div className="whitespace-nowrap text-xs text-muted-foreground print:text-gray-600">
+    <div className="whitespace-nowrap text-xs text-muted-foreground print:text-[10pt] print:text-black">
       {unmeasured > 0 && (
         <div>
           <span className="inline-flex items-center gap-1">
@@ -184,9 +184,7 @@ export function RiskReportDocument({
         <p className="flex items-start gap-1">
           <NoticeMark className="mt-0.5" />
           <span>
-            ※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（
-            {totalApprovedClaims}件）。GPS座標は打刻時点のものですが、
-            時刻についてはサーバーによる自動検証が行われていません。
+            {`※「圏外承認」は通信圏外で端末に記録され、運行管理者が承認した訪問です（${totalApprovedClaims}件）。GPS座標は打刻時点のものですが、時刻についてはサーバーによる自動検証が行われていません。`}
           </span>
         </p>
       )}
@@ -194,12 +192,12 @@ export function RiskReportDocument({
   );
 
   return (
-    <main className="mx-auto max-w-4xl p-4 pb-28 print:max-w-none print:p-0 print:pb-0 print:font-serif-jp">
+    <main className="mx-auto max-w-4xl p-4 pb-28 [line-break:strict] [text-wrap:pretty] [word-break:auto-phrase] print:max-w-none print:p-0 print:pb-0 print:font-serif-jp">
       {/* Report Title */}
       <div className="mb-6 text-center print:mb-8">
         {/* 発行元情報 */}
         <div className="mb-4 print:mb-6">
-          <p className="text-sm text-muted-foreground print:text-gray-600">
+          <p className="text-sm text-muted-foreground print:text-black">
             提出元:
             {orgName ? (
               <span className="ml-2 text-base font-bold text-foreground print:text-black">
@@ -209,7 +207,7 @@ export function RiskReportDocument({
               <Skeleton className="ml-2 inline-block h-5 w-40 align-middle print:hidden" />
             )}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground print:text-gray-600">
+          <p className="mt-1 text-sm text-muted-foreground print:text-black">
             発行日: {issueDate}
           </p>
         </div>
@@ -217,7 +215,7 @@ export function RiskReportDocument({
         <h1 className="text-balance text-xl font-extrabold text-foreground sm:text-2xl print:text-black print:text-3xl">
           <span className="inline-block">荷主別</span> <span className="inline-block">待機時間リスクレポート</span>
         </h1>
-        <p className="mt-0.5 text-xs text-muted-foreground print:text-gray-500">
+        <p className="mt-0.5 text-xs text-muted-foreground print:text-[10pt] print:text-black">
           守護神 — 物流記録管理システム
         </p>
       </div>
@@ -232,7 +230,7 @@ export function RiskReportDocument({
       {!loading && rows.length > 0 && <RiskReportSummary rows={rows} monthLabel={monthLabel} />}
 
       {!loading && rows.length > 0 && (
-        <p className="mb-3 px-1 text-xs leading-relaxed text-muted-foreground print:p-0 print:text-gray-700">
+        <p className="mb-3 px-1 text-xs leading-relaxed text-muted-foreground print:p-0 print:text-[10.5pt] print:text-black">
           リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
           <strong className="font-semibold text-foreground print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
         </p>
@@ -293,7 +291,7 @@ export function RiskReportDocument({
               </li>
             ))}
           </ul>
-          <Table className="hidden min-w-[40rem] md:table print:table print:min-w-0">
+          <Table className="hidden min-w-[40rem] md:table print:table print:min-w-0 print:text-[10pt] print:[&_td]:px-2 print:[&_th]:px-2">
             <TableHeader>
               <TableRow className="print:border-black">
                 <TableHead className="whitespace-nowrap font-bold print:text-black">荷主名 / 拠点</TableHead>
@@ -301,19 +299,19 @@ export function RiskReportDocument({
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">訪問回数</TableHead>
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">総待機時間</TableHead>
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">推定逸失利益</TableHead>
-                <TableHead className="text-right font-bold print:text-black">遅延利息の目安（1日あたり）</TableHead>
+                <TableHead className="text-right font-bold print:text-black">遅延利息の目安<br />（1日あたり）</TableHead>
                 <TableHead className="whitespace-nowrap text-center font-bold print:text-black">リスク判定</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((row, i) => (
-                <TableRow key={i} className="print:border-black">
+                <TableRow key={i} className="print:break-inside-avoid print:border-black">
                   <TableCell className="print:text-black">
                     <span className="font-semibold">
                       {row.client_organization_name || "不明な荷主"}
                     </span>
                     {row.location_name && (
-                      <span className="block text-xs text-muted-foreground print:text-gray-500">
+                      <span className="block whitespace-nowrap text-xs text-muted-foreground print:text-[10pt] print:text-black">
                         ＠ {row.location_name}
                       </span>
                     )}
@@ -352,7 +350,7 @@ export function RiskReportDocument({
             </summary>
             <div className="border-t border-border px-3 py-2">{notes}</div>
           </details>
-          <div className="mt-3 hidden text-xs text-muted-foreground print:block print:text-gray-600">
+          <div className="mt-3 hidden text-xs text-muted-foreground print:block print:break-inside-avoid print:text-[10pt] print:leading-relaxed print:text-black">
             <p className="mb-1 font-semibold print:text-black">注記</p>
             {notes}
           </div>
@@ -360,14 +358,14 @@ export function RiskReportDocument({
       )}
 
       {/* Legal Disclaimer Footer */}
-      <footer className="mt-8 border-t border-border pt-4 print:mt-12 print:border-black">
+      <footer className="mt-8 border-t border-border pt-4 print:mt-8 print:break-inside-avoid print:border-black">
         <p className="text-xs font-medium leading-relaxed text-slate-600 print:text-sm print:font-semibold print:text-black">
           本資料は記録データをもとにした参考資料です。
           {totalApprovedClaims > 0
             ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"
             : "記録された待機時間は、到着時の位置情報（GPS）とサーバー時刻にもとづく記録です。荷主との協議や待機料の請求の際の資料としてご利用いただけます。"}
         </p>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground print:text-gray-600">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground print:text-[10pt] print:text-black">
           遅延利息の目安は、年率14.6%を仮定して計算した参考値です。法的助言ではありません。
         </p>
       </footer>
