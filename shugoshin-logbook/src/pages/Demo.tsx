@@ -130,7 +130,7 @@ function GpsPanel() {
       <CardContent className="space-y-3">
         <svg
           viewBox={`0 0 ${VIEW_HALF_M * 2} ${VIEW_HALF_M * 2}`}
-          className="mx-auto w-full max-w-md rounded-lg border bg-muted/40"
+          className="mx-auto w-full max-w-md rounded-2xl bg-muted/50"
           role="img"
           aria-label="施設周辺のGPS軌跡"
         >
@@ -159,16 +159,16 @@ function GpsPanel() {
           </text>
         </svg>
 
-        <div className="grid grid-cols-3 gap-2 text-center text-sm">
-          <div className="rounded-lg border p-2">
+        <div className="grid grid-cols-3 divide-x divide-border text-center text-sm">
+          <div className="px-1 py-1">
             <div className="text-xs text-muted-foreground">時刻</div>
             <div className="font-semibold tabular-nums">{formatTimeOrNull(current.t)}</div>
           </div>
-          <div className="rounded-lg border p-2">
+          <div className="px-1 py-1">
             <div className="text-xs text-muted-foreground">施設まで</div>
             <div className="font-semibold tabular-nums">{distance.toLocaleString()} m</div>
           </div>
-          <div className="rounded-lg border p-2">
+          <div className="px-1 py-1">
             <div className="text-xs text-muted-foreground">状態</div>
             <div className="font-semibold text-balance">{PHASE_LABEL[current.phase]}</div>
           </div>
@@ -176,7 +176,7 @@ function GpsPanel() {
 
         {inFence && !stamped ? (
           // 施設の範囲に入った瞬間に、押すべきボタンを大きく出す。押すと到着打刻の時点まで進む（デモの中だけの動き）
-          <div className="rounded-xl border-2 border-accent bg-accent/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
+          <div className="rounded-2xl bg-muted/60 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <MapPin className="h-4 w-4 shrink-0 text-accent" aria-hidden />
               施設の{DEMO_GEOFENCE_RADIUS_M}m以内に入りました
@@ -196,7 +196,7 @@ function GpsPanel() {
           // 記録が確定した瞬間の手応え。印が一瞬で大きくなって現れる（動きを減らす設定では出さない）
           <div
             role="status"
-            className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
+            className="flex items-center gap-3 rounded-2xl bg-muted/60 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-500">
               <Check className="h-6 w-6" strokeWidth={3} aria-hidden />
@@ -209,13 +209,13 @@ function GpsPanel() {
             </div>
           </div>
         ) : (
-          <Button className="min-h-12 w-full" disabled>
+          <Button className="min-h-12 w-full bg-muted text-muted-foreground hover:bg-muted disabled:opacity-100" disabled>
             <Lock className="mr-2 h-4 w-4" />
             500m超のため打刻できません
           </Button>
         )}
         {!inFence && !stamped && (
-          <p className="flex items-center gap-2 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-sm text-foreground">
+          <p className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 shrink-0 text-warning" aria-hidden />
             施設から{DEMO_GEOFENCE_RADIUS_M}m以内に入ると押せます（あと {(distance - DEMO_GEOFENCE_RADIUS_M).toLocaleString()} m）
           </p>
@@ -224,8 +224,8 @@ function GpsPanel() {
         <div className="flex items-center gap-3">
           <Button
             size="sm"
-            variant={!playing && index === 0 ? "default" : "outline"}
-            className="min-h-11 shrink-0 gap-2"
+            variant="ghost"
+            className="min-h-11 shrink-0 gap-2 bg-muted hover:bg-muted/70"
             aria-label={playing ? "一時停止" : "1日の流れを再生"}
             onClick={() => {
               if (!playing && index >= last) setIndex(0);
@@ -252,7 +252,7 @@ function GpsPanel() {
             <button
               key={e.label}
               type="button"
-              className="min-h-11 rounded-full border px-3 hover:bg-muted"
+              className="min-h-11 rounded-full bg-muted/60 px-3 hover:bg-muted"
               onClick={() => {
                 const i = DEMO_TRACK.findIndex((p) => new Date(p.t) >= new Date(e.t));
                 setPlaying(false);
@@ -474,23 +474,23 @@ function VisitBar({ entries }: { entries: { eventType: string; timestamp: string
   const over = wait !== null && wait > 30;
   return (
     <div className="mt-3">
-      <div className="flex h-11 overflow-hidden rounded-full text-sm font-bold">
+      <div className="flex h-10 gap-0.5 overflow-hidden rounded-full text-sm font-semibold">
         <div
           className={`flex items-center justify-center whitespace-nowrap ${
-            wait === null ? "bg-muted text-muted-foreground" : over ? "bg-accent text-accent-foreground" : "bg-foreground/15 text-foreground"
+            wait === null ? "bg-muted text-muted-foreground" : over ? "bg-accent/25 text-foreground" : "bg-muted text-foreground/80"
           }`}
           style={{ width: `${waitPct}%` }}
         >
           {wait === null ? "待機 算定不能" : `待機 ${wait}分`}
         </div>
         {waitPct < 100 && (
-          <div className="flex items-center justify-center whitespace-nowrap bg-primary text-primary-foreground" style={{ width: `${100 - waitPct}%` }}>
+          <div className="flex items-center justify-center whitespace-nowrap bg-foreground/[0.06] text-foreground/80" style={{ width: `${100 - waitPct}%` }}>
             作業 {work}分
           </div>
         )}
       </div>
       {/* 時刻は、帯の左端・切れ目・右端の真下 */}
-      <div className="relative mt-1.5 h-6 text-base font-bold tabular-nums">
+      <div className="relative mt-1.5 h-6 text-[15px] font-semibold tabular-nums text-foreground/80">
         <span className="absolute left-0">{formatTimeOrNull(arrival)}</span>
         <span className="absolute -translate-x-1/2" style={{ left: `${waitPct}%` }}>
           {formatTimeOrNull(start)}
