@@ -19,7 +19,7 @@ import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
 import { Check, ChevronRight, Lock, MapPin, Pause, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { DriverMark, type DriverGlyph } from "@/components/demo/DriverMark";
+import { DriverMark, FishScatter, type DriverGlyph } from "@/components/demo/DriverMark";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -588,7 +588,8 @@ const INTEGRITY_POINTS: { title: string; body: string; glyph: DriverGlyph }[] = 
 /** シートの上の絵の場所。ほんのりオレンジの地に、絵が弾んで出る */
 function SheetArt({ glyph }: { glyph: DriverGlyph }) {
   return (
-    <div className="mx-4 mt-3 flex h-36 items-center justify-center rounded-3xl bg-accent/10">
+    <div className="relative isolate mx-4 mt-3 flex h-36 items-center justify-center overflow-hidden rounded-3xl bg-accent/10">
+      <FishScatter className="absolute -right-8 -top-6 -z-10 h-40 w-64 text-accent/20" />
       <DriverMark glyph={glyph} className="demo-pop h-28 w-auto" />
     </div>
   );
@@ -616,7 +617,9 @@ function DemoHero() {
   const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
 
   return (
-    <section className="mb-5" aria-labelledby="demo-hero-title">
+    <section className="relative isolate mb-5" aria-labelledby="demo-hero-title">
+      {/* 背景: 右上にうっすら泳ぐ魚（水産の飾り。文字と重なっても読めるよう、とても薄い） */}
+      <FishScatter className="absolute -right-6 -top-4 -z-10 h-44 w-72 text-primary/[0.07] lg:right-0 lg:h-52 lg:w-80" />
       <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-4xl">
         荷待ち時間の記録アプリ
       </h2>
