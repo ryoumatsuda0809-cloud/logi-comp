@@ -170,6 +170,14 @@
 /* ── デモ（/demo 系）だけの、スマホのアプリらしい手触り ──
    本物の画面には付けない。.demo-app は各デモ画面のいちばん外側に付ける。 */
 @layer components {
+  /* 字体は、日本のアプリ（LINE・Yahoo!・メルカリなど）と同じく、端末の標準にまかせる。
+     iPhone/Mac: 数字・英字は SF、日本語はヒラギノ角ゴ。Android: Roboto と Noto Sans CJK。Windows: Segoe UI と Yu Gothic UI。
+     端末にある字体を使う（どれも無いときだけ Noto Sans JP）。下から出るシートは body 直下に出るので、body にも当てる。 */
+  .demo-app,
+  body:has(.demo-app) {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+      "Yu Gothic UI", "Meiryo UI", "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
+  }
   .demo-app {
     /* 白い地に、細い線だけで区切る（箱で囲まない）。Public や talabat のような、平らな画面 */
     --background: 0 0% 100%;
