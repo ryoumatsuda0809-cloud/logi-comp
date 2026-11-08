@@ -83,11 +83,16 @@ export default function DemoReport() {
               ))}
             </ul>
           </section>
-          <FieldButton className="gap-3 lg:px-4 lg:text-base" onClick={() => window.print()}>
-            <Printer />
-            この報告書を印刷・PDF保存する
-          </FieldButton>
-          <DemoPdfLink href={DEMO_SAMPLE_PDF.report}>PDFの見本を開く</DemoPdfLink>
+          {/* 印刷は中身を読んだあとの操作なので、スマホでは小さく横に並べる */}
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
+            <FieldButton className="h-12 gap-2 px-3 text-base lg:h-[60px] lg:px-4" onClick={() => window.print()}>
+              <Printer />
+              印刷・PDF保存
+            </FieldButton>
+            <DemoPdfLink href={DEMO_SAMPLE_PDF.report} className="h-12 px-3 text-base lg:h-[60px] lg:px-4">
+              PDF見本
+            </DemoPdfLink>
+          </div>
           <p className="text-xs text-muted-foreground lg:hidden">
             印刷が動かない端末（ホーム画面から開いたアプリなど）では、PDFの見本を開いてください。
           </p>

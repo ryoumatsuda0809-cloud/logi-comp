@@ -19,14 +19,16 @@ export const DEMO_SAMPLE_PDF = {
 export function DemoPdfLink({
   href,
   fullWidth,
+  className = "",
   children,
 }: {
   href: (typeof DEMO_SAMPLE_PDF)[keyof typeof DEMO_SAMPLE_PDF];
   fullWidth?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <FieldButton asChild variant="outline" fullWidth={fullWidth} className="gap-3">
+    <FieldButton asChild variant="outline" fullWidth={fullWidth} className={`gap-3 ${className}`}>
       <a href={href} target="_blank" rel="noopener noreferrer">
         <FileDown />
         {children}

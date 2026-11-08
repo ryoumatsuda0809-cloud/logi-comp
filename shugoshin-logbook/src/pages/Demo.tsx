@@ -17,7 +17,7 @@ import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
-import { Building2, Check, ChevronRight, Clock, Coins, Layers, Lock, MapPin, MousePointerClick, Pause, Play, ShieldCheck, Truck } from "lucide-react";
+import { Building2, Check, ChevronRight, Coins, Lock, MapPin, MousePointerClick, Pause, Play, ShieldCheck, Truck } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { calcWaitCost, getRate, sumWaitCost, vehicleClassLabel } from "@/lib/waitCostCalc";
 import {
@@ -234,6 +234,7 @@ function GpsPanel() {
             {playing ? "一時停止" : "1日の流れを再生"}
           </Button>
           <Slider
+            className="h-11"
             value={[index]}
             min={0}
             max={last}
@@ -437,46 +438,61 @@ function FeePanel() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">
-          待機料の算定（{vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{rate}円/分・30分超過分のみ）
-        </CardTitle>
+        <CardTitle className="text-base">1日の待機料</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{rate}円/分・30分を超えた分だけ
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <ul className="space-y-2">
-          {rows.map(({ log, mins, fee }) => (
-            <li key={log.id} className="rounded-lg border p-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
-                <Badge variant={log.evidence_grade === "C" ? "outline" : "secondary"}>
-                  {log.evidence_grade === "C" ? "等級C：承認済みの申告" : "等級A：サーバー検証済"}
-                </Badge>
-              </div>
-              <div className="mt-1 flex items-baseline justify-between tabular-nums">
-                <span className="text-muted-foreground">
-                  到着 {formatTimeOrNull(effectiveArrival(log))} → 荷役開始 {formatTimeOrNull(loadingStartedAt(log))}（{mins ?? "-"}分）
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap pl-2 text-base font-semibold">
-                  {fee === null && <NoticeMark />}
-                  {fee === null ? "算定不能" : `${fee.toLocaleString()}円`}
-                </span>
-              </div>
-              {mins !== null && mins <= 30 && (
-                <p className="mt-1 text-xs text-muted-foreground">30分以内のため課金対象外</p>
-              )}
-              {log.evidence_grade === "C" && (
-                <p className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
-                  <NoticeMark className="mt-0.5" />
-                  電波圏外のため後から申告。申告された時刻で算定し、等級Cと明示します。
-                </p>
-              )}
-            </li>
-          ))}
+          {rows.map(({ log, mins, fee }) => {
+            const over = mins !== null && mins > 30;
+            return (
+              <li key={log.id} className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold">{DEMO_FACILITY_NAMES[log.facility_id]}</span>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      log.evidence_grade === "C" ? "bg-blue-200 text-blue-900" : "bg-white text-blue-700"
+                    }`}
+                  >
+                    {log.evidence_grade === "C" ? "等級C" : "等級A"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-end justify-between gap-2 tabular-nums">
+                  <div>
+                    <p className={`text-2xl font-extrabold ${over ? "text-blue-800" : "text-slate-500"}`}>
+                      {mins ?? "-"}
+                      <span className="ml-0.5 text-sm font-bold">分</span>
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatTimeOrNull(effectiveArrival(log))} → {formatTimeOrNull(loadingStartedAt(log))}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-base font-bold ${
+                      fee === null || fee === 0 ? "bg-white text-slate-500" : "bg-blue-700 text-white"
+                    }`}
+                  >
+                    {fee === null && <NoticeMark />}
+                    {fee === null ? "算定不能" : fee === 0 ? "対象外" : `${fee.toLocaleString()}円`}
+                  </span>
+                </div>
+                {log.evidence_grade === "C" && (
+                  <p className="mt-2 flex items-start gap-1 text-xs text-slate-500">
+                    <NoticeMark className="mt-0.5" />
+                    電波圏外のため、あとから申告した記録
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
-        <div className="flex items-baseline justify-between border-t pt-3">
-          <span className="text-sm text-muted-foreground">
-            1日の合計（待機1回ごとに30分を控除）
+        <div className="flex items-baseline justify-between rounded-xl bg-blue-100 px-4 py-3">
+          <span className="text-sm font-bold text-blue-900">合計</span>
+          <span className="shrink-0 whitespace-nowrap text-3xl font-extrabold tabular-nums text-blue-900">
+            {total.toLocaleString()}円
           </span>
-          <span className="shrink-0 whitespace-nowrap pl-2 text-2xl font-bold tabular-nums">{total.toLocaleString()}円</span>
         </div>
       </CardContent>
     </Card>
@@ -622,18 +638,14 @@ function DemoHero() {
         <p className="col-span-2 mt-2 text-sm font-semibold lg:col-span-4 lg:mt-1">記録が書き換えにくい理由</p>
 
         {INTEGRITY_POINTS.map((p, i) => {
-          const Icon = POINT_ICONS[i] ?? ShieldCheck;
-          return (
+                    return (
             <button
               key={p.title}
               type="button"
               onClick={() => setOpenPoint(i)}
-              className="flex min-h-[96px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm lg:min-h-[120px] lg:p-4"
+              className="flex min-h-[88px] flex-col justify-between gap-2 rounded-xl border border-l-4 border-sky-100 border-l-blue-400 bg-sky-50 p-3 text-left lg:min-h-[100px] lg:p-4"
               aria-label={`${p.title}。詳しく見る`}
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-success">
-                <Icon className="h-4 w-4" aria-hidden />
-              </span>
               <span className="text-sm font-semibold leading-snug">
                 {p.lines.map((l) => (
                   <span key={l} className="inline-block">
@@ -731,9 +743,6 @@ function TapHint({ children, tone = "default" }: { children: ReactNode; tone?: "
 // after:hidden は vaul がシートの下に伸ばす背景（引っぱったときの隙間埋め）を消す。浮かせると下に白い帯として見えるため
 const SHEET_PC = "lg:left-60 lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl lg:after:hidden";
 
-/** 「改ざんされにくい理由」のタイルの印（INTEGRITY_POINTS と同じ順） */
-const POINT_ICONS = [Clock, MapPin, Lock, Layers];
-
 /** 「3つの立場」のタブ */
 const DEMO_TABS = [
   { value: "punch", label: "ドライバー", Icon: Truck },
@@ -771,8 +780,8 @@ export default function Demo() {
         <DemoHero />
         <Tabs defaultValue="punch">
           <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
-            同じ1日を、3つの立場で見る
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent/25 px-2 py-0.5 text-xs font-bold text-foreground">
+            見る立場を選ぶ
+            <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-blue-800">
               <MousePointerClick className="h-3.5 w-3.5" aria-hidden />
               押して切り替え
             </span>
@@ -790,7 +799,6 @@ export default function Demo() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <p className="-mt-2 mb-3 text-xs text-muted-foreground">タップで切り替え。ドライバー・荷主・待機料で、同じデータの見え方が変わります。</p>
 
           <TabsContent value="punch" forceMount className={`space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 ${KEEP_TAB}`}>
             <GpsPanel />

@@ -118,12 +118,20 @@ export function diffMinutes(a: string | null, b: string | null): number | null {
 /**
  * 時刻フォーマット（HH:MM）。nullの場合は "未記録" を返す
  */
+// 端末のタイムゾーンで変わらないよう、時刻は常に日本時間（JST）で出す
+const JST_HM = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 export function formatTimeOrNull(iso: string | null): string {
   if (!iso) return "未記録";
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return "未記録";
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return JST_HM.format(d);
   } catch {
     return "未記録";
   }
