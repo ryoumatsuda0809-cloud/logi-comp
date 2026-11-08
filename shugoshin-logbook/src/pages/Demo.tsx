@@ -458,51 +458,71 @@ function minutesBetween(a: string | null, b: string | null): number | null {
 }
 
 /**
- * 1回の訪問を、上から下への縦の流れで見せる（時刻 → できごと）。
- * 点と点のあいだに「待機 72分」「作業 35分」を書く。荷役開始までが荷待ち時間で、30分を超えたら線をオレンジにする。
+ * 待ち時間の輪。時計やタイマーのアプリのように、1周=60分で、待った分だけ色が伸びる。
+ * 下の小さな印が30分（ここから先が待機料の対象）。30分を超えたらオレンジ、以内は灰色。真ん中に分数。
  */
+function WaitRing({ minutes }: { minutes: number | null }) {
+  const R = 27;
+  const C = 2 * Math.PI * R;
+  const frac = minutes === null ? 0 : Math.min(minutes, 60) / 60;
+  const over = minutes !== null && minutes > 30;
+  return (
+    <div className="flex w-[76px] shrink-0 flex-col items-center">
+      <div className="relative h-[76px] w-[76px]">
+        <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden>
+          <circle cx="38" cy="38" r={R} fill="none" strokeWidth="8" className="stroke-muted" />
+          <circle
+            cx="38"
+            cy="38"
+            r={R}
+            fill="none"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={`${frac * C} ${C}`}
+            className={over ? "stroke-accent" : "stroke-foreground/45"}
+          />
+          {/* 30分の印（1周=60分の半分＝円の下。円は左に -90度回してあるので、左の端に描くと下に出る） */}
+          <line x1={38 - R - 6} y1="38" x2={38 - R + 6} y2="38" strokeWidth="2.5" className="stroke-foreground" />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center leading-none">
+          <span className="text-xl font-bold tabular-nums">
+            {minutes === null ? "—" : minutes}
+            <span className="text-xs">分</span>
+          </span>
+        </div>
+      </div>
+      <span className={`mt-1 text-xs font-bold ${over ? "text-foreground" : "text-muted-foreground"}`}>
+        {over ? "待機・30分超" : "待機"}
+      </span>
+    </div>
+  );
+}
+
+/** 1回の訪問: 左に待ち時間の輪、右に「いつ着いて、いつ荷役が始まり、いつ終わったか」 */
 function VisitTimeline({ entries }: { entries: { eventType: string; timestamp: string | null }[] }) {
   const at = (types: string[]) => entries.find((e) => types.includes(e.eventType))?.timestamp ?? null;
   const arrival = at(["arrival"]);
   const start = at(["waiting_start"]);
   const end = at(["departure", "work_end"]);
-  const rows = [
-    { label: "到着打刻", ts: arrival },
-    { label: "荷役開始", ts: start },
-    { label: "作業完了", ts: end },
-  ];
-  const gaps = [
-    { name: "待機", mins: minutesBetween(arrival, start), warn: true },
-    { name: "作業", mins: minutesBetween(start, end), warn: false },
-  ];
+  const work = minutesBetween(start, end);
   return (
-    <ol className="mt-3">
-      {rows.map((r, i) => {
-        const gap = gaps[i];
-        const over = gap?.warn && gap.mins !== null && gap.mins > 30;
-        return (
-          <li key={r.label}>
-            <div className="flex items-center gap-3">
-              <span className={`h-3.5 w-3.5 shrink-0 rounded-full ${r.ts ? "bg-foreground" : "bg-border"}`} aria-hidden />
-              <span className="w-14 shrink-0 text-lg font-bold tabular-nums">{formatTimeOrNull(r.ts)}</span>
-              <span className="text-base">{r.label}</span>
-            </div>
-            {gap && (
-              <div className="flex items-center gap-3">
-                <span aria-hidden className="flex w-3.5 shrink-0 justify-center">
-                  <span className={`h-10 w-0.5 ${over ? "bg-accent" : "bg-border"}`} />
-                </span>
-                <span className="w-14 shrink-0" aria-hidden />
-                <span className={`text-[15px] tabular-nums ${over ? "font-bold text-foreground" : "font-medium text-foreground/75"}`}>
-                  {gap.name} {gap.mins === null ? "算定不能" : `${gap.mins}分`}
-                  {over && "（30分超）"}
-                </span>
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="mt-3 flex items-center gap-4">
+      <WaitRing minutes={minutesBetween(arrival, start)} />
+      <dl className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-sm text-muted-foreground">到着</dt>
+          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(arrival)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-sm text-muted-foreground">荷役開始（待機おわり）</dt>
+          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(start)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-sm text-muted-foreground">作業完了{work !== null && `（作業 ${work}分）`}</dt>
+          <dd className="text-lg font-bold tabular-nums">{formatTimeOrNull(end)}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
