@@ -65,7 +65,7 @@ export function RiskReportSummary({ rows, monthLabel }: { rows: RiskReportRow[];
         </p>
       )}
       {caveats.length > 0 && (
-        <p className="flex items-start gap-1 text-xs text-muted-foreground print:text-gray-700">
+        <p className="flex items-start gap-1 text-xs text-muted-foreground print:text-[10pt] print:text-black">
           <NoticeMark className="mt-0.5" />
           <span>※ {caveats.join("、")}を含みます。</span>
         </p>
