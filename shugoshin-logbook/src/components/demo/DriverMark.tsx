@@ -58,3 +58,31 @@ export function DriverMark({ glyph, className = "" }: { glyph: DriverGlyph; clas
     </svg>
   );
 }
+
+/** 魚1匹の形（頭が左）。色は currentColor。 */
+function Fish({ x, y, scale = 1, rotate = 0, flip = false }: { x: number; y: number; scale?: number; rotate?: number; flip?: boolean }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${rotate}) scale(${flip ? -scale : scale} ${scale})`}>
+      <path d="M0 30C20 4 74 4 96 30C74 56 20 56 0 30Z" fill="currentColor" />
+      <path d="M92 30L118 10L111 30L118 50Z" fill="currentColor" />
+      <circle cx="24" cy="26" r="3.5" fill="#fff" />
+    </g>
+  );
+}
+
+/**
+ * 背景にうっすら泳ぐ魚。色は currentColor（呼び出し側で薄くする）。
+ * 飾りなので、読み上げず、押せず、印刷にも出さない。
+ */
+export function FishScatter({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 280 170" className={`pointer-events-none select-none print:hidden ${className}`} aria-hidden>
+      <Fish x={120} y={6} scale={1.15} rotate={-8} />
+      <Fish x={38} y={78} scale={0.78} rotate={6} />
+      <Fish x={206} y={104} scale={0.58} rotate={-4} flip />
+      <circle cx="26" cy="40" r="5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="58" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx="262" cy="86" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
