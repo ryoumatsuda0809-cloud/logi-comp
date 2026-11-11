@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -130,7 +129,7 @@ function GpsPanel() {
       <CardContent className="space-y-3">
         <svg
           viewBox={`0 0 ${VIEW_HALF_M * 2} ${VIEW_HALF_M * 2}`}
-          className="mx-auto w-full max-w-md rounded-2xl bg-muted/50"
+          className="mx-auto w-full max-w-md rounded-2xl bg-white/60"
           role="img"
           aria-label="施設周辺のGPS軌跡"
         >
@@ -287,17 +286,16 @@ const KANBAN_INITIAL: KanbanTicket[] = [
   { no: 16, arrival: "2026-10-03T09:02:00+09:00", status: "waiting" },
 ];
 
-// 列ごとの色（待機=橙、呼出=青、荷役=緑）。色だけに頼らず、列の名前・件数・文字も残す
-// 列の色は、見出しの小さな点だけ（待機=橙、呼出=青、荷役=緑）。色だけに頼らず、列の名前と件数も出す
+// 列の色は、見出しの小さな点だけ（待機=橙、呼出=紺、荷役=緑）。色だけに頼らず、列の名前と件数も出す
 const KANBAN_COLUMNS: {
   status: KanbanStatus;
   label: string;
   action?: { label: string; next: KanbanStatus };
   dot: string;
 }[] = [
-  { status: "waiting", label: "待機中", action: { label: "呼出", next: "called" }, dot: "bg-amber-500" },
-  { status: "called", label: "呼出済", action: { label: "荷役開始", next: "working" }, dot: "bg-blue-500" },
-  { status: "working", label: "荷役中", dot: "bg-emerald-500" },
+  { status: "waiting", label: "待機中", action: { label: "呼出", next: "called" }, dot: "bg-accent" },
+  { status: "called", label: "呼出済", action: { label: "荷役開始", next: "working" }, dot: "bg-primary" },
+  { status: "working", label: "荷役中", dot: "bg-success" },
 ];
 
 function elapsedMinutes(from: string) {
@@ -334,7 +332,7 @@ function KanbanPanel() {
           {KANBAN_COLUMNS.map((col) => {
             const items = tickets.filter((t) => t.status === col.status);
             return (
-              <div key={col.status} className="rounded-xl bg-muted/60 p-2">
+              <div key={col.status} className="rounded-2xl bg-foreground/[0.05] p-2">
                 <div className="mb-2 flex items-center justify-between text-sm font-bold">
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} aria-hidden />
@@ -349,11 +347,11 @@ function KanbanPanel() {
                     <p className="py-3 text-center text-xs text-muted-foreground">なし</p>
                   )}
                   {items.map((t) => (
-                    <div key={t.no} className="rounded-lg bg-card p-3 text-sm">
+                    <div key={t.no} className="rounded-xl bg-card p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-xl font-bold tabular-nums">#{String(t.no).padStart(3, "0")}</span>
                         {col.status === "waiting" && (
-                          <span className="text-xs font-semibold text-amber-600 tabular-nums">
+                          <span className="text-xs font-semibold text-[#9a3412] tabular-nums">
                             待機 {elapsedMinutes(t.arrival)}分
                           </span>
                         )}
@@ -474,23 +472,23 @@ function VisitBar({ entries }: { entries: { eventType: string; timestamp: string
   const over = wait !== null && wait > 30;
   return (
     <div className="mt-3">
-      <div className="flex h-10 gap-0.5 overflow-hidden rounded-full text-sm font-semibold">
+      <div className="flex h-10 gap-[3px] text-sm font-semibold">
         <div
-          className={`flex items-center justify-center whitespace-nowrap ${
-            wait === null ? "bg-muted text-muted-foreground" : over ? "bg-accent/25 text-foreground" : "bg-muted text-foreground/80"
+          className={`flex items-center justify-center whitespace-nowrap rounded-xl ${
+            wait === null || !over ? "bg-foreground/[0.06] text-muted-foreground" : "bg-[#ffedd5] text-[#9a3412]"
           }`}
           style={{ width: `${waitPct}%` }}
         >
           {wait === null ? "待機 算定不能" : `待機 ${wait}分`}
         </div>
         {waitPct < 100 && (
-          <div className="flex items-center justify-center whitespace-nowrap bg-foreground/[0.06] text-foreground/80" style={{ width: `${100 - waitPct}%` }}>
+          <div className="flex items-center justify-center whitespace-nowrap rounded-xl bg-foreground/[0.06] text-muted-foreground" style={{ width: `${100 - waitPct}%` }}>
             作業 {work}分
           </div>
         )}
       </div>
       {/* 時刻は、帯の左端・切れ目・右端の真下 */}
-      <div className="relative mt-1.5 h-6 text-[15px] font-semibold tabular-nums text-foreground/80">
+      <div className="relative mt-1.5 h-5 text-[13px] font-medium tabular-nums text-muted-foreground">
         <span className="absolute left-0">{formatTimeOrNull(arrival)}</span>
         <span className="absolute -translate-x-1/2" style={{ left: `${waitPct}%` }}>
           {formatTimeOrNull(start)}
@@ -513,14 +511,14 @@ function TimelinePanel() {
         <CardTitle className="text-base">打刻タイムライン</CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="divide-y divide-border/70">
+        <ol className="divide-y divide-[var(--demo-hair)]">
           {visits.map((v) => (
-            <li key={v.key} className="py-5 first:pt-1 last:pb-1">
+            <li key={v.key} className="py-4 first:pt-1 last:pb-1">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-bold">{v.locationName}</p>
+                <p className="text-[15px] font-bold">{v.locationName}</p>
                 <span className="inline-flex shrink-0 items-center gap-2">
                   {v.evidenceGrade === "C" && <NoticeMark />}
-                  <span className={`text-lg font-bold tabular-nums ${v.waitMinutes === null || v.waitMinutes <= 30 ? "text-muted-foreground" : ""}`}>
+                  <span className={`text-[15px] font-bold tabular-nums ${v.waitMinutes === null || v.waitMinutes <= 30 ? "text-muted-foreground" : ""}`}>
                     {v.waitMinutes === null
                       ? "算定不能"
                       : v.waitMinutes <= 30
@@ -538,41 +536,18 @@ function TimelinePanel() {
   );
 }
 
-/** 白い地に、細い線で区切った一覧。小さな灰色の見出しを上に付ける（箱では囲まない） */
-function ListGroup({ title, children }: { title?: string; children: ReactNode }) {
+/** 1行。押せる行は、右に「›」を出す（押すと詳しく出ることを、文字ではなく形で示す） */
+function ListRow({ label, onClick, ariaLabel }: { label: string; onClick: () => void; ariaLabel?: string }) {
   return (
-    <section className="mt-6">
-      {title && <h3 className="mb-1 text-[13px] text-muted-foreground">{title}</h3>}
-      <ul className="divide-y divide-border border-y border-border">{children}</ul>
-    </section>
-  );
-}
-
-/** 1行。押せる行は、右に値と「›」を出す（押すと詳しく出ることを、文字ではなく形で示す） */
-function ListRow({
-  label,
-  value,
-  onClick,
-  ariaLabel,
-}: {
-  label: string;
-  value?: string;
-  onClick: () => void;
-  ariaLabel?: string;
-}) {
-  return (
-    <li>
+    <li className="border-t border-[var(--demo-hair)] first:border-t-0 lg:[&:nth-child(2)]:border-t-0">
       <button
         type="button"
         onClick={onClick}
         aria-label={ariaLabel}
-        className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left"
+        className="flex min-h-[52px] w-full items-center justify-between gap-3 py-3 text-left"
       >
-        <span className="text-[17px]">{label}</span>
-        <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
-          {value && <span className="text-[17px] font-semibold tabular-nums text-foreground">{value}</span>}
-          <ChevronRight className="h-5 w-5 text-muted-foreground/60" aria-hidden />
-        </span>
+        <span className="text-[15px] font-medium">{label}</span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden />
       </button>
     </li>
   );
@@ -584,6 +559,8 @@ const INTEGRITY_POINTS: { title: string; body: string; glyph: DriverGlyph }[] = 
   { title: "確定した証拠は書き換え不可", glyph: "lock", body: "署名済みの証拠は、管理者権限でも変更・削除できません。" },
   { title: "例外は等級で区別", glyph: "layers", body: "電波圏外の申告は管理者の承認を経た「等級C」として、通常の記録と区別して提示します。" },
 ];
+/** 「圏外の申告」の数字から開く説明（例外は等級で区別） */
+const GRADE_POINT_INDEX = 3;
 
 /** シートの上の絵の場所。ほんのりオレンジの地に、絵が弾んで出る */
 function SheetArt({ glyph }: { glyph: DriverGlyph }) {
@@ -595,12 +572,76 @@ function SheetArt({ glyph }: { glyph: DriverGlyph }) {
   );
 }
 
-/** シートの下の、丸いボタン2つ（左は枠だけ、右はオレンジで塗る） */
+/** シートの下の、丸いボタン（閉じるは枠だけ、進むボタンはオレンジで塗る） */
 const PILL = "h-12 flex-1 rounded-full text-base font-bold";
+
+/** 「記録が書き換えにくい理由」の1つを、下から出るシートで見せる */
+function PointSheet({ index, onClose }: { index: number | null; onClose: () => void }) {
+  const point = index === null ? null : INTEGRITY_POINTS[index];
+  return (
+    <Drawer open={point !== null} onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent className={SHEET_PC}>
+        {point && (
+          <>
+            <SheetArt glyph={point.glyph} />
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="text-xl font-bold">{point.title}</DrawerTitle>
+              <DrawerDescription className="text-base text-foreground">{point.body}</DrawerDescription>
+            </DrawerHeader>
+            <DrawerFooter className="flex-row" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+              <DrawerClose asChild>
+                <Button className={`${PILL} bg-primary text-primary-foreground hover:bg-primary/90`}>閉じる</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </>
+        )}
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+/** 数字のカード1枚。数字は大きく太く、単位は小さく添える。押すと内訳が出る */
+function Stat({
+  label,
+  value,
+  unit,
+  note,
+  onClick,
+  ariaLabel,
+  primary = false,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  note: string;
+  onClick: () => void;
+  ariaLabel: string;
+  primary?: boolean;
+}) {
+  const sub = primary ? "text-white/85" : "text-muted-foreground";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={`flex min-h-[116px] flex-col justify-between gap-2 p-4 text-left lg:min-h-[132px] lg:px-5 lg:py-[18px] ${
+        primary ? "demo-key" : "demo-glass"
+      }`}
+    >
+      <span className={`text-[13px] font-semibold ${sub}`}>{label}</span>
+      <span className="text-[34px] font-extrabold leading-none tracking-tight tabular-nums">
+        {value}
+        {unit && <small className="ml-0.5 text-[15px] font-bold">{unit}</small>}
+      </span>
+      <span className={`text-xs ${sub}`}>{note}</span>
+    </button>
+  );
+}
 
 /**
  * 最初に見える要約。初めて開いた人が、技術の説明より先に「何のアプリで、何が残るか」を読めるようにする。
  * 数字は待機料タブと同じ計算（convertWaitLogsToTimeline / sumWaitCost）から出す。
+ * 橙のカードは、この画面で一番大事な数字（待機料）の1枚だけ。
  */
 function DemoHero() {
   const navigate = useNavigate();
@@ -614,80 +655,55 @@ function DemoHero() {
   const [feeOpen, setFeeOpen] = useState(false);
   const feeRows = useMemo(() => demoFeeRows(), []);
   const overThirty = feeRows.filter((r) => r.mins !== null && r.mins > 30).length;
-  const point = openPoint === null ? null : INTEGRITY_POINTS[openPoint];
+  const gradeC = feeRows.filter((r) => r.log.evidence_grade === "C").length;
 
   return (
     <section className="relative isolate mb-5" aria-labelledby="demo-hero-title">
       {/* 背景: 右上にうっすら泳ぐ魚（水産の飾り。文字と重なっても読めるよう、とても薄い） */}
-      <FishScatter className="absolute -right-6 -top-4 -z-10 h-44 w-72 text-primary/[0.07] lg:right-0 lg:h-52 lg:w-80" />
-      <h2 id="demo-hero-title" className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-4xl">
-        荷待ち時間の記録アプリ
+      <FishScatter className="absolute -right-4 -top-4 -z-10 h-44 w-72 text-primary/[0.06] lg:right-0 lg:h-52 lg:w-80" />
+      <h2 id="demo-hero-title" className="text-[22px] font-extrabold leading-tight tracking-tight lg:text-[26px]">
+        荷待ち時間の記録
       </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        荷捌き場で待たされた時間を、位置とサーバー時刻で記録します。荷主に出す報告書と、待機料の根拠になります。
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        架空のドライバーの1日（2026年10月3日・{feeRows.length}施設）。位置とサーバー時刻で記録し、待機料の根拠にします。
       </p>
 
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-10">
-        <div>
-          {/* いちばん大きい数字を、箱に入れず、左上にそのまま置く（証券アプリの残高と同じ置き方） */}
-          <p className="mt-6 text-[13px] text-muted-foreground">架空のドライバーの1日（3施設を訪問）</p>
-          <button
-            type="button"
-            onClick={() => setFeeOpen(true)}
-            className="mt-1 flex w-full items-end justify-between gap-3 text-left"
-            aria-label={`この1日の待機料の目安 ${fee}円。内訳を見る`}
-          >
-            <span className="min-w-0">
-              <span className="block text-[3.5rem] font-bold leading-none tracking-tight tabular-nums">
-                ¥{fee.toLocaleString()}
-              </span>
-              <span className="mt-2 block text-sm text-muted-foreground">
-                待機料（目安）・30分を超えた待機 × {getRate(DEMO_VEHICLE_CLASS)}円/分
-              </span>
-            </span>
-            <ChevronRight className="mb-1 h-6 w-6 shrink-0 text-muted-foreground/60" aria-hidden />
-          </button>
-          <ListGroup>
-            <ListRow
-              label="待たされた時間の合計"
-              value={`${minutes.toLocaleString()}分`}
-              onClick={() => setFeeOpen(true)}
-              ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
-            />
-            <ListRow
-              label="訪問した施設"
-              value={`${feeRows.length}件（うち30分超 ${overThirty}件）`}
-              onClick={() => setFeeOpen(true)}
-              ariaLabel={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
-            />
-          </ListGroup>
-        </div>
-
-        <ListGroup title="記録が書き換えにくい理由">
-          {INTEGRITY_POINTS.map((p, i) => (
-            <ListRow key={p.title} label={p.title} onClick={() => setOpenPoint(i)} ariaLabel={`${p.title}。詳しく見る`} />
-          ))}
-        </ListGroup>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-[1.25fr_1fr_1fr_1fr] lg:gap-4">
+        <Stat
+          primary
+          label="待機料（目安）"
+          value={`¥${fee.toLocaleString()}`}
+          note={`30分超の待機 × ${getRate(DEMO_VEHICLE_CLASS)}円/分`}
+          onClick={() => setFeeOpen(true)}
+          ariaLabel={`この1日の待機料の目安 ${fee}円。内訳を見る`}
+        />
+        <Stat
+          label="待たされた時間"
+          value={minutes.toLocaleString()}
+          unit="分"
+          note={`${feeRows.length}施設の合計`}
+          onClick={() => setFeeOpen(true)}
+          ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
+        />
+        <Stat
+          label="訪問した施設"
+          value={String(feeRows.length)}
+          unit="件"
+          note={`うち30分超 ${overThirty}件`}
+          onClick={() => setFeeOpen(true)}
+          ariaLabel={`訪問 ${feeRows.length}件、うち30分超 ${overThirty}件。内訳を見る`}
+        />
+        <Stat
+          label="圏外の申告"
+          value={String(gradeC)}
+          unit="件"
+          note="等級C・管理者が承認"
+          onClick={() => setOpenPoint(GRADE_POINT_INDEX)}
+          ariaLabel={`圏外の申告 ${gradeC}件。等級の説明を見る`}
+        />
       </div>
 
-      <Drawer open={point !== null} onOpenChange={(open) => !open && setOpenPoint(null)}>
-        <DrawerContent className={SHEET_PC}>
-          {point && (
-            <>
-              <SheetArt glyph={point.glyph} />
-              <DrawerHeader className="text-left">
-                <DrawerTitle className="text-xl font-bold">{point.title}</DrawerTitle>
-                <DrawerDescription className="text-base text-foreground">{point.body}</DrawerDescription>
-              </DrawerHeader>
-              <DrawerFooter className="flex-row" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-                <DrawerClose asChild>
-                  <Button className={`${PILL} bg-accent text-accent-foreground hover:bg-accent/90`}>閉じる</Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </>
-          )}
-        </DrawerContent>
-      </Drawer>
+      <PointSheet index={openPoint} onClose={() => setOpenPoint(null)} />
 
       <Drawer open={feeOpen} onOpenChange={setFeeOpen}>
         <DrawerContent className={SHEET_PC}>
@@ -717,7 +733,7 @@ function DemoHero() {
           </div>
           <DrawerFooter className="flex-row" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <DrawerClose asChild>
-              <Button variant="outline" className={`${PILL} border-2 border-foreground/80`}>
+              <Button variant="outline" className={`${PILL} border-[1.5px] border-foreground/20`}>
                 閉じる
               </Button>
             </DrawerClose>
@@ -731,12 +747,30 @@ function DemoHero() {
   );
 }
 
+/** 記録が書き換えにくい理由。押すと、下から出るシートで説明する */
+function IntegrityPanel() {
+  const [openPoint, setOpenPoint] = useState<number | null>(null);
+  return (
+    <section className="demo-glass mt-4 p-5" aria-labelledby="demo-integrity-title">
+      <h3 id="demo-integrity-title" className="mb-2 text-[15px] font-bold">
+        記録が書き換えにくい理由
+      </h3>
+      <ul className="lg:grid lg:grid-cols-2 lg:gap-x-10">
+        {INTEGRITY_POINTS.map((p, i) => (
+          <ListRow key={p.title} label={p.title} onClick={() => setOpenPoint(i)} ariaLabel={`${p.title}。詳しく見る`} />
+        ))}
+      </ul>
+      <PointSheet index={openPoint} onClose={() => setOpenPoint(null)} />
+    </section>
+  );
+}
+
 /**
  * PC では下から出るシートを画面いっぱいに広げず、本文（左のサイドバーを除いた幅）の中央に浮いたカードとして出す。
  * スマホは今までどおり画面下いっぱいのシート。
  */
 // after:hidden は vaul がシートの下に伸ばす背景（引っぱったときの隙間埋め）を消す。浮かせると下に白い帯として見えるため
-const SHEET_PC = "lg:left-60 lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl lg:after:hidden";
+const SHEET_PC = "lg:left-[17rem] lg:mx-auto lg:bottom-6 lg:max-w-lg lg:rounded-2xl lg:after:hidden";
 
 /** 「3つの立場」のタブ */
 const DEMO_TABS = [
@@ -755,32 +789,33 @@ const KEEP_TAB = "data-[state=inactive]:hidden";
 export default function Demo() {
   return (
     <div className="demo-app min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-primary px-4 py-3 shadow-md lg:hidden" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent">
-            <img src="/icon-192.png" alt="" className="h-8 w-8 rounded-md" />
+      {/* スマホだけ: いちばん上に名前（PC は左のメニューに出ている） */}
+      <header className="px-4 pb-1 pt-3 lg:hidden" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+        <div className="mx-auto flex max-w-4xl items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent">
+            <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-primary-foreground">守護神</h1>
-            <p className="truncate text-xs text-primary-foreground/70">デモ</p>
+            <h1 className="truncate text-[17px] font-bold leading-tight">守護神</h1>
+            <p className="truncate text-xs text-muted-foreground">デモ</p>
           </div>
         </div>
       </header>
 
-      <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
+      <p className="px-4 pt-2 text-xs text-muted-foreground lg:px-8 lg:pt-5">
         架空のデータです。実在の施設・人物・取引とは無関係です。
-      </div>
+      </p>
 
-      <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-6xl lg:px-8 lg:pb-12 lg:pt-8">
+      <main className="mx-auto max-w-4xl p-4 pb-28 lg:mx-0 lg:max-w-[1100px] lg:px-8 lg:pb-12 lg:pt-3">
         <DemoHero />
         <Tabs defaultValue="punch">
-          {/* 証券アプリのように、文字だけのタブ。今開いている画面の下に太い線が引かれる */}
-          <TabsList className="mb-4 h-12 w-full justify-start gap-7 rounded-none border-b border-border bg-transparent p-0">
+          {/* 丸い切り替え。今開いているものを紺で塗る */}
+          <TabsList className="mb-4 inline-flex h-auto rounded-full bg-foreground/[0.06] p-1">
             {DEMO_TABS.map(({ value, label }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="h-full rounded-none border-b-[3px] border-transparent bg-transparent px-1 text-[17px] font-medium text-muted-foreground shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="min-h-11 rounded-full px-5 text-sm font-semibold text-muted-foreground shadow-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
               >
                 {label}
               </TabsTrigger>
@@ -801,6 +836,7 @@ export default function Demo() {
             <DemoSubmitPanel />
           </TabsContent>
         </Tabs>
+        <IntegrityPanel />
       </main>
 
       <DemoBottomNav />
