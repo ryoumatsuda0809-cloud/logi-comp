@@ -18,6 +18,8 @@ const row = (over: Partial<RiskReportRow> = {}): RiskReportRow => ({
 // jsdom は CSS を適用しないので、表（md 以上と印刷）とカード（md 未満）の両方が DOM に出る。
 // 実際の画面では、どちらか一方だけが見える。
 const BOTH = 2;
+// 遅延利息の目安は、紙（印刷）の表にだけ出す。画面のカードと表には出さない
+const PRINT_ONLY = 1;
 
 const renderDoc = (rows: RiskReportRow[], extra: Partial<Parameters<typeof RiskReportDocument>[0]> = {}) =>
   render(
@@ -35,7 +37,7 @@ describe("RiskReportDocument", () => {
     renderDoc([row({ estimated_loss_jpy: 50000 })]);
     expect(screen.getAllByText("¥50,000")).toHaveLength(BOTH);
     // 50,000 × 0.146 ÷ 365 = 20。月次を年換算した旧式（¥87,600）は出さない
-    expect(screen.getAllByText("¥20")).toHaveLength(BOTH);
+    expect(screen.getAllByText("¥20")).toHaveLength(PRINT_ONLY);
     expect(screen.queryByText("¥87,600")).toBeNull();
     expect(screen.getByText("架空運送株式会社")).toBeTruthy();
   });
@@ -43,17 +45,22 @@ describe("RiskReportDocument", () => {
   it("遅延利息の1日あたりの額は円未満を四捨五入する", () => {
     renderDoc([row({ estimated_loss_jpy: 12345 })]);
     // 12,345 × 0.146 ÷ 365 = 4.938... → 5
-    expect(screen.getAllByText("¥5")).toHaveLength(BOTH);
+    expect(screen.getAllByText("¥5")).toHaveLength(PRINT_ONLY);
   });
 
   it("遅延利息の列は「1日あたりの目安」と分かる見出しにし、年率を仮定した参考値であると書く", () => {
-    renderDoc([row()]);
-    // 表の見出し・カードの見出しに出る
-    expect(screen.getAllByText(/遅延利息の目安（1日あたり）/).length).toBeGreaterThanOrEqual(BOTH);
+    const { container } = renderDoc([row()]);
+    // 紙の表の見出しにだけ出る（画面では列ごと隠す）。カードには出さない
+    const head = [...container.querySelectorAll("th")].find((th) => th.textContent === "遅延利息の目安（1日あたり）")!;
+    expect(head.className).toContain("hidden");
+    expect(head.className).toContain("print:table-cell");
+    expect(within(container.querySelector("ul")!).queryByText(/遅延利息/)).toBeNull();
     expect(screen.queryByText(/遅延損害金/)).toBeNull();
     expect(screen.getByText(/遅延利息の目安は、年率14\.6%を仮定して計算した参考値です。法的助言ではありません。/)).toBeTruthy();
-    // 計算式の注記は画面用（折りたたみ）と印刷用の2か所に出る
-    expect(screen.getAllByText(/推定逸失利益 × 年率14\.6% ÷ 365日/)).toHaveLength(2);
+    // 計算式の注記は、画面用（折りたたみ）と印刷用の2か所にあるが、どちらも紙にだけ出る
+    const formula = screen.getAllByText(/推定逸失利益 × 年率14\.6% ÷ 365日/);
+    expect(formula).toHaveLength(2);
+    for (const el of formula) expect(el.className).toContain("print:block");
     expect(screen.queryByText(/取適法|中小受託|国土交通省|支払う義務/)).toBeNull();
   });
 
@@ -114,7 +121,8 @@ describe("RiskReportDocument", () => {
     expect(within(cards!).getByText(/架空冷蔵/)).toBeTruthy();
     expect(within(cards!).getByText("168分")).toBeTruthy();
     expect(within(cards!).getByText("¥1,750")).toBeTruthy();
-    expect(within(cards!).getByText("¥1")).toBeTruthy();
+    // 遅延利息の目安（¥1）は、カードには出さない
+    expect(within(cards!).queryByText("¥1")).toBeNull();
     expect(within(cards!).getByText("中")).toBeTruthy();
   });
 
@@ -154,7 +162,7 @@ describe("RiskReportDocument", () => {
     expect(printed.textContent).toContain("待機料の考え方");
     expect(printed.textContent).toContain("年率14.6%");
     expect(printed.textContent).toContain("算定不可");
-    expect(details.querySelector("summary")!.textContent).toBe("注記：金額の算定方法・遅延利息の目安・算定不可");
+    expect(details.querySelector("summary")!.textContent).toBe("注記：金額の算定方法・算定不可");
     expect(details.textContent).toContain(printed.textContent!.replace(/^注記/, ""));
   });
 

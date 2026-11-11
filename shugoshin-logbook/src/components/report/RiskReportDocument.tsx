@@ -159,7 +159,6 @@ export function RiskReportDocument({
   // 折りたたみの見出し。中身にある注記の種類だけを挙げる
   const notesLabel = [
     "注記：金額の算定方法",
-    "遅延利息の目安",
     totalUnmeasured > 0 && "算定不可",
     totalApprovedClaims > 0 && "圏外承認",
   ].filter(Boolean).join("・");
@@ -169,7 +168,8 @@ export function RiskReportDocument({
       <p>
         ※ 推定逸失利益は、待機料の考え方にもとづき、待機1回ごとに30分を差し引いた時間に車格別の単価を乗じて算定した額です。
       </p>
-      <p>
+      {/* 遅延利息は紙にだけ出す列なので、その注記も紙にだけ出す */}
+      <p className="hidden print:block">
         ※ 遅延利息の目安は、推定逸失利益が未払のままのとき、1日遅れるごとに加わる額（推定逸失利益 × 年率14.6% ÷ 365日）です。実際の額は、未払額と遅れた日数で決まります。
       </p>
       {totalUnmeasured > 0 && (
@@ -194,9 +194,9 @@ export function RiskReportDocument({
   return (
     <main className="mx-auto max-w-4xl p-4 pb-28 [line-break:strict] [text-wrap:pretty] [word-break:auto-phrase] print:max-w-none print:p-0 print:pb-0 print:font-serif-jp">
       {/* Report Title */}
-      <div className="mb-6 text-center print:mb-8">
+      <div className="mb-4 text-center print:mb-8">
         {/* 発行元情報 */}
-        <div className="mb-4 print:mb-6">
+        <div className="hidden print:mb-6 print:block">
           <p className="text-sm text-muted-foreground print:text-black">
             提出元:
             {orgName ? (
@@ -215,7 +215,7 @@ export function RiskReportDocument({
         <h1 className="text-balance text-xl font-extrabold text-foreground sm:text-2xl print:text-black print:text-3xl">
           <span className="inline-block">荷主別</span> <span className="inline-block">待機時間リスクレポート</span>
         </h1>
-        <p className="mt-0.5 text-xs text-muted-foreground print:text-[10pt] print:text-black">
+        <p className="hidden print:mt-0.5 print:block print:text-[10pt] print:text-black">
           守護神 — 物流記録管理システム
         </p>
       </div>
@@ -230,10 +230,17 @@ export function RiskReportDocument({
       {!loading && rows.length > 0 && <RiskReportSummary rows={rows} monthLabel={monthLabel} />}
 
       {!loading && rows.length > 0 && (
-        <p className="mb-3 px-1 text-xs leading-relaxed text-muted-foreground print:p-0 print:text-[10.5pt] print:text-black">
-          リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
-          <strong className="font-semibold text-foreground print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
-        </p>
+        <>
+          {/* 画面: 判定の基準だけを1行で。紙: 判定のしかたの説明も付ける */}
+          <p className="mb-3 px-1 text-xs text-muted-foreground print:hidden">
+            判定（訪問1回の平均待機）：
+            <strong className="font-semibold text-foreground">60分以上＝高、30分以上＝中、30分未満＝低</strong>
+          </p>
+          <p className="mb-3 hidden print:block print:p-0 print:text-[10.5pt] print:leading-relaxed print:text-black">
+            リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
+            <strong className="font-semibold print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
+          </p>
+        </>
       )}
 
       {/* Data Table */}
@@ -253,7 +260,8 @@ export function RiskReportDocument({
         </div>
       ) : (
         <div className="border-y border-border bg-card print:rounded-xl print:border print:border-black print:bg-white print:shadow-none">
-          {/* 狭い画面（md 未満）は、7列の表を横にスクロールさせず、1行ずつのカードにする。
+          {/* 画面の表は5列（対象月と遅延利息の目安は紙だけ。対象月は上に出ていて、遅延利息は年率を仮定した参考値のため）。
+              狭い画面（md 未満）は、表を横にスクロールさせず、1行ずつのカードにする。
               印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
           <ul className="divide-y divide-border/70 md:hidden print:hidden">
             {rows.map((row, i) => (
@@ -284,22 +292,18 @@ export function RiskReportDocument({
                   <RiskCell row={row} align="end" dot />
                 </div>
                 <VisitBreakdown row={row} />
-                <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-                  <span>遅延利息の目安（1日あたり）</span>
-                  <span className="font-semibold">{formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}</span>
-                </p>
               </li>
             ))}
           </ul>
-          <Table className="hidden min-w-[40rem] md:table print:table print:min-w-0 print:text-[10pt] print:[&_td]:px-2 print:[&_th]:px-2">
+          <Table className="hidden md:table print:table print:min-w-0 print:text-[10pt] print:[&_td]:px-2 print:[&_th]:px-2">
             <TableHeader>
               <TableRow className="print:border-black">
                 <TableHead className="whitespace-nowrap font-bold print:text-black">荷主名 / 拠点</TableHead>
-                <TableHead className="whitespace-nowrap font-bold print:text-black">対象月</TableHead>
+                <TableHead className="hidden whitespace-nowrap font-bold print:table-cell print:text-black">対象月</TableHead>
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">訪問回数</TableHead>
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">総待機時間</TableHead>
                 <TableHead className="whitespace-nowrap text-right font-bold print:text-black">推定逸失利益</TableHead>
-                <TableHead className="text-right font-bold print:text-black">遅延利息の目安<br />（1日あたり）</TableHead>
+                <TableHead className="hidden text-right font-bold print:table-cell print:text-black">遅延利息の目安<br />（1日あたり）</TableHead>
                 <TableHead className="whitespace-nowrap text-center font-bold print:text-black">リスク判定</TableHead>
               </TableRow>
             </TableHeader>
@@ -316,7 +320,7 @@ export function RiskReportDocument({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap print:text-black">{formatMonth(row.report_month)}</TableCell>
+                  <TableCell className="hidden whitespace-nowrap print:table-cell print:text-black">{formatMonth(row.report_month)}</TableCell>
                   <TableCell className="text-right print:text-black">
                     {row.total_visits ?? 0}
                     <VisitBreakdown row={row} />
@@ -327,7 +331,7 @@ export function RiskReportDocument({
                   <TableCell className="text-right font-bold text-blue-900 print:text-black">
                     {formatJpy(row.estimated_loss_jpy)}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-blue-900 print:text-black">
+                  <TableCell className="hidden text-right font-bold text-blue-900 print:table-cell print:text-black">
                     {formatJpy(calcDailyLateInterest(row.estimated_loss_jpy))}
                   </TableCell>
                   <TableCell>
@@ -358,16 +362,21 @@ export function RiskReportDocument({
       )}
 
       {/* Legal Disclaimer Footer */}
-      <footer className="mt-8 border-t border-border pt-4 print:mt-8 print:break-inside-avoid print:border-black">
-        <p className="text-xs font-medium leading-relaxed text-slate-600 print:text-sm print:font-semibold print:text-black">
-          本資料は記録データをもとにした参考資料です。
-          {totalApprovedClaims > 0
-            ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"
-            : "記録された待機時間は、到着時の位置情報（GPS）とサーバー時刻にもとづく記録です。荷主との協議や待機料の請求の際の資料としてご利用いただけます。"}
+      <footer className="mt-6 border-t border-border pt-3 print:mt-8 print:break-inside-avoid print:border-black print:pt-4">
+        <p className="text-xs text-muted-foreground print:hidden">
+          記録データをもとにした参考資料です。法的助言ではありません。
         </p>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground print:text-[10pt] print:text-black">
-          遅延利息の目安は、年率14.6%を仮定して計算した参考値です。法的助言ではありません。
-        </p>
+        <div className="hidden print:block">
+          <p className="print:text-sm print:font-semibold print:leading-relaxed print:text-black">
+            本資料は記録データをもとにした参考資料です。
+            {totalApprovedClaims > 0
+              ? "記録された待機時間は、GPSおよび端末ログにより担保されたもの（サーバー時刻で検証済み）と、通信圏外のため運行管理者が承認したもの（時刻の自動検証なし）で構成されています。後者は上記の「圏外承認」件数をご確認ください。"
+              : "記録された待機時間は、到着時の位置情報（GPS）とサーバー時刻にもとづく記録です。荷主との協議や待機料の請求の際の資料としてご利用いただけます。"}
+          </p>
+          <p className="mt-3 print:text-[10pt] print:leading-relaxed print:text-black">
+            遅延利息の目安は、年率14.6%を仮定して計算した参考値です。法的助言ではありません。
+          </p>
+        </div>
       </footer>
     </main>
   );

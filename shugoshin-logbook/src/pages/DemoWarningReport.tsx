@@ -50,10 +50,6 @@ export default function DemoWarningReport() {
                 PDF見本
               </DemoPdfLink>
             </div>
-            {/* PC では印刷が動くので、この説明は出さない */}
-            <p className="text-center text-xs text-muted-foreground lg:hidden">
-              印刷が動かない端末（ホーム画面から開いたアプリなど）では、PDFの見本を開いてください。
-            </p>
           </div>
         }
       />
