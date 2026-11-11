@@ -258,7 +258,8 @@ export function RiskReportDocument({
           </p>
         </div>
       ) : (
-        <div className="border-y border-border bg-card print:rounded-xl print:border print:border-black print:bg-white print:shadow-none">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card px-4 md:px-0 print:overflow-visible print:rounded-xl print:border-black print:bg-white print:px-0 print:shadow-none">
+          {/* 白い面の中に左右の余白を取る（px-4）。余白が無いと、面の端と文字の端が重なって、文字が切れているように見える */}
           {/* 画面の表は5列（対象月と遅延利息の目安は紙だけ。対象月は上に出ていて、遅延利息は年率を仮定した参考値のため）。
               狭い画面（md 未満）は、表を横にスクロールさせず、1行ずつのカードにする。
               印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
