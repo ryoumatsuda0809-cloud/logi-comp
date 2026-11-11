@@ -39,7 +39,6 @@ export default function DemoWarningReport() {
         monthLabel={DEMO_REPORT_MONTH_LABEL}
         controls={
           <div className="mb-4 flex flex-col items-center gap-3 print:hidden lg:mb-4 lg:flex-row lg:justify-center lg:gap-4">
-            <p className="text-sm font-semibold text-foreground">対象月: {DEMO_REPORT_MONTH_LABEL}</p>
             {/* 印刷は中身を読んだあとの操作なので、スマホでは小さく横に並べる（中身を画面の上に出す） */}
             <div className="grid w-full grid-cols-2 gap-2 lg:w-auto lg:gap-4">
               <FieldButton fullWidth={false} className="h-12 gap-2 px-3 text-base lg:h-[60px] lg:px-8 lg:text-lg" onClick={() => window.print()}>

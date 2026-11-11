@@ -35,7 +35,8 @@ const renderDoc = (rows: RiskReportRow[], extra: Partial<Parameters<typeof RiskR
 describe("RiskReportDocument", () => {
   it("行の金額と、遅延利息の1日あたりの目安（未払額×年率14.6%÷365）を出す", () => {
     renderDoc([row({ estimated_loss_jpy: 50000 })]);
-    expect(screen.getAllByText("¥50,000")).toHaveLength(BOTH);
+    // 行（表とカード）と、画面の要約の合計（行が1つなので同じ額）
+    expect(screen.getAllByText("¥50,000")).toHaveLength(BOTH + 1);
     // 50,000 × 0.146 ÷ 365 = 20。月次を年換算した旧式（¥87,600）は出さない
     expect(screen.getAllByText("¥20")).toHaveLength(PRINT_ONLY);
     expect(screen.queryByText("¥87,600")).toBeNull();
@@ -94,8 +95,8 @@ describe("RiskReportDocument", () => {
         monthLabel="2026年9月"
       />,
     );
-    // 表とカードの内訳で 2 種 × 2、注記（画面用・印刷用）で 2 つ × 2、表の上の要約で 1 つ
-    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2 * 2 + 1);
+    // 表とカードの内訳で 2 種 × 2、注記（画面用・印刷用）で 2 つ × 2、表の上の要約（画面用・印刷用）で 2 つ
+    expect(container.querySelectorAll("svg")).toHaveLength(2 * BOTH + 2 * 2 + 2);
     // マークは飾りなので読み上げない。意味は隣の文が持つ
     container.querySelectorAll("svg").forEach((svg) => {
       expect(svg.getAttribute("aria-hidden")).toBe("true");
@@ -167,8 +168,11 @@ describe("RiskReportDocument", () => {
   });
 
   it("推定逸失利益を見出しの用語にし、待機料は算定の考え方の説明にだけ使う", () => {
-    renderDoc([row()]);
-    expect(screen.getAllByText("推定逸失利益").length).toBeGreaterThanOrEqual(BOTH);
+    const { container } = renderDoc([row()]);
+    // 表の見出しと、画面の要約に1度ずつ。カードの行ごとには繰り返さない
+    expect(screen.getByRole("columnheader", { name: "推定逸失利益" })).toBeTruthy();
+    expect(screen.getByText(/^推定逸失利益（2026年9月・1荷主の合計）$/)).toBeTruthy();
+    expect(within(container.querySelector("ul")!).queryByText(/推定逸失利益/)).toBeNull();
     expect(screen.getAllByText(/推定逸失利益は、待機料の考え方にもとづき、待機1回ごとに30分を差し引いた/)).toHaveLength(2);
     expect(screen.queryByText(/待機料は待機1回ごとに30分を控除/)).toBeNull();
   });

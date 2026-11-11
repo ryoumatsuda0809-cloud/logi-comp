@@ -75,13 +75,12 @@ function averageMeasuredWait(row: RiskReportRow): number | null {
 function RiskCell({ row, align, dot = false }: { row: RiskReportRow; align: "end" | "center"; dot?: boolean }) {
   const avg = averageMeasuredWait(row);
   if (dot && row.gmen_risk_level) {
-    // 一覧の行用: 小さな点（濃さで高・中・低）と文字。平均は括弧で添える
+    // 一覧の行用: 小さな点（濃さで高・中・低）と文字だけ。平均は、同じカードの下の行に出す
     const dotColor = { 高: "bg-blue-700", 中: "bg-blue-400", 低: "bg-blue-200" }[row.gmen_risk_level] ?? "bg-muted";
     return (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
         <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} aria-hidden />
         <span className="font-bold text-foreground">{row.gmen_risk_level}</span>
-        <span className="text-xs text-muted-foreground">{avg === null ? "平均 —" : `平均 ${avg}分`}</span>
       </span>
     );
   }
@@ -265,32 +264,26 @@ export function RiskReportDocument({
               印刷は紙の幅が md 未満でも表のまま（print: で表を出し、カードを隠す）。 */}
           <ul className="divide-y divide-border/70 md:hidden print:hidden">
             {rows.map((row, i) => (
-              <li key={i} className="space-y-1.5 py-3.5">
-                {/* iPhone の一覧のように、左に名前、右に金額。判定は小さな点と文字 */}
-                <div className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 text-base font-semibold">
-                    {row.client_organization_name || "不明な荷主"}
-                    {row.location_name && (
-                      <span className="block text-sm font-normal text-muted-foreground">
-                        ＠ {row.location_name}
-                      </span>
-                    )}
-                  </p>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-xl font-bold tabular-nums text-blue-900">
-                      {formatJpy(row.estimated_loss_jpy)}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">推定逸失利益</span>
+              <li key={i} className="space-y-1 py-3">
+                {/* 1行目: 名前と金額。2行目: 拠点と判定。3行目: 回数・待機・平均。
+                    金額が何の額かは、上の要約に1度だけ書いてある（行ごとには繰り返さない） */}
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="min-w-0 text-base font-semibold">{row.client_organization_name || "不明な荷主"}</p>
+                  <span className="shrink-0 text-xl font-bold tabular-nums text-blue-900">
+                    {formatJpy(row.estimated_loss_jpy)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground tabular-nums">
-                  <span>
-                    待機 <span className="font-semibold text-foreground">{row.total_wait_minutes ?? 0}分</span>
-                    <span className="mx-1.5">・</span>
-                    訪問 <span className="font-semibold text-foreground">{row.total_visits ?? 0}</span>
-                  </span>
+                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <span className="min-w-0 truncate">{row.location_name}</span>
                   <RiskCell row={row} align="end" dot />
                 </div>
+                <p className="text-sm text-muted-foreground tabular-nums">
+                  <span>{row.total_visits ?? 0}回</span>
+                  <span className="mx-1.5">・</span>
+                  <span>{row.total_wait_minutes ?? 0}分</span>
+                  <span className="mx-1.5">・</span>
+                  <span>{averageMeasuredWait(row) === null ? "平均 —" : `平均 ${averageMeasuredWait(row)}分`}</span>
+                </p>
                 <VisitBreakdown row={row} />
               </li>
             ))}
