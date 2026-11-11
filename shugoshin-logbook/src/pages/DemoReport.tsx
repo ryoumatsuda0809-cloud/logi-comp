@@ -50,7 +50,7 @@ export default function DemoReport() {
 
   return (
     <div
-      className="demo-app min-h-screen bg-gray-100 pb-28 print:bg-white print:pb-0"
+      className="demo-app min-h-screen bg-background pb-28 print:bg-white print:pb-0"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
       {/* PC では左のサイドバーで移動できるので、上のヘッダーは出さない */}
@@ -64,7 +64,7 @@ export default function DemoReport() {
       <div className="lg:mx-auto lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 lg:px-6 print:block">
         <aside className="mx-auto flex max-w-4xl flex-col gap-3 px-4 pt-4 print:hidden lg:sticky lg:top-6 lg:order-2 lg:mx-0 lg:max-w-none lg:px-0 lg:pt-6">
           {/* PC だけ: 紙面を下まで読まなくても分かる要点 */}
-          <section className="hidden rounded-2xl border bg-card p-4 shadow-sm lg:block" aria-label="この報告書の要点">
+          <section className="demo-glass hidden p-5 lg:block" aria-label="この報告書の要点">
             <p className="text-sm text-muted-foreground">この日の待機料（目安）</p>
             <p className="text-4xl font-extrabold tracking-tight tabular-nums">
               ¥{report.estimated_wait_cost.toLocaleString()}

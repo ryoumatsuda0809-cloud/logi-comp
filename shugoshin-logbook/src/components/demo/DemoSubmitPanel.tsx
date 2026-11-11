@@ -83,15 +83,15 @@ export function DemoSubmitPanel() {
       </CardHeader>
       <CardContent className="space-y-3">
         <dl className="grid grid-cols-3 gap-2 text-center text-sm">
-          <div className="rounded-lg border p-2">
+          <div className="rounded-xl bg-foreground/[0.05] p-2">
             <dt className="text-xs text-muted-foreground">訪問</dt>
             <dd className="font-semibold tabular-nums">{summary.visits}件</dd>
           </div>
-          <div className="rounded-lg border p-2">
+          <div className="rounded-xl bg-foreground/[0.05] p-2">
             <dt className="text-xs text-muted-foreground">待機の合計</dt>
             <dd className="font-semibold tabular-nums">{summary.totalWaitMinutes}分</dd>
           </div>
-          <div className="rounded-lg border p-2">
+          <div className="rounded-xl bg-foreground/[0.05] p-2">
             <dt className="text-xs text-muted-foreground">待機料</dt>
             <dd className="whitespace-nowrap font-semibold tabular-nums">{summary.fee.toLocaleString()}円</dd>
           </div>
@@ -143,7 +143,7 @@ export function DemoSubmitPanel() {
               onPointerCancel={cancelHold}
               onPointerLeave={cancelHold}
               onContextMenu={(e) => e.preventDefault()}
-              className="relative h-14 w-full overflow-hidden rounded-xl border-2 border-primary bg-primary text-xl font-bold text-primary-foreground"
+              className="relative h-14 w-full overflow-hidden rounded-full border-2 border-primary bg-primary text-xl font-bold text-primary-foreground"
               style={
                 {
                   userSelect: "none",

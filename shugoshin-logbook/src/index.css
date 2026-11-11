@@ -179,33 +179,75 @@
       "Yu Gothic UI", "Meiryo UI", "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
   }
   .demo-app {
-    /* 白い地に、細い線だけで区切る（箱で囲まない）。Public や talabat のような、平らな画面 */
-    --background: 0 0% 100%;
+    /* 案A「明るいガラス」（docs/DESIGN_SCHEME.md）。淡い青の地に、白いガラスのカードを浮かせる。
+       色は紺・橙・緑のまま増やさない。本物の画面には当てない */
+    --background: 212 62% 96%; /* #eef4fb */
+    --muted-foreground: 215 19% 35%; /* #475569 */
+    --demo-glass: rgba(255, 255, 255, 0.62);
+    --demo-glass-line: rgba(255, 255, 255, 0.9);
+    --demo-hair: rgba(15, 23, 42, 0.08);
+    --demo-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 12px 32px -12px rgba(15, 23, 42, 0.18);
+    background-color: #eef4fb;
+    background-image: radial-gradient(900px 500px at 88% -5%, #fdf1e7, transparent 60%),
+      radial-gradient(700px 600px at 0% 100%, #d4e6f7, transparent 60%), linear-gradient(160deg, #eef4fb, #dfeaf6);
     -webkit-tap-highlight-color: transparent;
     /* 画面が切り替わったときに、ふっと出す。transform を使わないのは、
        動いている間に下の固定ナビの位置がずれないようにするため（opacity は位置に影響しない） */
     animation: demo-fade-in 180ms ease-out both;
   }
-  /* パネル（Card）は、箱をやめて、上に細い線を引くだけにする */
-  .demo-app .bg-card.rounded-lg.border {
-    background: transparent;
-    border-width: 1px 0 0 0;
-    border-color: hsl(var(--border));
-    border-radius: 0;
-    box-shadow: none;
+  /* 画面の端を引っぱったときに見える地も、同じ淡い青にする */
+  body:has(.demo-app) {
+    background-color: #eef4fb;
   }
-  /* タブの線のすぐ下では、二重にならないよう、最初のパネルの上の線は引かない（PC は横並びなので両方） */
-  .demo-app [role="tabpanel"] > .bg-card.rounded-lg.border:first-child {
-    border-top-width: 0;
+  /* ガラスの面。パネル（Card）はすべてこれになる。影は1つだけ */
+  .demo-glass,
+  .demo-app .bg-card.rounded-lg.border {
+    background: var(--demo-glass);
+    border: 1px solid var(--demo-glass-line);
+    border-radius: 24px;
+    box-shadow: var(--demo-shadow);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+  /* 画面で一番大事な数字1つだけを載せる、橙のカード（1画面に1つ） */
+  .demo-key {
+    background: linear-gradient(150deg, #fb923c, #f97316 55%, #ea580c);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 24px;
+    box-shadow: 0 18px 36px -14px rgba(249, 115, 22, 0.6);
+    color: #fff;
+  }
+  /* ボタンは丸い錠剤（選択欄は除く） */
+  .demo-app button.rounded-md:not([role="combobox"]),
+  .demo-app a.rounded-md {
+    border-radius: 999px;
+  }
+  /* ナビ。スマホ: 下に浮いた丸いガラスのバー。PC: 左に浮いたガラスのメニュー */
+  .demo-nav-bar {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--demo-glass-line);
+    border-radius: 999px;
+    box-shadow: var(--demo-shadow);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
   }
   @media (min-width: 1024px) {
-    .demo-app [role="tabpanel"] > .bg-card.rounded-lg.border {
-      border-top-width: 0;
+    .demo-nav {
+      background: var(--demo-glass);
+      border: 1px solid var(--demo-glass-line);
+      border-radius: 24px;
+      box-shadow: var(--demo-shadow);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
     }
-  }
-  .demo-app .bg-card.rounded-lg.border > .p-6 {
-    padding-left: 0;
-    padding-right: 0;
+    .demo-nav-bar {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
   /* 下から出るシートの中の絵が、ぽんっと弾んで出る */
   .demo-pop {
@@ -216,15 +258,26 @@
   .demo-app a:active {
     transform: scale(0.97);
   }
-  /* PC（lg 以上）では左に固定のサイドバー（DemoBottomNav）が出るので、その幅だけ中身を右に寄せる */
+  /* PC（lg 以上）では左に浮いたメニュー（DemoBottomNav）が出るので、その幅だけ中身を右に寄せる */
   @media (min-width: 1024px) {
     .demo-app {
-      padding-left: 15rem;
+      padding-left: 17rem;
     }
   }
+  /* 印刷（報告書・警告レポートの紙面）は白黒のまま。地もガラスも出さない */
   @media print {
     .demo-app {
       padding-left: 0;
+      background: #fff;
+    }
+    .demo-glass,
+    .demo-app .bg-card.rounded-lg.border {
+      background: #fff;
+      border-color: hsl(var(--border));
+      border-radius: 0.5rem;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
     }
   }
   @media (prefers-reduced-motion: reduce) {

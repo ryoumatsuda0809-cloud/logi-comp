@@ -1,0 +1,92 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --navy:#0f172a; --navy-2:#1e293b; --ink:#0f172a; --ink-2:#475569; --ink-3:#94a3b8;
+  --orange:#f97316; --orange-soft:#ffedd5; --teal:#10b981;
+  --bg-a:#eef4fb; --bg-b:#dfeaf6; --bg-c:#fdf1e7;
+  --glass:rgba(255,255,255,.62); --glass-line:rgba(255,255,255,.9); --hair:rgba(15,23,42,.08);
+  --r-lg:24px; --r-md:16px; --r-pill:999px;
+  --shadow:0 1px 0 rgba(255,255,255,.8) inset, 0 12px 32px -12px rgba(15,23,42,.18);
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI","Noto Sans CJK JP",sans-serif;color:var(--ink);
+  background:radial-gradient(900px 500px at 88% -5%,var(--bg-c),transparent 60%),radial-gradient(700px 600px at 0% 100%,#d4e6f7,transparent 60%),linear-gradient(160deg,var(--bg-a),var(--bg-b));min-height:100vh}
+.dark{--ink:#f1f5f9;--ink-2:#cbd5e1;--ink-3:#64748b;--glass:rgba(255,255,255,.07);--glass-line:rgba(255,255,255,.14);--hair:rgba(255,255,255,.1);
+  --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 16px 40px -16px rgba(0,0,0,.6);
+  background:radial-gradient(900px 500px at 90% -10%,rgba(249,115,22,.28),transparent 60%),radial-gradient(800px 600px at 0% 110%,#1d3a66,transparent 60%),linear-gradient(160deg,#0b1220,#0f172a);color:var(--ink)}
+.wrap{display:grid;grid-template-columns:232px 1fr;gap:20px;padding:20px;max-width:1366px}
+.glass{background:var(--glass);border:1px solid var(--glass-line);border-radius:var(--r-lg);box-shadow:var(--shadow);backdrop-filter:blur(18px)}
+.side{padding:16px;display:flex;flex-direction:column;gap:6px;height:calc(100vh - 40px);position:sticky;top:20px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 6px 14px}
+.logo{width:36px;height:36px;border-radius:12px;background:var(--orange);display:grid;place-items:center;color:#fff;font-weight:800}
+.brand b{font-size:17px}.brand small{display:block;color:var(--ink-2);font-size:11px}
+.nav{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;color:var(--ink-2);font-size:14px;font-weight:600}
+.nav i{width:18px;height:18px;border-radius:5px;border:2px solid currentColor;opacity:.7}
+.nav.on{background:var(--navy);color:#fff;box-shadow:0 8px 20px -8px rgba(15,23,42,.5)} .dark .nav.on{background:#fff;color:#0f172a}
+.cap{font-size:11px;color:var(--ink-3);padding:12px 12px 4px;letter-spacing:.04em}
+h1{font-size:26px;font-weight:800;letter-spacing:-.01em} .sub{color:var(--ink-2);font-size:13px;margin-top:4px}
+.row{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:16px;margin-top:18px}
+.stat{padding:18px 20px;min-height:132px;display:flex;flex-direction:column;justify-content:space-between}
+.stat .l{font-size:13px;color:var(--ink-2);font-weight:600}.stat .v{font-size:34px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:15px;font-weight:700;margin-left:2px}.stat .n{font-size:12px;color:var(--ink-2)}
+.stat.key{background:linear-gradient(150deg,#fb923c,#f97316 55%,#ea580c);border-color:rgba(255,255,255,.35);color:#fff;box-shadow:0 18px 36px -14px rgba(249,115,22,.6)}
+.stat.key .l,.stat.key .n{color:rgba(255,255,255,.85)}
+.two{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px}
+.panel{padding:20px}.panel h2{font-size:15px;font-weight:700}.panel .h{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:rgba(15,23,42,.06);border-radius:var(--r-pill);padding:4px;font-size:13px;font-weight:600;color:var(--ink-2)} .dark .seg{background:rgba(255,255,255,.08)}
+.seg span{padding:7px 14px;border-radius:var(--r-pill)}.seg .on{background:var(--navy);color:#fff}.dark .seg .on{background:#fff;color:#0f172a}
+.visit{padding:14px 0;border-top:1px solid var(--hair)}.visit:first-of-type{border-top:0;padding-top:0}
+.vh{display:flex;justify-content:space-between;font-weight:700;font-size:15px}.vh span:last-child{font-variant-numeric:tabular-nums}
+.bar{display:flex;gap:3px;height:36px;margin-top:10px;font-size:13px;font-weight:600}
+.bar div{display:grid;place-items:center;border-radius:12px}
+.w{background:var(--orange-soft);color:#9a3412}.w.ok{background:rgba(15,23,42,.06);color:var(--ink-2)}.k{background:rgba(15,23,42,.06);color:var(--ink-2)}
+.dark .w{background:rgba(249,115,22,.28);color:#fed7aa}.dark .w.ok,.dark .k{background:rgba(255,255,255,.08);color:var(--ink-2)}
+.t{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2);margin-top:6px;font-variant-numeric:tabular-nums}
+.li{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid var(--hair);font-size:15px}.li:first-of-type{border-top:0}
+.li em{font-style:normal;color:var(--ink-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 22px;border-radius:var(--r-pill);font-weight:700;font-size:15px}
+.btn.p{background:var(--orange);color:#fff}.btn.s{background:var(--navy);color:#fff}.btn.g{border:1.5px solid var(--hair);color:var(--ink)} .dark .btn.s{background:#fff;color:#0f172a}
+.sw{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}.sw div{width:92px;font-size:11px;color:var(--ink-2)}.sw i{display:block;height:44px;border-radius:12px;margin-bottom:6px;border:1px solid var(--hair)}
+.tag{position:fixed;right:16px;top:12px;font-size:12px;font-weight:700;background:var(--navy);color:#fff;padding:6px 12px;border-radius:999px;z-index:5}
+@media(max-width:700px){.wrap{grid-template-columns:1fr;padding:14px;gap:14px}.side{display:none}.row{grid-template-columns:1fr 1fr;gap:12px}.stat.key{grid-column:span 2}.two{grid-template-columns:1fr}h1{font-size:22px}.sw div{width:72px}
+ .tab{position:fixed;left:14px;right:14px;bottom:14px;display:flex;padding:6px;border-radius:999px;z-index:4}.tab span{flex:1;text-align:center;font-size:12px;font-weight:700;padding:12px 0;border-radius:999px;color:var(--ink-2)}.tab .on{background:var(--navy);color:#fff}.pad{height:90px}}
+@media(min-width:701px){.tab,.pad{display:none}}
+</style></head><body class="">
+<div class="tag">案A：明るいガラス</div>
+<div class="wrap">
+ <aside class="side glass">
+  <div class="brand"><div class="logo">守</div><div><b>守護神</b><small>デモ（架空のデータ）</small></div></div>
+  <div class="cap">記録</div>
+  <div class="nav on"><i></i>打刻</div><div class="nav"><i></i>発注</div>
+  <div class="cap">書類</div>
+  <div class="nav"><i></i>報告書</div><div class="nav"><i></i>警告</div>
+ </aside>
+ <main>
+  <h1>荷待ち時間の記録</h1><p class="sub">2026年10月3日・架空運送・3施設</p>
+  <div class="row">
+   <div class="stat glass key"><div class="l">待機料（目安）</div><div class="v">¥3,350</div><div class="n">30分を超えた待機 × 50円/分</div></div>
+   <div class="stat glass"><div class="l">待たされた時間</div><div class="v">152<small>分</small></div><div class="n">3施設の合計</div></div>
+   <div class="stat glass"><div class="l">訪問した施設</div><div class="v">3<small>件</small></div><div class="n">うち30分超 2件</div></div>
+   <div class="stat glass"><div class="l">圏外の申告</div><div class="v">1<small>件</small></div><div class="n">等級C・管理者が承認</div></div>
+  </div>
+  <div class="two">
+   <section class="panel glass">
+    <div class="h"><h2>打刻タイムライン</h2><div class="seg"><span class="on">ドライバー</span><span>荷主</span><span>待機料</span></div></div>
+    <div class="visit"><div class="vh"><span>架空水産 第2荷捌き場</span><span>2,100円</span></div><div class="bar"><div class="w" style="width:67%">待機 72分</div><div class="k" style="width:33%">作業 35分</div></div><div class="t"><span>08:05</span><span>09:17</span><span>09:52</span></div></div>
+    <div class="visit"><div class="vh"><span>架空冷蔵 本社倉庫</span><span style="color:var(--ink-3)">対象外</span></div><div class="bar"><div class="w ok" style="width:54%">待機 25分</div><div class="k" style="width:46%">作業 21分</div></div><div class="t"><span>11:02</span><span>11:27</span><span>11:48</span></div></div>
+    <div class="visit"><div class="vh"><span>架空物産 配送センター</span><span>1,250円</span></div><div class="bar"><div class="w" style="width:69%">待機 55分</div><div class="k" style="width:31%">作業 25分</div></div><div class="t"><span>14:20</span><span>15:15</span><span>15:40</span></div></div>
+   </section>
+   <section class="panel glass">
+    <div class="h"><h2>記録が書き換えにくい理由</h2></div>
+    <div class="li">時刻はサーバーが決める<em>›</em></div><div class="li">500m超では打刻できない<em>›</em></div><div class="li">確定した証拠は書き換え不可<em>›</em></div><div class="li">例外は等級で区別<em>›</em></div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><span class="btn p">到着打刻</span><span class="btn s">報告書を見る</span><span class="btn g">閉じる</span></div>
+   </section>
+  </div>
+  <section class="panel glass" style="margin-top:16px"><h2>色</h2>
+   <div class="sw"><div><i style="background:#0f172a"></i>紺 #0f172a<br>文字・選択中</div><div><i style="background:#f97316"></i>橙 #f97316<br>押す・一番の数字</div><div><i style="background:#ffedd5"></i>うすい橙<br>30分超の待機</div><div><i style="background:#10b981"></i>緑 #10b981<br>記録できた</div><div><i style="background:#eef4fb"></i>地 #eef4fb<br>海の淡い青</div><div><i style="background:rgba(255,255,255,.62)"></i>ガラス<br>白62%＋ぼかし</div><div><i style="background:#475569"></i>#475569<br>補助の文字</div></div>
+  </section>
+  <div class="pad"></div>
+ </main>
+</div>
+<nav class="tab glass"><span class="on">打刻</span><span>発注</span><span>報告書</span><span>警告</span></nav>
+</body></html>
