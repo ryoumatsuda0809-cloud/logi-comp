@@ -15,12 +15,14 @@ const renderAt = (path: string) =>
   );
 
 describe.each([
-  ["/demo/report", "報告書"],
-  ["/demo/warning", "警告"],
-])("%s", (path, currentLabel) => {
-  it("共通ヘッダーの戻るボタンと、現在地を示す下ナビ（他のデモ画面へ行ける）がある", () => {
+  ["/demo/report", "報告書", "報告書"],
+  ["/demo/warning", "警告", "警告レポート"],
+])("%s", (path, currentLabel, title) => {
+  it("いちばん上に画面の名前があり、現在地を示す下ナビ（他のデモ画面へ行ける）がある", () => {
     renderAt(path);
-    expect(screen.getByRole("button", { name: "戻る" })).toBeInTheDocument();
+    expect(within(screen.getAllByRole("banner")[0]).getByRole("heading", { name: title })).toBeInTheDocument();
+    // 紺の帯の戻るボタンはやめた（移動は下のナビ）
+    expect(screen.queryByRole("button", { name: "戻る" })).not.toBeInTheDocument();
     expect(screen.queryByText("デモに戻る")).not.toBeInTheDocument();
 
     const nav = screen.getByRole("navigation");
@@ -39,7 +41,7 @@ describe.each([
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
 
-  it("ヘッダーと下ナビは印刷しない（print:hidden）", () => {
+  it("上の行と下ナビは印刷しない（print:hidden）", () => {
     renderAt(path);
     expect(screen.getAllByRole("banner")[0].className).toContain("print:hidden");
     expect(screen.getByRole("navigation").parentElement?.className).toContain("print:hidden");

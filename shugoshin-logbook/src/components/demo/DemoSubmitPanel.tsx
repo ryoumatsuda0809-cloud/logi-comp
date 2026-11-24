@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { convertWaitLogsToTimeline } from "@/lib/waitLogToTimeline";
-import { sumWaitCost } from "@/lib/waitCostCalc";
-import { DEMO_FACILITY_NAMES, DEMO_VEHICLE_CLASS, DEMO_WAIT_LOGS } from "@/demo/demoData";
 
 /** 実際の日報（DailyReportConfirm）と同じ長押しの長さ */
 export const HOLD_DURATION_MS = 1000;
@@ -17,6 +14,7 @@ const SUBMITTED_AT_LABEL = "2026年10月3日 18:30";
  * /demo の「日報の提出」。
  * 長押しで提出すると「提出済み・変更不可」になり、修正を試しても拒否される様子を見せる。
  * 状態はこの画面の中だけ。Supabase にも AI にもアクセスしない。
+ * 訪問・待機・待機料の数字は、すぐ上の「1日の待機料」と重なるので出さない（長押しのボタンだけ）。
  */
 export function DemoSubmitPanel() {
   const [submitted, setSubmitted] = useState(false);
@@ -25,18 +23,6 @@ export function DemoSubmitPanel() {
   const holdStartRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
-
-  const summary = useMemo(() => {
-    const { totalWaitMinutes, waitMinutesPerEvent } = convertWaitLogsToTimeline(
-      DEMO_WAIT_LOGS,
-      DEMO_FACILITY_NAMES,
-    );
-    return {
-      visits: DEMO_WAIT_LOGS.length,
-      totalWaitMinutes,
-      fee: sumWaitCost(waitMinutesPerEvent, DEMO_VEHICLE_CLASS),
-    };
-  }, []);
 
   const cancelHold = useCallback(() => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
@@ -77,37 +63,15 @@ export function DemoSubmitPanel() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">日報の提出</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          1日の記録をまとめて提出します。提出すると、あとから書き換えられません。
-        </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <dl className="grid grid-cols-3 gap-2 text-center text-sm">
-          <div className="rounded-xl bg-foreground/[0.05] p-2">
-            <dt className="text-xs text-muted-foreground">訪問</dt>
-            <dd className="font-semibold tabular-nums">{summary.visits}件</dd>
-          </div>
-          <div className="rounded-xl bg-foreground/[0.05] p-2">
-            <dt className="text-xs text-muted-foreground">待機の合計</dt>
-            <dd className="font-semibold tabular-nums">{summary.totalWaitMinutes}分</dd>
-          </div>
-          <div className="rounded-xl bg-foreground/[0.05] p-2">
-            <dt className="text-xs text-muted-foreground">待機料</dt>
-            <dd className="whitespace-nowrap font-semibold tabular-nums">{summary.fee.toLocaleString()}円</dd>
-          </div>
-        </dl>
-        <p className="text-xs text-muted-foreground">
-          待機時間はGPSの記録です（変更不可）。
-        </p>
-
         {submitted ? (
           <div className="space-y-3">
             <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border bg-muted/40 py-3">
               <div className="flex items-center gap-2 text-lg font-bold text-muted-foreground">
                 <CheckCircle2 className="h-5 w-5" />
-                本日は提出済みです
+                提出済み・変更できません
               </div>
-              <p className="text-xs text-muted-foreground">送信済みの記録のため変更できません</p>
               <p className="text-xs tabular-nums text-muted-foreground">提出 {SUBMITTED_AT_LABEL}</p>
             </div>
 
@@ -121,7 +85,7 @@ export function DemoSubmitPanel() {
             </Button>
             {editAttempted && (
               <p role="alert" className="rounded-lg border p-3 text-sm">
-                提出済みのため変更できません。管理者の権限でも、変更・削除はできません。
+                提出済みのため変更できません
               </p>
             )}
 
@@ -161,9 +125,6 @@ export function DemoSubmitPanel() {
               </span>
             </button>
             {holdProgress > 0 && <Progress value={holdProgress} className="mt-2 h-1.5" />}
-            <p className="mt-1 text-center text-xs text-muted-foreground">
-              ボタンを1秒間、押し続けてください。途中で離すと提出されません。
-            </p>
           </div>
         )}
       </CardContent>

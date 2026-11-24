@@ -5,7 +5,7 @@ import { FieldButton } from "@/components/ui/field-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { PageHeader } from "@/components/PageHeader";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,7 +77,7 @@ export default function DemoOrders() {
   const [approved, setApproved] = useState<DemoOrderDocumentData | null>(null);
   const [editAttempted, setEditAttempted] = useState(false);
   const [tab, setTab] = useState("new");
-  const [showDocument, setShowDocument] = useState(true);
+  const [showDocument, setShowDocument] = useState(false);
   const { toast } = useToast();
   const abortRef = useRef<AbortController | null>(null);
 
@@ -194,9 +194,8 @@ export default function DemoOrders() {
     // 承認した内容をその場で固定する。以後は form を書き換えても書面は変わらない。
     setApproved({ ...form, temperatureZone, deliveryDate });
     setEditAttempted(false);
-    // 実際の画面と同じく、承認・保存すると一覧に移る
+    // 実際の画面と同じく、承認・保存すると一覧に移る。発注書は押すまで閉じておく
     toast({ title: "承認・保存しました" });
-    setShowDocument(true);
     setTab("list");
   };
 
@@ -226,28 +225,23 @@ export default function DemoOrders() {
 
   return (
     <div className="demo-app min-h-screen bg-background">
-      <PageHeader
+      <DemoTopBar
         title="発注管理"
-        subtitle="デモ"
-        backTo="/demo"
         right={
           <button
             type="button"
             aria-label="最初の状態に戻す"
             onClick={reset}
-            className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-primary-foreground/80 hover:bg-primary-foreground/10"
+            className="flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground hover:bg-foreground/[0.06]"
           >
             <RotateCcw className="h-4 w-4" aria-hidden />
             <span>やり直す</span>
           </button>
         }
       />
+      <DemoNotice />
 
-      <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </div>
-
-      <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-3xl lg:pb-12 lg:pt-8">
+      <main className="mx-auto max-w-4xl p-4 pb-28 lg:mx-0 lg:max-w-3xl lg:px-8 lg:pb-12 lg:pt-4">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4 h-auto w-full">
             <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>
@@ -266,7 +260,7 @@ export default function DemoOrders() {
                     aria-label="発注内容（自由入力）"
                     value={freeText}
                     maxLength={DEMO_FREE_TEXT_MAX}
-                    placeholder="例：架空水産の第2荷捌き場から架空冷蔵の本社倉庫まで、冷凍のブリ20箱、運賃6万円、明日納品"
+                    placeholder="例：冷凍ブリ20箱、運賃6万円、明日納品"
                     disabled={locked || isParsing}
                     onChange={(e) => changeFreeText(e.target.value)}
                     className="min-h-[120px] text-base"
@@ -315,18 +309,14 @@ export default function DemoOrders() {
                     {fallbackExample ? `（${fallbackExample.label.split("：")[0]}の結果）` : ""}
                   </p>
                 )}
-                {locked && (
-                  <p className="text-sm text-muted-foreground">
-                    承認済みの発注があります。右上の「やり直す」で最初の状態に戻せます。
-                  </p>
-                )}
+                {/* 「やり直す」ボタンは上の行に見えているので、ここでは案内しない */}
               </CardContent>
             </Card>
 
             {form && !locked && (
               <Card className="border-accent">
                 <CardHeader>
-                  <CardTitle className="text-base">解析結果（編集可能）</CardTitle>
+                  <CardTitle className="text-base">解析結果（確認・編集できます）</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -385,7 +375,7 @@ export default function DemoOrders() {
 
                   {paymentDeadline && (
                     <div className="rounded-lg bg-accent/10 p-3 text-sm">
-                      <span className="font-bold text-foreground">支払期限（納品日を含めて60日以内）: {paymentDeadline}</span>
+                      <span className="font-bold text-foreground">支払期限 {paymentDeadline}（60日以内）</span>
                     </div>
                   )}
 
@@ -400,9 +390,6 @@ export default function DemoOrders() {
                           <li key={notice}>{notice}</li>
                         ))}
                       </ul>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        デモ用の事前表示です。承認できるかどうかは、承認ボタンを押したときの確認で決まります。
-                      </p>
                     </div>
                   )}
 
@@ -434,12 +421,8 @@ export default function DemoOrders() {
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-card-foreground">{displayText(approved.item_name)}</span>
-                      <Badge className="border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">承認済</Badge>
+                      <Badge className="border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">承認済・編集不可</Badge>
                       <Badge variant="outline">{approved.temperatureZone}</Badge>
-                      <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                        <Lock className="h-3 w-3" />
-                        承認済み（編集不可）
-                      </span>
                     </div>
                     <p className="break-words text-sm text-muted-foreground">
                       {displayRoute(approved.origin, approved.destination)}
@@ -475,8 +458,7 @@ export default function DemoOrders() {
                     </button>
                     {editAttempted && (
                       <div role="alert" className="rounded-lg border p-3 text-sm">
-                        <p className="font-bold">承認済みの発注です</p>
-                        <p className="mt-0.5">承認済みのデータは改ざん防止のため編集できません。</p>
+                        <p className="font-bold">承認済みのため編集できません</p>
                       </div>
                     )}
                   </div>
@@ -484,7 +466,6 @@ export default function DemoOrders() {
                   {showDocument && (
                     <div className="space-y-2 border-t border-border pt-3">
                       <DemoOrderDocument data={approved} />
-                      <p className="text-xs text-muted-foreground">実際の画面では、この書面をPDFでダウンロードします。</p>
                       <DemoPdfLink href={DEMO_SAMPLE_PDF.order}>PDFの見本を開く（例1の内容）</DemoPdfLink>
                     </div>
                   )}

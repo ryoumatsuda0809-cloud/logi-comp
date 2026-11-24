@@ -84,11 +84,11 @@ export const DEMO_ORDER_EXAMPLES: DemoOrderExample[] = [
 
 /** 自由入力欄の下に、常に出す注記 */
 export const DEMO_FREE_TEXT_DISCLOSURE =
-  "自由入力の文は、解析のため外部のAI（Google Gemini）に送信されます。個人情報や実在の取引は入力しないでください。回数に上限があります。";
+  "入力は外部AI（Gemini）に送信されます。個人情報は入れないでください。";
 
 /** 自由入力をAIが解析できたときの注記 */
-export const DEMO_AI_NOTE = "入力した文を外部のAIで解析した結果です。内容は必ず確認してください";
+export const DEMO_AI_NOTE = "AIの解析結果です。内容を確認してください";
 
 /** AIが失敗したときの注記。どの例の結果かは画面側で付ける */
 export const DEMO_AI_FALLBACK_NOTE =
-  "AIに接続できなかったため、例の結果を表示します。入力した文を解析した結果ではありません";
+  "AIに接続できないため、例の結果を表示しています";

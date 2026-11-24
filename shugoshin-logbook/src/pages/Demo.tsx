@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/drawer";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
 import { Check, ChevronRight, Lock, MapPin, Pause, Play } from "lucide-react";
@@ -122,9 +123,6 @@ function GpsPanel() {
         <CardTitle className="flex items-center gap-2 text-base">
           <MapPin className="h-4 w-4" /> 到着の判定
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          GPSで、施設から{DEMO_GEOFENCE_RADIUS_M}m以内にいるかを確かめます。再生すると1日の動きを追えます。
-        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <svg
@@ -178,7 +176,7 @@ function GpsPanel() {
           <div className="rounded-2xl bg-muted/60 p-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <MapPin className="h-4 w-4 shrink-0 text-accent" aria-hidden />
-              施設の{DEMO_GEOFENCE_RADIUS_M}m以内に入りました
+              {DEMO_GEOFENCE_RADIUS_M}m以内に入りました
             </p>
             <Button
               className="mt-2 min-h-14 w-full bg-accent text-lg font-bold text-accent-foreground hover:bg-accent/90"
@@ -209,14 +207,14 @@ function GpsPanel() {
           </div>
         ) : (
           <Button className="min-h-12 w-full bg-muted text-muted-foreground hover:bg-muted disabled:opacity-100" disabled>
-            <Lock className="mr-2 h-4 w-4" />
-            500m超のため打刻できません
+            <Lock className="mr-2 h-4 w-4" aria-hidden />
+            到着打刻
           </Button>
         )}
         {!inFence && !stamped && (
-          <p className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0 text-warning" aria-hidden />
-            施設から{DEMO_GEOFENCE_RADIUS_M}m以内に入ると押せます（あと {(distance - DEMO_GEOFENCE_RADIUS_M).toLocaleString()} m）
+          // 500m の線は地図の円で見えるので、ここは「あと何m」だけ
+          <p className="px-1 text-center text-sm text-muted-foreground tabular-nums">
+            あと {(distance - DEMO_GEOFENCE_RADIUS_M).toLocaleString()} m
           </p>
         )}
 
@@ -378,7 +376,7 @@ function KanbanPanel() {
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          荷主が押せるのは「呼出」と「荷役開始」まで。完了はドライバーの打刻だけが確定します。
+          荷主が押せるのは呼出と荷役開始まで
         </p>
         <Button variant="outline" size="sm" className="min-h-11" onClick={() => setTickets(KANBAN_INITIAL)}>
           最初の状態に戻す
@@ -415,7 +413,7 @@ function FeePanel() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">1日の待機料</CardTitle>
         <p className="text-xs text-muted-foreground">
-          {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{rate}円/分・30分を超えた分だけ
+          {vehicleClassLabel(DEMO_VEHICLE_CLASS)}・{rate}円/分・30分超のみ
         </p>
       </CardHeader>
       <CardContent>
@@ -613,7 +611,8 @@ function Stat({
   label: string;
   value: string;
   unit?: string;
-  note: string;
+  /** 数字の下の短い補足。隣のカードと同じことになるなら付けない */
+  note?: string;
   onClick: () => void;
   ariaLabel: string;
   primary?: boolean;
@@ -633,7 +632,7 @@ function Stat({
         {value}
         {unit && <small className="ml-0.5 text-[15px] font-bold">{unit}</small>}
       </span>
-      <span className={`text-xs ${sub}`}>{note}</span>
+      {note ? <span className={`text-xs ${sub}`}>{note}</span> : <span aria-hidden />}
     </button>
   );
 }
@@ -664,16 +663,15 @@ function DemoHero() {
       <h2 id="demo-hero-title" className="text-[22px] font-extrabold leading-tight tracking-tight lg:text-[26px]">
         荷待ち時間の記録
       </h2>
-      <p className="mt-1 text-[13px] text-muted-foreground">
-        架空のドライバーの1日（2026年10月3日・{feeRows.length}施設）。位置とサーバー時刻で記録し、待機料の根拠にします。
-      </p>
+      {/* 説明文は置かない。記録のしくみは下の「書き換えにくい理由」に任せる */}
+      <p className="mt-1 text-[13px] text-muted-foreground">架空のドライバーの1日・10月3日</p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-[1.25fr_1fr_1fr_1fr] lg:gap-4">
         <Stat
           primary
           label="待機料（目安）"
           value={`¥${fee.toLocaleString()}`}
-          note={`30分超の待機 × ${getRate(DEMO_VEHICLE_CLASS)}円/分`}
+          note={`30分超 × ${getRate(DEMO_VEHICLE_CLASS)}円/分`}
           onClick={() => setFeeOpen(true)}
           ariaLabel={`この1日の待機料の目安 ${fee}円。内訳を見る`}
         />
@@ -681,7 +679,6 @@ function DemoHero() {
           label="待たされた時間"
           value={minutes.toLocaleString()}
           unit="分"
-          note={`${feeRows.length}施設の合計`}
           onClick={() => setFeeOpen(true)}
           ariaLabel={`この1日の待機 ${minutes}分。内訳を見る`}
         />
@@ -697,7 +694,7 @@ function DemoHero() {
           label="圏外の申告"
           value={String(gradeC)}
           unit="件"
-          note="等級C・管理者が承認"
+          note="管理者が承認"
           onClick={() => setOpenPoint(GRADE_POINT_INDEX)}
           ariaLabel={`圏外の申告 ${gradeC}件。等級の説明を見る`}
         />
@@ -790,21 +787,8 @@ export default function Demo() {
   return (
     <div className="demo-app min-h-screen bg-background">
       {/* スマホだけ: いちばん上に名前（PC は左のメニューに出ている） */}
-      <header className="px-4 pb-1 pt-3 lg:hidden" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
-        <div className="mx-auto flex max-w-4xl items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent">
-            <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-[17px] font-bold leading-tight">守護神</h1>
-            <p className="truncate text-xs text-muted-foreground">デモ</p>
-          </div>
-        </div>
-      </header>
-
-      <p className="px-4 pt-2 text-xs text-muted-foreground lg:px-8 lg:pt-5">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </p>
+      <DemoTopBar title="守護神" hideOnDesktop />
+      <DemoNotice className="lg:pt-5" />
 
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:mx-0 lg:max-w-[1100px] lg:px-8 lg:pb-12 lg:pt-3">
         <DemoHero />

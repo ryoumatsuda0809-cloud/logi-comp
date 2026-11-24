@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Printer } from "lucide-react";
 import { FieldButton } from "@/components/ui/field-button";
-import { PageHeader } from "@/components/PageHeader";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
 import { RiskReportDocument } from "@/components/report/RiskReportDocument";
@@ -25,12 +25,9 @@ export default function DemoWarningReport() {
       className="demo-app min-h-screen bg-background print:bg-white print:text-black"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
-      {/* PC では左のサイドバーで移動できるので、上のヘッダーは出さない（その分、表まで1画面に収める） */}
-      <PageHeader title="警告レポート" subtitle="デモ" backTo="/demo" className="print:hidden lg:hidden" />
-
-      <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground print:hidden">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </div>
+      {/* PC では左のメニューに名前が出ているので、上の行は出さない（その分、表まで1画面に収める） */}
+      <DemoTopBar title="警告レポート" hideOnDesktop />
+      <DemoNotice className="lg:pt-5" />
 
       <RiskReportDocument
         rows={rows}
