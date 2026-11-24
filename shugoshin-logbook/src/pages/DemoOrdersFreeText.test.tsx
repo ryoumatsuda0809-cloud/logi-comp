@@ -36,7 +36,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
   it("外部のAIに送信されることを、入力欄の下に常に示す", () => {
     renderPage();
     expect(screen.getByText(DEMO_FREE_TEXT_DISCLOSURE)).toBeTruthy();
-    expect(DEMO_FREE_TEXT_DISCLOSURE).toMatch(/外部のAI/);
+    expect(DEMO_FREE_TEXT_DISCLOSURE).toMatch(/外部AI/);
   });
 
   it("AI が解析できたら、その結果を確認用のフォームに入れる。注記は固定結果からAIの結果に変わる", async () => {
@@ -54,7 +54,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
 
     expect(parseMock).toHaveBeenCalledTimes(1);
     expect(parseMock.mock.calls[0][0]).toBe("唐戸から架空冷蔵の本社倉庫まで、冷蔵のアジ8箱、運賃4万2千円、明日納品");
-    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（確認・編集できます）")).toBeTruthy();
     expect(field("品名").value).toBe("アジ");
     expect(field("運賃（円）").value).toBe("42000");
     // 温度帯と納品日は、入力した文から読み取る（固定の例の文ではない）
@@ -70,7 +70,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
 
     await parseFree("何かの発注の文");
 
-    expect(screen.getByText("解析結果（編集可能）")).toBeTruthy();
+    expect(screen.getByText("解析結果（確認・編集できます）")).toBeTruthy();
     // 例1の固定結果
     expect(field("品名").value).toBe("ブリ");
     expect(field("運賃（円）").value).toBe("60000");
@@ -154,7 +154,7 @@ describe("DemoOrders: 自由入力のAI解析", () => {
     resolve({ item_name: "ブリ", quantity: "1箱", price: "1000", origin: "A", destination: "B", payment_date: null });
     await act(async () => {});
 
-    expect(screen.queryByText("解析結果（編集可能）")).toBeNull();
+    expect(screen.queryByText("解析結果（確認・編集できます）")).toBeNull();
     expect((screen.getByRole("button", { name: "AI解析" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
