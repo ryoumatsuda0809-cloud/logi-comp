@@ -41,7 +41,7 @@ export function DemoTopBar({ title, subtitle = "デモ", right, hideOnDesktop = 
 export function DemoNotice({ className }: { className?: string }) {
   return (
     <p className={cn("px-4 pt-2 text-xs text-muted-foreground print:hidden lg:px-8", className)}>
-      架空のデータです。実在の施設・人物・取引とは無関係です。
+      架空のデータです（実在とは無関係）
     </p>
   );
 }
