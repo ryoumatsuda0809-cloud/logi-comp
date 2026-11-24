@@ -230,11 +230,19 @@ export function RiskReportDocument({
 
       {!loading && rows.length > 0 && (
         <>
-          {/* 画面: 判定の基準だけを1行で。紙: 判定のしかたの説明も付ける */}
-          <p className="mb-3 px-1 text-xs text-muted-foreground print:hidden">
-            判定（訪問1回の平均待機）：
-            <strong className="font-semibold text-foreground">60分以上＝高、30分以上＝中、30分未満＝低</strong>
-          </p>
+          {/* 画面: 凡例（バッジ＋しきい値）。文にしない。紙: 判定のしかたの説明も付ける */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground print:hidden">
+            {([
+              ["高", "60分以上"],
+              ["中", "30分以上"],
+              ["低", "30分未満"],
+            ] as const).map(([level, threshold]) => (
+              <span key={level} className="inline-flex items-center gap-1">
+                <RiskBadge level={level} />
+                {threshold}
+              </span>
+            ))}
+          </div>
           <p className="mb-3 hidden print:block print:p-0 print:text-[10.5pt] print:leading-relaxed print:text-black">
             リスク判定の見かた：荷主・拠点ごとに、訪問1回あたりの平均待機時間（待機時間を測れなかった訪問は除く）で判定します。
             <strong className="font-semibold print:text-black">60分以上＝高、30分以上＝中、30分未満＝低</strong>。
