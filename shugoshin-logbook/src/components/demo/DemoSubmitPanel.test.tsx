@@ -31,7 +31,7 @@ describe("DemoSubmitPanel", () => {
     act(() => {
       vi.advanceTimersByTime(HOLD_DURATION_MS);
     });
-    expect(screen.queryByText("本日は提出済みです")).toBeNull();
+    expect(screen.queryByText("提出済み・変更できません")).toBeNull();
     expect(holdButton()).toBeTruthy();
   });
 
@@ -41,8 +41,7 @@ describe("DemoSubmitPanel", () => {
     act(() => {
       vi.advanceTimersByTime(HOLD_DURATION_MS);
     });
-    expect(screen.getByText("本日は提出済みです")).toBeTruthy();
-    expect(screen.getByText("送信済みの記録のため変更できません")).toBeTruthy();
+    expect(screen.getByText("提出済み・変更できません")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /長押し/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /修正してみる/ }));
@@ -57,7 +56,7 @@ describe("DemoSubmitPanel", () => {
       vi.advanceTimersByTime(HOLD_DURATION_MS);
     });
     fireEvent.click(screen.getByRole("button", { name: "最初の状態に戻す" }));
-    expect(screen.queryByText("本日は提出済みです")).toBeNull();
+    expect(screen.queryByText("提出済み・変更できません")).toBeNull();
     expect(holdButton()).toBeTruthy();
   });
 });
