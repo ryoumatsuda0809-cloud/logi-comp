@@ -5,7 +5,7 @@ import { FieldButton } from "@/components/ui/field-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { PageHeader } from "@/components/PageHeader";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -226,28 +226,23 @@ export default function DemoOrders() {
 
   return (
     <div className="demo-app min-h-screen bg-background">
-      <PageHeader
+      <DemoTopBar
         title="発注管理"
-        subtitle="デモ"
-        backTo="/demo"
         right={
           <button
             type="button"
             aria-label="最初の状態に戻す"
             onClick={reset}
-            className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-primary-foreground/80 hover:bg-primary-foreground/10"
+            className="flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground hover:bg-foreground/[0.06]"
           >
             <RotateCcw className="h-4 w-4" aria-hidden />
             <span>やり直す</span>
           </button>
         }
       />
+      <DemoNotice />
 
-      <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </div>
-
-      <main className="mx-auto max-w-4xl p-4 pb-28 lg:max-w-3xl lg:pb-12 lg:pt-8">
+      <main className="mx-auto max-w-4xl p-4 pb-28 lg:mx-0 lg:max-w-3xl lg:px-8 lg:pb-12 lg:pt-4">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4 h-auto w-full">
             <TabsTrigger value="new" className="min-h-11 flex-1">新規発注</TabsTrigger>

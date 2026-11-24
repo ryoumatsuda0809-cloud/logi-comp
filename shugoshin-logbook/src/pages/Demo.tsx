@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/drawer";
 import { DemoSubmitPanel } from "@/components/demo/DemoSubmitPanel";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { NoticeMark } from "@/components/NoticeMark";
 import { groupTimelineByVisit } from "@/demo/groupTimelineByVisit";
 import { Check, ChevronRight, Lock, MapPin, Pause, Play } from "lucide-react";
@@ -790,21 +791,8 @@ export default function Demo() {
   return (
     <div className="demo-app min-h-screen bg-background">
       {/* スマホだけ: いちばん上に名前（PC は左のメニューに出ている） */}
-      <header className="px-4 pb-1 pt-3 lg:hidden" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
-        <div className="mx-auto flex max-w-4xl items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent">
-            <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-[17px] font-bold leading-tight">守護神</h1>
-            <p className="truncate text-xs text-muted-foreground">デモ</p>
-          </div>
-        </div>
-      </header>
-
-      <p className="px-4 pt-2 text-xs text-muted-foreground lg:px-8 lg:pt-5">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </p>
+      <DemoTopBar title="守護神" hideOnDesktop />
+      <DemoNotice className="lg:pt-5" />
 
       <main className="mx-auto max-w-4xl p-4 pb-28 lg:mx-0 lg:max-w-[1100px] lg:px-8 lg:pb-12 lg:pt-3">
         <DemoHero />

@@ -44,12 +44,13 @@ describe("DemoOrders", () => {
     parseMock.mockRejectedValue(new DemoAiError("AI解析に失敗しました（503）", false));
   });
 
-  it("架空データの帯がある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
+  it("架空データの注意書きがある。実際の画面と同じ見出し・タブ・下のナビを持つ", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /例1/ }));
     expect(screen.getByText(/架空のデータです/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "発注管理" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "戻る" })).toBeTruthy();
+    // 紺の帯の戻るボタンはやめた（移動は下のナビ）
+    expect(screen.queryByRole("button", { name: "戻る" })).toBeNull();
     expect(screen.getByRole("tab", { name: "新規発注" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "発注一覧" })).toBeTruthy();
     // 一覧は最初は空

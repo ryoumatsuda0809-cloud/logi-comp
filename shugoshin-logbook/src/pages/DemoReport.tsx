@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Printer } from "lucide-react";
 import { FieldButton } from "@/components/ui/field-button";
-import { PageHeader } from "@/components/PageHeader";
+import { DemoNotice, DemoTopBar } from "@/components/demo/DemoTopBar";
 import { DemoBottomNav } from "@/components/demo/DemoBottomNav";
 import { DEMO_SAMPLE_PDF, DemoPdfLink } from "@/components/demo/DemoPdfLink";
 import { ReportDocument, type ReportData, type ReportParties } from "@/components/report/ReportDocument";
@@ -53,12 +53,9 @@ export default function DemoReport() {
       className="demo-app min-h-screen bg-background pb-28 print:bg-white print:pb-0"
       style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}
     >
-      {/* PC では左のサイドバーで移動できるので、上のヘッダーは出さない */}
-      <PageHeader title="報告書" subtitle="荷主に届く報告書（デモ）" backTo="/demo" className="print:hidden lg:hidden" />
-
-      <div className="border-b bg-muted px-4 py-2 text-center text-xs text-muted-foreground print:hidden">
-        架空のデータです。実在の施設・人物・取引とは無関係です。
-      </div>
+      {/* PC では左のメニューに名前が出ているので、上の行は出さない */}
+      <DemoTopBar title="報告書" subtitle="荷主に届く報告書（デモ）" hideOnDesktop />
+      <DemoNotice className="lg:pt-5" />
 
       {/* スマホ: ボタン → 紙面の縦並び。PC: 左に紙面、右に要点とボタン（スクロールしても右は残る） */}
       <div className="lg:mx-auto lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 lg:px-6 print:block">
